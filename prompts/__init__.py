@@ -6,3 +6,5 @@
 from prompts.paper_prompts import *
 from prompts.agent_prompts import *
 from prompts.research_prompts import *
+from prompts.workflow_prompts import *
+from prompts.writing_prompts import *

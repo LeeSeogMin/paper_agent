@@ -21,9 +21,9 @@ from models.paper import Paper, PaperOutline
 from models.research import ResearchMaterial, ResearchSummary
 from models.state import PaperWorkflowState
 from agents.base import BaseAgent
-from agents.researcher import ResearchAgent
-from agents.writer import WriterAgent
-from agents.editor import EditorAgent, StyleGuide
+from agents.research_agent import ResearchAgent
+from agents.writing_agent import WriterAgent
+from agents.editing_agent import EditorAgent, StyleGuide
 from graphs.paper_writing import PaperWritingGraph
 
 
