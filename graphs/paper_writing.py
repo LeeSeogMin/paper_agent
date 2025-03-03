@@ -15,6 +15,7 @@ from agents.research_agent import ResearchAgent
 from agents.writing_agent import WriterAgent
 from agents.editing_agent import EditorAgent, StyleGuide
 from graphs.base import BaseGraph
+from agents.review_agent import ReviewAgent
 
 
 def research_node(state: PaperWorkflowState) -> PaperWorkflowState:

@@ -1,6 +1,6 @@
 """
-사용자 상호작용 에이전트 모듈
-사용자와의 상호작용을 관리하고 피드백을 수집하는 에이전트입니다.
+논문 리뷰 및 사용자 상호작용 에이전트 모듈
+논문을 검토하고 사용자와의 상호작용을 관리하는 통합 에이전트입니다.
 """
 
 import os
@@ -50,21 +50,42 @@ class ProgressUpdate(BaseModel):
     issues: List[str] = Field(description="현재 이슈", default_factory=list)
 
 
-class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
-    """사용자 상호작용 관리 에이전트"""
+class PaperReview(BaseModel):
+    """논문 리뷰 결과 형식"""
+    paper_title: str = Field(description="리뷰한 논문 제목")
+    overall_score: int = Field(description="전체 평가 점수 (1-10)")
+    strengths: List[str] = Field(description="장점")
+    weaknesses: List[str] = Field(description="약점")
+    improvement_suggestions: List[str] = Field(description="개선 제안")
+    section_feedback: Dict[str, str] = Field(description="섹션별 피드백")
+    structural_comments: str = Field(description="구조적 의견")
+    language_comments: str = Field(description="언어적 의견")
+
+
+class ReviewAction(BaseModel):
+    """리뷰 조치 사항 형식"""
+    action_type: str = Field(description="조치 유형 (수정, 추가, 삭제, 재구성 등)")
+    section: Optional[str] = Field(description="관련 섹션", default=None)
+    description: str = Field(description="조치 설명")
+    priority: str = Field(description="우선순위 (높음, 중간, 낮음)")
+    rationale: str = Field(description="조치의 근거")
+
+
+class ReviewAgent(BaseAgent[Dict[str, Any]]):
+    """논문 리뷰 및 사용자 상호작용 통합 에이전트"""
 
     def __init__(
         self,
-        name: str = "사용자 상호작용 에이전트",
-        description: str = "사용자 상호작용 관리 및 피드백 수집",
+        name: str = "리뷰 및 상호작용 에이전트",
+        description: str = "논문 리뷰 및 사용자 피드백 관리",
         verbose: bool = False
     ):
         """
-        UserInteractionAgent 초기화
+        ReviewAgent 초기화
 
         Args:
-            name (str, optional): 에이전트 이름. 기본값은 "사용자 상호작용 에이전트"
-            description (str, optional): 에이전트 설명. 기본값은 "사용자 상호작용 관리 및 피드백 수집"
+            name (str, optional): 에이전트 이름. 기본값은 "리뷰 및 상호작용 에이전트"
+            description (str, optional): 에이전트 설명. 기본값은 "논문 리뷰 및 사용자 피드백 관리"
             verbose (bool, optional): 상세 로깅 활성화 여부. 기본값은 False
         """
         super().__init__(name, description, verbose=verbose)
@@ -78,6 +99,9 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
         # 피드백 저장소 초기화
         self.feedback_history = []
         
+        # 리뷰 저장소 초기화
+        self.review_history = []
+        
         # 진행 상황 초기화
         self.current_progress = None
         
@@ -87,6 +111,12 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
         """프롬프트와 체인 초기화"""
         # 피드백 분석 파서 초기화
         self.feedback_analysis_parser = PydanticOutputParser(pydantic_object=FeedbackAnalysis)
+        
+        # 논문 리뷰 파서 초기화
+        self.paper_review_parser = PydanticOutputParser(pydantic_object=PaperReview)
+        
+        # 리뷰 조치 파서 초기화
+        self.review_action_parser = PydanticOutputParser(pydantic_object=ReviewAction)
         
         # 피드백 분석 체인 초기화
         self.feedback_analysis_chain = LLMChain(
@@ -107,6 +137,59 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
                 {format_instructions}
                 """,
                 input_variables=["feedback", "format_instructions"],
+            ),
+            verbose=self.verbose
+        )
+        
+        # 논문 리뷰 체인 초기화
+        self.paper_review_chain = LLMChain(
+            llm=self.llm,
+            prompt=PromptTemplate(
+                template="""다음 논문을 철저히 검토하고 종합적인 학술 리뷰를 제공해 주세요.
+                
+                논문 제목: {paper_title}
+                
+                논문 내용:
+                {paper_content}
+                
+                다음 항목을 포함한 철저한 학술 리뷰를 작성해 주세요:
+                1. 전체 평가 점수 (1-10)
+                2. 주요 장점 목록
+                3. 주요 약점 목록
+                4. 구체적인 개선 제안 목록
+                5. 주요 섹션별 피드백
+                6. 구조적 의견 (논문 구성, 흐름, 논리적 일관성)
+                7. 언어적 의견 (명확성, 간결성, 학술적 표현)
+                
+                리뷰는 객관적이고 건설적이어야 하며, 논문의 학술적 가치를 향상시키는 데 도움이 되어야 합니다.
+                
+                {format_instructions}
+                """,
+                input_variables=["paper_title", "paper_content", "format_instructions"],
+            ),
+            verbose=self.verbose
+        )
+        
+        # 리뷰 조치 체인 초기화
+        self.review_action_chain = LLMChain(
+            llm=self.llm,
+            prompt=PromptTemplate(
+                template="""논문 리뷰 결과를 바탕으로 구체적인 조치 사항을 제안해 주세요.
+                
+                논문 제목: {paper_title}
+                리뷰 결과:
+                {review_result}
+                
+                다음 형식으로 가장 중요한 조치 사항을 제안해 주세요:
+                1. 조치 유형 (수정, 추가, 삭제, 재구성 등)
+                2. 관련 섹션 (해당되는 경우)
+                3. 상세한 조치 설명
+                4. 우선순위 (높음, 중간, 낮음)
+                5. 이 조치가 필요한 근거
+                
+                {format_instructions}
+                """,
+                input_variables=["paper_title", "review_result", "format_instructions"],
             ),
             verbose=self.verbose
         )
@@ -135,7 +218,7 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
             verbose=self.verbose
         )
         
-        logger.debug("사용자 상호작용 에이전트 프롬프트 및 체인 초기화 완료")
+        logger.debug("리뷰 및 상호작용 에이전트 프롬프트 및 체인 초기화 완료")
 
     def collect_feedback(self, feedback_text: str) -> UserFeedback:
         """
@@ -375,25 +458,191 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
         """
         return [feedback.dict() for feedback in self.feedback_history]
 
+    def review_paper(self, paper: Paper) -> PaperReview:
+        """
+        논문을 검토하고 종합적인 피드백을 제공합니다.
+
+        Args:
+            paper (Paper): 검토할 논문
+
+        Returns:
+            PaperReview: 논문 리뷰 결과
+        """
+        logger.info(f"논문 '{paper.title}' 검토 중...")
+        
+        try:
+            # 논문 전체 내용 생성
+            paper_content = f"# {paper.title}\n\n"
+            
+            for section in paper.sections:
+                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+            
+            # 참고 문헌 섹션 추가
+            if paper.references:
+                paper_content += "## 참고 문헌\n\n"
+                for i, ref in enumerate(paper.references, 1):
+                    authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+            
+            # 논문 리뷰 수행
+            format_instructions = self.paper_review_parser.get_format_instructions()
+            
+            result = self.paper_review_chain.invoke({
+                "paper_title": paper.title,
+                "paper_content": paper_content,
+                "format_instructions": format_instructions
+            })
+            
+            # 결과 파싱
+            review = self.paper_review_parser.parse(result["text"])
+            
+            # 리뷰 저장
+            self.review_history.append(review)
+            
+            # 상태 업데이트
+            self.update_state({
+                "last_review": review.dict(),
+                "review_count": len(self.review_history)
+            })
+            
+            logger.info(f"논문 '{paper.title}' 검토 완료: 평가 점수 {review.overall_score}/10")
+            return review
+            
+        except Exception as e:
+            logger.error(f"논문 검토 중 오류 발생: {str(e)}")
+            
+            # 오류 발생 시 기본 리뷰 반환
+            default_review = PaperReview(
+                paper_title=paper.title,
+                overall_score=5,
+                strengths=["리뷰 중 오류 발생"],
+                weaknesses=["검토를 완료할 수 없음"],
+                improvement_suggestions=["시스템 오류를 확인하세요"],
+                section_feedback={},
+                structural_comments="검토 중 오류가 발생했습니다.",
+                language_comments="검토 중 오류가 발생했습니다."
+            )
+            
+            return default_review
+
+    def suggest_review_actions(self, paper: Paper, review: PaperReview) -> List[ReviewAction]:
+        """
+        리뷰 결과를 바탕으로 구체적인 조치 사항을 제안합니다.
+
+        Args:
+            paper (Paper): 검토된 논문
+            review (PaperReview): 논문 리뷰 결과
+
+        Returns:
+            List[ReviewAction]: 제안된 조치 사항 목록
+        """
+        logger.info(f"논문 '{paper.title}'에 대한 조치 사항 제안 중...")
+        
+        try:
+            # 리뷰 결과 준비
+            review_result = json.dumps(review.dict(), ensure_ascii=False)
+            
+            # 조치 사항 제안 수행
+            format_instructions = self.review_action_parser.get_format_instructions()
+            
+            actions = []
+            
+            # 주요 약점에 대한 조치 사항 생성
+            for weakness in review.weaknesses[:3]:  # 상위 3개 약점만 처리
+                result = self.review_action_chain.invoke({
+                    "paper_title": paper.title,
+                    "review_result": f"약점: {weakness}\n{review_result}",
+                    "format_instructions": format_instructions
+                })
+                
+                # 결과 파싱
+                action = self.review_action_parser.parse(result["text"])
+                actions.append(action)
+            
+            logger.info(f"논문 '{paper.title}'에 대한 {len(actions)}개 조치 사항 제안 완료")
+            return actions
+            
+        except Exception as e:
+            logger.error(f"조치 사항 제안 중 오류 발생: {str(e)}")
+            
+            # 오류 발생 시 기본 조치 사항 반환
+            return [
+                ReviewAction(
+                    action_type="검토",
+                    section=None,
+                    description="조치 사항 제안 중 오류가 발생했습니다.",
+                    priority="높음",
+                    rationale="시스템 오류를 해결하세요."
+                )
+            ]
+
+    def format_review_report(self, review: PaperReview, actions: List[ReviewAction] = None) -> str:
+        """
+        논문 리뷰 결과와 조치 사항을 사용자 친화적인 보고서로 포맷팅합니다.
+
+        Args:
+            review (PaperReview): 논문 리뷰 결과
+            actions (List[ReviewAction], optional): 제안된 조치 사항 목록
+
+        Returns:
+            str: 포맷팅된 리뷰 보고서
+        """
+        report = f"# 논문 리뷰 보고서: {review.paper_title}\n\n"
+        report += f"## 전체 평가\n\n"
+        report += f"**점수**: {review.overall_score}/10\n\n"
+        
+        report += "## 장점\n\n"
+        for strength in review.strengths:
+            report += f"- ✓ {strength}\n"
+        
+        report += "\n## 약점\n\n"
+        for weakness in review.weaknesses:
+            report += f"- ✗ {weakness}\n"
+        
+        report += "\n## 개선 제안\n\n"
+        for suggestion in review.improvement_suggestions:
+            report += f"- 💡 {suggestion}\n"
+        
+        if review.section_feedback:
+            report += "\n## 섹션별 피드백\n\n"
+            for section, feedback in review.section_feedback.items():
+                report += f"### {section}\n\n{feedback}\n\n"
+        
+        report += f"## 구조적 의견\n\n{review.structural_comments}\n\n"
+        report += f"## 언어적 의견\n\n{review.language_comments}\n\n"
+        
+        if actions:
+            report += "## 권장 조치 사항\n\n"
+            for i, action in enumerate(actions, 1):
+                report += f"### 조치 {i}: {action.action_type}\n\n"
+                if action.section:
+                    report += f"**관련 섹션**: {action.section}\n\n"
+                report += f"**설명**: {action.description}\n\n"
+                report += f"**우선순위**: {action.priority}\n\n"
+                report += f"**근거**: {action.rationale}\n\n"
+        
+        return report
+
     def run(
         self, 
         input_data: Dict[str, Any], 
         config: Optional[RunnableConfig] = None
     ) -> Dict[str, Any]:
         """
-        사용자 상호작용 에이전트를 실행합니다.
+        리뷰 및 상호작용 에이전트를 실행합니다.
 
         Args:
             input_data (Dict[str, Any]): 입력 데이터
-                - action: 실행할 액션 (collect_feedback, generate_progress_update)
+                - action: 실행할 액션 (collect_feedback, generate_progress_update, review_paper)
                 - feedback_text: 사용자 피드백 텍스트 (collect_feedback 액션에 필요)
                 - workflow_state: 워크플로우 상태 (generate_progress_update 액션에 필요)
+                - paper: 검토할 논문 (review_paper 액션에 필요)
             config (Optional[RunnableConfig], optional): 실행 구성
 
         Returns:
             Dict[str, Any]: 실행 결과
         """
-        logger.info("사용자 상호작용 에이전트 실행 중...")
+        logger.info("리뷰 및 상호작용 에이전트 실행 중...")
         
         try:
             action = input_data.get("action", "")
@@ -428,11 +677,28 @@ class UserInteractionAgent(BaseAgent[Dict[str, Any]]):
                     "message": message
                 }
                 
+            elif action == "review_paper":
+                paper = input_data.get("paper")
+                if not paper:
+                    raise ValueError("검토할 논문이 제공되지 않았습니다.")
+                
+                review = self.review_paper(paper)
+                actions = self.suggest_review_actions(paper, review)
+                report = self.format_review_report(review, actions)
+                
+                return {
+                    "success": True,
+                    "action": "review_paper",
+                    "review": review.dict(),
+                    "actions": [action.dict() for action in actions],
+                    "report": report
+                }
+                
             else:
                 raise ValueError(f"지원되지 않는 액션: {action}")
                 
         except Exception as e:
-            logger.error(f"사용자 상호작용 에이전트 실행 중 오류 발생: {str(e)}")
+            logger.error(f"리뷰 및 상호작용 에이전트 실행 중 오류 발생: {str(e)}")
             
             return {
                 "success": False,
