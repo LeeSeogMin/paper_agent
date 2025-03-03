@@ -112,406 +112,535 @@ class EditorAgent(BaseAgent[Paper]):
             llm=self.llm,
             prompt=PromptTemplate(
                 template=REFERENCE_FORMATTING_PROMPT,
-                input_variables=["references", "format_instructions"],
+                input_variables=["references", "citation_style"],
             ),
             verbose=self.verbose
         )
         
         logger.debug("편집 에이전트 프롬프트 및 체인 초기화 완료")
 
-    def edit_section(
-        self, 
-        section: PaperSection, 
-        style_guide: Optional[StyleGuide] = None
-    ) -> PaperSection:
+    def create_style_guide(self, style_name: str = "Standard Academic") -> StyleGuide:
         """
-        논문 섹션 편집
-        
+        스타일 가이드를 생성합니다.
+
         Args:
-            section: 편집할 섹션
-            style_guide: 적용할 스타일 가이드
-            
+            style_name (str, optional): 스타일 가이드 이름. 기본값은 "Standard Academic"
+
         Returns:
-            PaperSection: 편집된 섹션
+            StyleGuide: 생성된 스타일 가이드
         """
-        section_title = section.title
-        section_content = section.content
+        logger.info(f"'{style_name}' 스타일 가이드 생성 중...")
         
-        logger.info(f"섹션 편집 중: {section_title}")
-        
-        # 스타일 가이드 정보
-        style_guide_text = ""
-        if style_guide:
-            style_guide_text = (
-                f"스타일 가이드: {style_guide.name}\n"
-                f"규칙:\n" + "\n".join([f"- {rule}" for rule in style_guide.rules]) + "\n"
+        # 기본 학술 스타일 가이드
+        if style_name == "Standard Academic":
+            return StyleGuide(
+                name="Standard Academic",
+                rules=[
+                    "명확하고 간결한 문장 사용",
+                    "능동태 선호 (수동태 최소화)",
+                    "일관된 시제 사용 (주로 현재 시제)",
+                    "첫 사용 시 약어 정의",
+                    "객관적인 어조 유지",
+                    "주장에 대한 증거 제시",
+                    "적절한 인용 사용",
+                    "일인칭 사용 최소화",
+                    "전문 용어 적절히 사용",
+                    "단락 간 논리적 흐름 유지"
+                ],
+                examples={
+                    "수동태": "연구가 수행되었다. → 연구자들이 연구를 수행했다.",
+                    "모호한 표현": "이것은 중요하다. → 이 발견은 치료법 개발에 중요하다.",
+                    "약어": "AI는 유용하다. → 인공지능(AI)은 유용하다.",
+                    "주관적 표현": "놀라운 결과이다. → 결과는 기존 연구와 15% 차이를 보인다."
+                }
             )
         
-        # 프롬프트 준비
-        messages = [
-            {"role": "user", "content": (
-                f"다음 논문 섹션을 편집해 주세요:\n\n"
-                f"제목: {section_title}\n\n"
-                f"내용:\n{section_content}\n\n"
-                f"{style_guide_text}\n\n"
-                "문법, 맞춤법, 문장 구조, 명확성을 개선하고, 학술적 문체를 유지하세요."
-            )}
-        ]
-        
-        # LLM으로 편집
-        response = self.editing_chain.invoke({"content": section_content, "style_guide": style_guide_text})
-        chain = response | self.llm | self.editing_parser
-        
-        try:
-            edit_result = chain.invoke({})
-            
-            # 편집된 섹션 반환
-            edited_section = PaperSection(
-                title=section_title,
-                content=edit_result.edited_content,
-                citations=section.citations
+        # APA 스타일 가이드
+        elif style_name == "APA":
+            return StyleGuide(
+                name="APA Style",
+                rules=[
+                    "명확하고 간결한 문장 사용",
+                    "능동태 선호",
+                    "과거 시제 사용 (연구 방법 및 결과 설명 시)",
+                    "현재 시제 사용 (결론 및 확립된 지식 설명 시)",
+                    "성별 중립적 언어 사용",
+                    "정확한 용어 사용",
+                    "약어 사용 시 첫 번째 언급에서 정의",
+                    "숫자 10 이상은 숫자로 표기",
+                    "문장 시작 시 숫자는 단어로 표기",
+                    "직접 인용 시 페이지 번호 포함"
+                ],
+                examples={
+                    "수동태": "실험이 수행되었다. → 연구자들이 실험을 수행했다.",
+                    "성별 편향": "각 참가자는 그의 응답을 제출했다. → 각 참가자는 자신의 응답을 제출했다.",
+                    "시제 불일치": "데이터는 수집되었고 분석된다. → 데이터는 수집되었고 분석되었다.",
+                    "숫자 표기": "실험에 5명의 참가자가 참여했다. → 실험에 다섯 명의 참가자가 참여했다."
+                }
             )
-            
-            logger.info(f"섹션 편집 완료: {section_title}, {len(edit_result.changes_made)}개 변경사항")
-            return edited_section
-            
-        except Exception as e:
-            logger.error(f"섹션 편집 중 오류: {str(e)}", error=str(e))
-            return section  # 오류 발생 시 원본 섹션 반환
-    
-    def edit_paper(
-        self, 
-        paper: Paper, 
-        style_guide: Optional[StyleGuide] = None
-    ) -> Paper:
-        """
-        전체 논문 편집
         
+        # MLA 스타일 가이드
+        elif style_name == "MLA":
+            return StyleGuide(
+                name="MLA Style",
+                rules=[
+                    "현재 시제 사용 (문학 작품 논의 시)",
+                    "명확하고 간결한 문장 사용",
+                    "능동태 선호",
+                    "일인칭 사용 가능 (적절한 경우)",
+                    "직접 인용 시 페이지 번호 포함",
+                    "작품 제목은 이탤릭체 또는 따옴표로 표시",
+                    "약어 사용 최소화",
+                    "문학적 현재 시제 사용",
+                    "정확한 인용 사용",
+                    "논리적 단락 구성"
+                ],
+                examples={
+                    "시제": "작가는 말했다. → 작가는 말한다.",
+                    "제목 표기": "소설 '전쟁과 평화' → 소설 『전쟁과 평화』",
+                    "인용": "이것은 중요하다(스미스). → 스미스는 \"이것이 중요하다\"고 주장한다(42).",
+                    "약어": "등. → 기타 등등"
+                }
+            )
+        
+        # Chicago 스타일 가이드
+        elif style_name == "Chicago":
+            return StyleGuide(
+                name="Chicago Style",
+                rules=[
+                    "명확하고 간결한 문장 사용",
+                    "능동태 선호",
+                    "일관된 시제 사용",
+                    "약어 사용 시 첫 번째 언급에서 정의",
+                    "숫자 100 이하는 단어로 표기 (특정 예외 있음)",
+                    "직접 인용 시 페이지 번호 포함",
+                    "각주 또는 미주 사용",
+                    "작품 제목은 이탤릭체 또는 따옴표로 표시",
+                    "정확한 인용 사용",
+                    "논리적 단락 구성"
+                ],
+                examples={
+                    "숫자 표기": "42개의 샘플 → 사십이 개의 샘플",
+                    "인용": "스미스는 중요하다고 말했다. → 스미스는 \"이것이 중요하다\"고 말했다.¹",
+                    "제목 표기": "논문 '인공지능의 미래' → 논문 \"인공지능의 미래\"",
+                    "약어": "WHO는 → 세계보건기구(WHO)는"
+                }
+            )
+        
+        # 기본 스타일 가이드 반환
+        else:
+            logger.warning(f"알 수 없는 스타일 가이드 '{style_name}'. 기본 학술 스타일 가이드를 사용합니다.")
+            return self.create_style_guide("Standard Academic")
+
+    def edit_paper(self, paper: Paper, style_guide: StyleGuide) -> Paper:
+        """
+        논문을 편집합니다.
+
         Args:
-            paper: 편집할 논문
-            style_guide: 적용할 스타일 가이드
-            
+            paper (Paper): 편집할 논문
+            style_guide (StyleGuide): 적용할 스타일 가이드
+
         Returns:
             Paper: 편집된 논문
         """
-        logger.info(f"논문 편집 중: {paper.title}")
-        
-        # 섹션별 편집
-        edited_sections = []
-        for section in paper.sections:
-            edited_section = self.edit_section(section, style_guide)
-            edited_sections.append(edited_section)
-        
-        # 초록 편집
-        abstract_section = PaperSection(
-            title="Abstract",
-            content=paper.abstract,
-            citations=[]
-        )
-        edited_abstract = self.edit_section(abstract_section, style_guide)
-        
-        # 편집된 논문 생성
-        edited_paper = Paper(
-            title=paper.title,
-            abstract=edited_abstract.content,
-            sections=edited_sections,
-            references=paper.references,
-            keywords=paper.keywords
-        )
-        
-        logger.info(f"논문 편집 완료: {paper.title}")
-        return edited_paper
-    
-    def review_paper(self, paper: Paper) -> ReviewResult:
-        """
-        논문 리뷰 및 피드백 생성
-        
-        Args:
-            paper: 리뷰할 논문
-            
-        Returns:
-            ReviewResult: 논문 리뷰 피드백
-        """
-        logger.info(f"논문 리뷰 중: {paper.title}")
-        
-        # 논문 전체 텍스트
-        paper_text = paper.get_full_text()
-        
-        # 텍스트가 너무 길면 섹션 요약 사용
-        if len(paper_text) > 8000:
-            paper_text = (
-                f"제목: {paper.title}\n\n"
-                f"초록: {paper.abstract}\n\n"
-            )
-            
-            # 섹션 요약 추가
-            for section in paper.sections:
-                # 각 섹션의 처음 부분만 포함
-                content_preview = section.content[:500] + "..." if len(section.content) > 500 else section.content
-                paper_text += f"## {section.title}\n\n{content_preview}\n\n"
-            
-            # 참고 문헌 정보 추가
-            paper_text += f"참고 문헌 수: {len(paper.references)}\n"
-        
-        # 프롬프트 준비
-        messages = [
-            {"role": "user", "content": (
-                f"다음 논문을 리뷰하고 피드백을 제공해 주세요:\n\n{paper_text}"
-            )}
-        ]
-        
-        # LLM으로 리뷰 생성
-        response = self.review_chain.invoke({"paper_content": paper_text})
-        chain = response | self.llm | self.review_parser
+        logger.info(f"논문 '{paper.title}' 편집 중...")
         
         try:
-            review_result = chain.invoke({})
-            logger.info(f"논문 리뷰 완료: {paper.title}, 평가: {review_result.overall_rating}/10")
-            return review_result
+            # 논문 전체 내용 생성
+            paper_content = f"# {paper.title}\n\n"
+            
+            for section in paper.sections:
+                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+            
+            # 참고 문헌 섹션 추가
+            if paper.references:
+                paper_content += "## 참고 문헌\n\n"
+                for i, ref in enumerate(paper.references, 1):
+                    authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+            
+            # 스타일 가이드 정보 준비
+            style_guide_info = json.dumps(style_guide.dict(), ensure_ascii=False)
+            
+            # 편집 수행
+            format_instructions = self.editing_parser.get_format_instructions()
+            
+            result = self.editing_chain.invoke({
+                "content": paper_content,
+                "style_guide": style_guide_info,
+                "format_instructions": format_instructions
+            })
+            
+            # 결과 파싱
+            edit_task = self.editing_parser.parse(result["text"])
+            
+            # 편집된 논문 파싱
+            edited_paper = self._parse_edited_paper(edit_task.edited_content, paper)
+            
+            # 변경 사항 기록
+            edited_paper.edit_history.append({
+                "timestamp": self._get_timestamp(),
+                "changes": edit_task.changes_made,
+                "style_guide": style_guide.name
+            })
+            
+            logger.info(f"논문 '{paper.title}' 편집 완료 ({len(edit_task.changes_made)}개 변경사항)")
+            return edited_paper
             
         except Exception as e:
-            logger.error(f"논문 리뷰 중 오류: {str(e)}", error=str(e))
+            logger.error(f"논문 편집 중 오류 발생: {str(e)}")
             
-            # 오류 시 기본 리뷰 반환
-            return ReviewResult(
-                strengths=["리뷰 생성 중 오류가 발생했습니다."],
-                weaknesses=["리뷰 생성 중 오류가 발생했습니다."],
-                suggestions=["논문을 다시 검토하거나 리뷰 프로세스를 재시도하세요."],
-                overall_rating=5
-            )
-    
-    def format_paper(
-        self, 
-        paper: Paper, 
-        style_guide: StyleGuide,
-        output_format: str = "markdown"
-    ) -> str:
+            # 오류 발생 시 원본 논문 반환
+            paper.edit_history.append({
+                "timestamp": self._get_timestamp(),
+                "changes": ["편집 중 오류 발생"],
+                "style_guide": style_guide.name
+            })
+            return paper
+
+    def review_paper(self, paper: Paper) -> Dict[str, Any]:
         """
-        논문을 지정된 형식으로 포맷팅
-        
+        논문을 검토하고 피드백을 제공합니다.
+
         Args:
-            paper: 포맷팅할 논문
-            style_guide: 적용할 스타일 가이드
-            output_format: 출력 형식 (markdown, latex, docx)
-            
+            paper (Paper): 검토할 논문
+
         Returns:
-            str: 포맷팅된 논문 내용 또는 파일 경로
+            Dict[str, Any]: 검토 결과
         """
-        logger.info(f"논문 포맷팅 중: {paper.title}, 형식: {output_format}")
+        logger.info(f"논문 '{paper.title}' 검토 중...")
         
-        if output_format.lower() == "markdown":
-            return self._format_markdown(paper, style_guide)
-        elif output_format.lower() == "latex":
-            return self._format_latex(paper, style_guide)
+        try:
+            # 논문 전체 내용 생성
+            paper_content = f"# {paper.title}\n\n"
+            
+            for section in paper.sections:
+                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+            
+            # 참고 문헌 섹션 추가
+            if paper.references:
+                paper_content += "## 참고 문헌\n\n"
+                for i, ref in enumerate(paper.references, 1):
+                    authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+            
+            # 검토 수행
+            format_instructions = self.review_parser.get_format_instructions()
+            
+            result = self.review_chain.invoke({
+                "paper_content": paper_content,
+                "format_instructions": format_instructions
+            })
+            
+            # 결과 파싱
+            review_result = self.review_parser.parse(result["text"])
+            
+            # 검토 결과를 딕셔너리로 변환
+            review_dict = review_result.dict()
+            
+            logger.info(f"논문 '{paper.title}' 검토 완료 (평가: {review_result.overall_rating}/10)")
+            return review_dict
+            
+        except Exception as e:
+            logger.error(f"논문 검토 중 오류 발생: {str(e)}")
+            
+            # 오류 발생 시 기본 검토 결과 반환
+            return {
+                "overall_rating": 5,
+                "strengths": ["검토 중 오류 발생"],
+                "weaknesses": ["검토를 완료할 수 없음"],
+                "suggestions": ["시스템 오류를 확인하세요"],
+                "grammar_issues": [],
+                "structure_comments": "검토 중 오류가 발생했습니다."
+            }
+
+    def format_references(self, references: List[Reference], citation_style: str = "APA") -> List[str]:
+        """
+        참고 문헌을 지정된 인용 스타일로 형식화합니다.
+
+        Args:
+            references (List[Reference]): 참고 문헌 목록
+            citation_style (str, optional): 인용 스타일. 기본값은 "APA"
+
+        Returns:
+            List[str]: 형식화된 참고 문헌 목록
+        """
+        logger.info(f"{len(references)}개의 참고 문헌을 '{citation_style}' 스타일로 형식화 중...")
+        
+        try:
+            # 참고 문헌 정보 준비
+            references_info = []
+            for ref in references:
+                ref_info = {
+                    "title": ref.title,
+                    "authors": ref.authors,
+                    "year": ref.year,
+                    "source": ref.source,
+                    "url": ref.url
+                }
+                references_info.append(ref_info)
+            
+            references_json = json.dumps(references_info, ensure_ascii=False)
+            
+            # 참고 문헌 형식화 수행
+            result = self.reference_chain.invoke({
+                "references": references_json,
+                "citation_style": citation_style
+            })
+            
+            # 결과 파싱
+            formatted_references = []
+            for line in result["text"].strip().split("\n"):
+                line = line.strip()
+                if line and not line.startswith("#") and not line.startswith("```"):
+                    formatted_references.append(line)
+            
+            logger.info(f"{len(formatted_references)}개의 참고 문헌 형식화 완료")
+            return formatted_references
+            
+        except Exception as e:
+            logger.error(f"참고 문헌 형식화 중 오류 발생: {str(e)}")
+            
+            # 오류 발생 시 기본 형식 반환
+            return [f"{ref.title}. {', '.join(ref.authors) if ref.authors else '알 수 없음'}. ({ref.year}). {ref.source}." 
+                   for ref in references]
+
+    def save_formatted_paper(self, paper: Paper, output_format: str = "markdown") -> str:
+        """
+        편집된 논문을 지정된 형식으로 저장합니다.
+
+        Args:
+            paper (Paper): 저장할 논문
+            output_format (str, optional): 출력 형식. 기본값은 "markdown"
+
+        Returns:
+            str: 저장된 파일 경로
+        """
+        # 파일 이름 생성
+        safe_title = re.sub(r'[^\w\s-]', '', paper.title).strip().lower()
+        safe_title = re.sub(r'[-\s]+', '-', safe_title)
+        
+        if output_format == "markdown":
+            filename = f"{safe_title}.md"
+            file_path = os.path.join(OUTPUT_DIR, filename)
+            
+            try:
+                # 마크다운 형식으로 논문 내용 생성
+                content = f"# {paper.title}\n\n"
+                
+                for section in paper.sections:
+                    content += f"## {section.title}\n\n{section.content}\n\n"
+                
+                # 참고 문헌 섹션 추가
+                if paper.references:
+                    content += "## 참고 문헌\n\n"
+                    for i, ref in enumerate(paper.references, 1):
+                        authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
+                        content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+                
+                # 파일 저장
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                logger.info(f"논문 '{paper.title}' 마크다운 형식으로 저장됨: {file_path}")
+                return file_path
+                
+            except Exception as e:
+                logger.error(f"논문 저장 중 오류 발생: {str(e)}")
+                return ""
+                
+        elif output_format == "latex":
+            filename = f"{safe_title}.tex"
+            file_path = os.path.join(OUTPUT_DIR, filename)
+            
+            try:
+                # LaTeX 형식으로 논문 내용 생성
+                content = "\\documentclass{article}\n"
+                content += "\\usepackage[utf8]{inputenc}\n"
+                content += "\\usepackage{natbib}\n"
+                content += "\\usepackage{graphicx}\n"
+                content += "\\usepackage{hyperref}\n\n"
+                
+                content += f"\\title{{{paper.title}}}\n"
+                
+                # 저자 정보 (없으므로 기본값 사용)
+                content += "\\author{AI Paper Writer}\n"
+                content += "\\date{\\today}\n\n"
+                
+                content += "\\begin{document}\n\n"
+                content += "\\maketitle\n\n"
+                
+                # 초록 섹션 (있는 경우)
+                abstract_section = next((s for s in paper.sections if s.title.lower() == "초록" or s.title.lower() == "abstract"), None)
+                if abstract_section:
+                    content += "\\begin{abstract}\n"
+                    content += abstract_section.content + "\n"
+                    content += "\\end{abstract}\n\n"
+                
+                # 목차
+                content += "\\tableofcontents\n\\newpage\n\n"
+                
+                # 각 섹션
+                for section in paper.sections:
+                    # 초록은 이미 처리했으므로 건너뜀
+                    if section.title.lower() == "초록" or section.title.lower() == "abstract":
+                        continue
+                        
+                    content += f"\\section{{{section.title}}}\n\n"
+                    
+                    # LaTeX 특수 문자 이스케이프
+                    section_content = section.content
+                    section_content = section_content.replace("_", "\\_")
+                    section_content = section_content.replace("%", "\\%")
+                    section_content = section_content.replace("&", "\\&")
+                    section_content = section_content.replace("#", "\\#")
+                    
+                    content += section_content + "\n\n"
+                
+                # 참고 문헌
+                if paper.references:
+                    content += "\\begin{thebibliography}{99}\n\n"
+                    
+                    for i, ref in enumerate(paper.references, 1):
+                        authors = ", ".join(ref.authors) if ref.authors else "Unknown"
+                        content += f"\\bibitem{{{i}}}\n"
+                        content += f"{authors} ({ref.year}). {ref.title}. {ref.source}.\n\n"
+                    
+                    content += "\\end{thebibliography}\n\n"
+                
+                content += "\\end{document}"
+                
+                # 파일 저장
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                
+                logger.info(f"논문 '{paper.title}' LaTeX 형식으로 저장됨: {file_path}")
+                return file_path
+                
+            except Exception as e:
+                logger.error(f"논문 LaTeX 형식 저장 중 오류 발생: {str(e)}")
+                return ""
+        
         else:
-            logger.warning(f"지원되지 않는 출력 형식: {output_format}, markdown으로 대체")
-            return self._format_markdown(paper, style_guide)
-    
-    def _format_markdown(self, paper: Paper, style_guide: StyleGuide) -> str:
+            logger.error(f"지원되지 않는 출력 형식: {output_format}")
+            return ""
+
+    def _parse_edited_paper(self, edited_content: str, original_paper: Paper) -> Paper:
         """
-        논문을 마크다운 형식으로 포맷팅
-        
+        편집된 논문 내용을 파싱하여 Paper 객체로 변환합니다.
+
         Args:
-            paper: 포맷팅할 논문
-            style_guide: 적용할 스타일 가이드
-            
+            edited_content (str): 편집된 논문 내용
+            original_paper (Paper): 원본 논문
+
         Returns:
-            str: 마크다운 형식의 논문 내용
+            Paper: 파싱된 논문 객체
         """
-        # 파일 이름 생성
-        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in paper.title)
-        safe_title = safe_title.replace(" ", "_").lower()
-        filename = f"{safe_title}_formatted.md"
-        file_path = os.path.join(OUTPUT_DIR, filename)
-        
-        # 마크다운 내용 생성
-        md_content = f"# {paper.title}\n\n"
-        
-        # 키워드
-        if paper.keywords:
-            md_content += "**키워드**: " + ", ".join(paper.keywords) + "\n\n"
-        
-        # 초록
-        md_content += "## 초록\n\n"
-        md_content += paper.abstract + "\n\n"
-        
-        # 섹션
-        for section in paper.sections:
-            md_content += f"## {section.title}\n\n"
-            md_content += section.content + "\n\n"
-        
-        # 참고 문헌
-        if paper.references:
-            md_content += "## 참고 문헌\n\n"
+        try:
+            # 제목 추출
+            title_match = re.search(r"#\s+(.+?)(?:\n|$)", edited_content)
+            title = title_match.group(1).strip() if title_match else original_paper.title
             
-            # 스타일 가이드에 따라 인용 형식 적용
-            citation_style = style_guide.rules[0].lower()
+            # 섹션 추출
+            sections = []
+            section_pattern = re.compile(r"##\s+(.+?)\n\n([\s\S]+?)(?=\n##|\n# |$)")
             
-            for i, ref in enumerate(paper.references, 1):
-                authors = ref.authors if isinstance(ref.authors, str) else ", ".join(ref.authors)
+            for match in section_pattern.finditer(edited_content):
+                section_title = match.group(1).strip()
+                section_content = match.group(2).strip()
                 
-                if citation_style == "apa":
-                    # APA 스타일
-                    md_content += f"{authors} ({ref.year}). {ref.title}. "
-                    if ref.url:
-                        md_content += f"Retrieved from {ref.url}"
-                    md_content += "\n\n"
-                    
-                elif citation_style == "mla":
-                    # MLA 스타일
-                    md_content += f"{authors}. \"{ref.title}.\" {ref.year}. "
-                    if ref.url:
-                        md_content += f"Web. {ref.url}"
-                    md_content += "\n\n"
-                    
-                elif citation_style == "chicago":
-                    # Chicago 스타일
-                    md_content += f"{authors}. {ref.title}. {ref.year}. "
-                    if ref.url:
-                        md_content += f"{ref.url}."
-                    md_content += "\n\n"
-                    
-                else:
-                    # 기본 형식
-                    md_content += f"{i}. {authors} ({ref.year}). {ref.title}. "
-                    if ref.url:
-                        md_content += f"URL: {ref.url}"
-                    md_content += "\n\n"
-        
-        # 파일로 저장
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(md_content)
-        
-        logger.info(f"마크다운 형식으로 포맷팅 완료: {file_path}")
-        return file_path
-    
-    def _format_latex(self, paper: Paper, style_guide: StyleGuide) -> str:
-        """
-        논문을 LaTeX 형식으로 포맷팅
-        
-        Args:
-            paper: 포맷팅할 논문
-            style_guide: 적용할 스타일 가이드
-            
-        Returns:
-            str: LaTeX 형식의 논문 내용
-        """
-        # 파일 이름 생성
-        safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in paper.title)
-        safe_title = safe_title.replace(" ", "_").lower()
-        filename = f"{safe_title}_formatted.tex"
-        file_path = os.path.join(OUTPUT_DIR, filename)
-        
-        # LaTeX 헤더
-        latex_content = (
-            "\\documentclass{article}\n"
-            "\\usepackage[utf8]{inputenc}\n"
-            "\\usepackage{hyperref}\n"
-            "\\usepackage{natbib}\n"
-            "\\usepackage{graphicx}\n"
-            "\\usepackage{geometry}\n"
-            "\\geometry{a4paper, margin=1in}\n\n"
-            f"\\title{{{paper.title}}}\n"
-            "\\author{}\n"
-            "\\date{\\today}\n\n"
-            "\\begin{document}\n\n"
-            "\\maketitle\n\n"
-        )
-        
-        # 키워드
-        if paper.keywords:
-            latex_content += "\\textbf{Keywords:} " + ", ".join(paper.keywords) + "\n\n"
-        
-        # 초록
-        latex_content += "\\begin{abstract}\n"
-        latex_content += paper.abstract + "\n"
-        latex_content += "\\end{abstract}\n\n"
-        
-        # 섹션
-        for section in paper.sections:
-            latex_content += f"\\section{{{section.title}}}\n\n"
-            # LaTeX 특수 문자 이스케이프
-            content = section.content.replace("_", "\\_").replace("%", "\\%").replace("&", "\\&")
-            latex_content += content + "\n\n"
-        
-        # 참고 문헌
-        if paper.references:
-            latex_content += "\\begin{thebibliography}{99}\n\n"
-            
-            for i, ref in enumerate(paper.references, 1):
-                authors = ref.authors if isinstance(ref.authors, str) else " and ".join(ref.authors)
-                label = f"ref{i}"
+                # 참고 문헌 섹션은 건너뜀
+                if "참고 문헌" in section_title or "References" in section_title:
+                    continue
                 
-                latex_content += f"\\bibitem[{label}]{{{label}}}\n"
-                latex_content += f"{authors} ({ref.year}). {ref.title}. "
+                # 기존 섹션에서 인용 정보 가져오기
+                citations = []
+                for original_section in original_paper.sections:
+                    if original_section.title == section_title:
+                        citations = original_section.citations
+                        break
                 
-                if ref.url:
-                    latex_content += f"\\url{{{ref.url}}}"
-                
-                latex_content += "\n\n"
+                sections.append(PaperSection(
+                    title=section_title,
+                    content=section_content,
+                    citations=citations
+                ))
             
-            latex_content += "\\end{thebibliography}\n\n"
-        
-        # LaTeX 푸터
-        latex_content += "\\end{document}"
-        
-        # 파일로 저장
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(latex_content)
-        
-        logger.info(f"LaTeX 형식으로 포맷팅 완료: {file_path}")
-        return file_path
-    
+            # 편집된 논문 객체 생성
+            edited_paper = Paper(
+                title=title,
+                topic=original_paper.topic,
+                sections=sections,
+                references=original_paper.references,
+                template_name=original_paper.template_name,
+                edit_history=original_paper.edit_history.copy()
+            )
+            
+            return edited_paper
+            
+        except Exception as e:
+            logger.error(f"편집된 논문 파싱 중 오류 발생: {str(e)}")
+            return original_paper
+
+    def _get_timestamp(self) -> str:
+        """현재 타임스탬프를 반환합니다."""
+        from datetime import datetime
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     def run(
         self, 
         paper: Paper,
-        style_guide: Optional[StyleGuide] = None,
+        style_guide_name: str = "Standard Academic",
+        citation_style: str = "APA",
         output_format: str = "markdown",
         config: Optional[RunnableConfig] = None
     ) -> Paper:
         """
-        편집 에이전트 실행
-        
+        편집 에이전트를 실행하고 편집된 논문을 반환합니다.
+
         Args:
-            paper: 편집할 논문
-            style_guide: 적용할 스타일 가이드
-            output_format: 출력 형식
-            config: 실행 설정
-            
+            paper (Paper): 편집할 논문
+            style_guide_name (str, optional): 스타일 가이드 이름. 기본값은 "Standard Academic"
+            citation_style (str, optional): 인용 스타일. 기본값은 "APA"
+            output_format (str, optional): 출력 형식. 기본값은 "markdown"
+            config (Optional[RunnableConfig], optional): 실행 구성
+
         Returns:
             Paper: 편집된 논문
         """
-        logger.info(f"편집 에이전트 실행 중: {paper.title}")
+        logger.info(f"편집 에이전트 실행 중: 논문 '{paper.title}'")
         
-        # 기본 스타일 가이드 설정
-        if not style_guide:
-            style_guide = StyleGuide(
-                name="Standard Academic",
-                rules=[
-                    "명확하고 간결한 문장 사용",
-                    "학술적 어조 유지",
-                    "능동태 우선 사용",
-                    "일관된 용어 사용"
-                ],
-                examples={
-                    "잘못된 예": "이 논문은 명확하고 간결한 문장을 사용하여 작성되었습니다.",
-                    "올바른 예": "이 논문은 학술적 어조를 유지하면서 작성되었습니다."
-                }
-            )
-        
-        # 1. 논문 편집
-        edited_paper = self.edit_paper(paper, style_guide)
-        
-        # 2. 논문 리뷰
-        review = self.review_paper(edited_paper)
-        
-        # 리뷰 결과를 논문 상태에 저장
-        edited_paper.metadata = edited_paper.metadata or {}
-        edited_paper.metadata["review"] = review.dict()
-        
-        # 3. 논문 포맷팅
-        formatted_file = self.format_paper(edited_paper, style_guide, output_format)
-        edited_paper.metadata["formatted_file"] = formatted_file
-        
-        logger.info(f"편집 에이전트 실행 완료: {paper.title}, 평점: {review.overall_rating}/10")
-        return edited_paper 
+        try:
+            # 상태 초기화
+            self.reset()
+            
+            # 1. 스타일 가이드 생성
+            style_guide = self.create_style_guide(style_guide_name)
+            
+            # 2. 논문 편집
+            edited_paper = self.edit_paper(paper, style_guide)
+            
+            # 3. 논문 리뷰
+            review_result = self.review_paper(edited_paper)
+            
+            # 리뷰 결과를 논문 상태에 저장
+            edited_paper.metadata = edited_paper.metadata or {}
+            edited_paper.metadata["review"] = review_result
+            
+            # 4. 논문 포맷팅
+            formatted_file = self.save_formatted_paper(edited_paper, output_format)
+            edited_paper.metadata["formatted_file"] = formatted_file
+            
+            logger.info(f"편집 에이전트 실행 완료: {paper.title}, 평점: {review_result['overall_rating']}/10")
+            return edited_paper
+            
+        except Exception as e:
+            logger.error(f"편집 에이전트 실행 중 오류 발생: {str(e)}")
+            
+            # 오류 발생 시 원본 논문 반환
+            paper.edit_history.append({
+                "timestamp": self._get_timestamp(),
+                "changes": ["편집 중 오류 발생"],
+                "style_guide": style_guide.name
+            })
+            return paper 
