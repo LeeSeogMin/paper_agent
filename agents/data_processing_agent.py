@@ -155,15 +155,15 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
             logger.info(f"PDF 처리 완료: {pdf_path}, {len(pages)}페이지, {len(text)}자")
             
             # 청크 생성
-        chunks = self.create_chunks(text, metadata=metadata)
+            chunks = self.create_chunks(text, metadata=metadata)
             
-        return ProcessingResult(
-            pdf_path=pdf_path,
-            total_pages=len(pages) if pages else 1,
-            total_chunks=len(chunks),
-            extracted_text_length=len(text),
-            metadata=metadata or {}
-        )
+            return ProcessingResult(
+                pdf_path=pdf_path,
+                total_pages=len(pages) if pages else 1,
+                total_chunks=len(chunks),
+                extracted_text_length=len(text),
+                metadata=metadata
+            )
             
         except Exception as e:
             logger.error(f"PDF 처리 중 오류 발생: {str(e)}")
@@ -202,6 +202,10 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
             logger.info(f"청크 생성 완료: {len(chunks)}개 청크")
             return chunks
             
+        except Exception as e:
+            logger.error(f"청크 생성 중 오류 발생: {str(e)}")
+            raise
+
     def initialize_vector_db(self, collection_name: str) -> Chroma:
         """
         벡터 DB를 초기화합니다.
