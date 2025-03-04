@@ -187,3 +187,41 @@ class Paper(BaseModel):
                 "status": "draft"
             }
         }
+
+class PaperOutline(BaseModel):
+    """Model representing the outline/structure of a paper"""
+    title: str
+    sections: List[Dict[str, Any]] = Field(
+        description="List of sections with their titles and brief descriptions"
+    )
+    target_length: Optional[int] = Field(
+        default=None,
+        description="Target length of the paper in words"
+    )
+    key_points: Optional[List[str]] = Field(
+        default=None,
+        description="Key points to be covered in the paper"
+    )
+    
+    class Config:
+        schema_extra = {
+            "example": {
+                "title": "Novel Approaches to Academic Paper Writing with AI",
+                "sections": [
+                    {
+                        "title": "Introduction",
+                        "description": "Background and motivation of the study"
+                    },
+                    {
+                        "title": "Literature Review",
+                        "description": "Review of existing approaches"
+                    }
+                ],
+                "target_length": 5000,
+                "key_points": [
+                    "Current challenges in academic writing",
+                    "AI-based solutions",
+                    "Future directions"
+                ]
+            }
+        }

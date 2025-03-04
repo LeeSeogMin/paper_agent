@@ -14,12 +14,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
+TEMPERATURE = OPENAI_TEMPERATURE  # Add alias for backward compatibility
 
 # Paper settings
 DEFAULT_TEMPLATE = "academic"
 DEFAULT_STYLE_GUIDE = "Standard Academic"
 DEFAULT_CITATION_STYLE = "APA"
 DEFAULT_FORMAT = "markdown"
+MAX_SECTION_TOKENS = 2000  # 섹션당 최대 토큰 수 추가
 
 # Output settings
 OUTPUT_DIR = os.path.join(BASE_DIR, "output")

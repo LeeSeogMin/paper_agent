@@ -35,8 +35,14 @@ def parse_arguments():
     """
     parser = argparse.ArgumentParser(description="AI Paper Writing Agent")
     
+    # Add new argument for user requirements
+    parser.add_argument("--requirements", type=str, default=None, 
+                       help="Detailed requirements for the paper in free text format")
+    
+    # Make topic optional since it might be extracted from requirements
+    parser.add_argument("--topic", type=str, required=False, help="Paper topic")
+    
     # Since DEFAULT_TEMPLATE and other constants are commented out, we handle default values as strings
-    parser.add_argument("--topic", type=str, required=True, help="Paper topic")
     parser.add_argument("--template", type=str, default="academic", help="Paper template name")
     parser.add_argument("--style", type=str, default="Standard Academic", help="Style guide name") 
     parser.add_argument("--citation", type=str, default="APA", help="Citation style")
@@ -49,6 +55,33 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def process_requirements(requirements: str) -> Dict[str, Any]:
+    """
+    Process user requirements using LLM to extract structured information
+    
+    Args:
+        requirements (str): Free-form text containing user requirements
+        
+    Returns:
+        Dict[str, Any]: Extracted parameters including topic, style, etc.
+    """
+    try:
+        # Here you would integrate with your LLM to analyze the requirements
+        # For now, we'll return a basic structure
+        # TODO: Implement LLM integration
+        return {
+            "topic": None,
+            "template": "academic",
+            "style": "Standard Academic",
+            "citation": "APA",
+            "format": "markdown",
+            "additional_requirements": requirements
+        }
+    except Exception as e:
+        logger.error(f"Error processing requirements: {str(e)}")
+        return {}
+
+
 def main():
     """
     Main application function
@@ -58,9 +91,34 @@ def main():
     # Configure logging
     configure_logging(args.log_level)
     
-    # Request topic from user if not provided
+    # Get requirements from user if not provided via command line
+    requirements = args.requirements
+    if not requirements:
+        print("\nPlease describe your paper requirements in detail.")
+        print("You can include topic, style preferences, specific sections needed, etc.")
+        print("Example: 'I need a technical paper about Graph Neural Networks focusing on")
+        print("recent applications in social networks, using IEEE format with LaTeX output.'")
+        requirements = input("\nYour requirements: ").strip()
+    
+    # Process requirements using LLM
+    if requirements:
+        params = process_requirements(requirements)
+        
+        # Update args with extracted parameters if not explicitly provided
+        if not args.topic and params.get("topic"):
+            args.topic = params["topic"]
+        if not args.template and params.get("template"):
+            args.template = params["template"]
+        if not args.style and params.get("style"):
+            args.style = params["style"]
+        if not args.citation and params.get("citation"):
+            args.citation = params["citation"]
+        if not args.format and params.get("format"):
+            args.format = params["format"]
+    
+    # Request topic from user if still not available
     if not args.topic:
-        args.topic = input("Graph Neural Network Topic Modeling: ")
+        args.topic = input("Please enter the paper topic: ")
     
     # If template not provided
     if not args.template:

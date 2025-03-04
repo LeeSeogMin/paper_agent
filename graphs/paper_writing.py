@@ -11,11 +11,15 @@ from config.settings import DEFAULT_TEMPLATE
 from utils.logger import logger
 from models.state import PaperWorkflowState
 from models.paper import Paper
-from agents.research_agent import ResearchAgent
-from agents.writing_agent import WriterAgent
-from agents.editing_agent import EditorAgent, StyleGuide
+from agents import (
+    get_coordinator_agent,
+    get_research_agent,
+    get_writer_agent,
+    get_editor_agent
+)
 from graphs.base import BaseGraph
 from agents.review_agent import ReviewAgent
+from agents.coordinator_agent import CoordinatorAgent
 
 
 def research_node(state: PaperWorkflowState) -> PaperWorkflowState:
@@ -31,6 +35,7 @@ def research_node(state: PaperWorkflowState) -> PaperWorkflowState:
     logger.info(f"연구 노드 실행 중: {state.topic}")
     
     # 연구 에이전트 초기화
+    ResearchAgent = get_research_agent()
     agent = ResearchAgent(verbose=state.verbose)
     
     # 연구 수행
@@ -58,6 +63,7 @@ def writing_node(state: PaperWorkflowState) -> PaperWorkflowState:
     logger.info(f"작성 노드 실행 중: {state.topic}")
     
     # 작성 에이전트 초기화
+    WriterAgent = get_writer_agent()
     agent = WriterAgent(verbose=state.verbose)
     
     # 템플릿 이름 확인
@@ -91,6 +97,7 @@ def editing_node(state: PaperWorkflowState) -> PaperWorkflowState:
     logger.info(f"편집 노드 실행 중: {state.paper.title}")
     
     # 편집 에이전트 초기화
+    EditorAgent = get_editor_agent()
     agent = EditorAgent(verbose=state.verbose)
     
     # 스타일 가이드 생성

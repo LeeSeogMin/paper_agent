@@ -16,7 +16,7 @@ class Author(BaseModel):
     affiliation: Optional[str] = None
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "name": "John Smith",
                 "affiliation": "University of Research"
@@ -32,7 +32,7 @@ class SearchQuery(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": "q1",
                 "text": "graph neural networks survey",
@@ -60,7 +60,7 @@ class ResearchMaterial(BaseModel):
     venue: Optional[str] = None
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "id": "paper_1",
                 "title": "A Survey of Graph Neural Networks",
@@ -90,7 +90,7 @@ class ResearchAnalysis(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now)
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "topic": "Graph Neural Networks for Topic Modeling",
                 "key_findings": [
@@ -113,5 +113,58 @@ class ResearchAnalysis(BaseModel):
                 ],
                 "materials": ["paper_1", "paper_2", "paper_3"],
                 "timestamp": "2023-06-10T00:00:00"
+            }
+        }
+
+
+class ResearchSummary(BaseModel):
+    """Model representing a summary of research findings"""
+    topic: str
+    key_findings: List[str] = Field(
+        default_factory=list,
+        description="주요 연구 결과 목록"
+    )
+    collected_materials: List[ResearchMaterial] = Field(
+        default_factory=list,
+        description="수집된 연구 자료 목록"
+    )
+    gaps: Optional[List[str]] = Field(
+        default=None,
+        description="식별된 연구 격차"
+    )
+    next_steps: Optional[List[str]] = Field(
+        default=None,
+        description="권장되는 다음 연구 단계"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.now,
+        description="연구 요약 생성 시간"
+    )
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "topic": "AI in Academic Writing",
+                "key_findings": [
+                    "AI tools significantly improve writing efficiency",
+                    "Language models can assist in literature review"
+                ],
+                "collected_materials": [
+                    {
+                        "id": "paper1",
+                        "title": "AI Writing Assistants",
+                        "authors": ["John Smith"],
+                        "summary": "Overview of AI writing tools..."
+                    }
+                ],
+                "gaps": [
+                    "Limited research on AI's impact on academic style",
+                    "Need for better evaluation metrics"
+                ],
+                "next_steps": [
+                    "Conduct comparative analysis of AI writing tools",
+                    "Develop academic style guidelines for AI assistance"
+                ],
+                "timestamp": "2023-06-01T00:00:00"
             }
         }
