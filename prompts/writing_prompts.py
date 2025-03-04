@@ -406,3 +406,50 @@ Write an academic paragraph that effectively integrates the citation.
 """,
     input_variables=["quote", "source", "context", "integration_purpose", "citation_style"],
 )
+
+# Academic writing prompt
+ACADEMIC_WRITING_PROMPT = PromptTemplate(
+    template="""
+당신은 학술 논문 작성 전문가입니다. 다음 연구 결과와 개요를 바탕으로 학술 논문을 작성해주세요.
+
+연구 주제: {topic}
+
+연구 결과:
+{research_results}
+
+논문 개요:
+{outline}
+
+작성 지침:
+1. 객관적인 학술적 어조로 작성하세요.
+2. 연구 결과를 명확하게 설명하세요.
+3. 적절한 학술 용어를 사용하세요.
+4. 논리적인 구조를 유지하세요.
+5. 내용에 맞는 적절한 참고문헌을 인용하세요.
+
+인용 지침 (APA 스타일):
+- 문장 내에서 인용할 때: 홍길동(2020)에 따르면, "인용 내용" 또는 "인용 내용"(홍길동, 2020)
+- 여러 저자 인용: (홍길동, 김철수, 2020) 또는 (홍길동 외, 2020)
+- 직접 인용 시 페이지 표시: (홍길동, 2020, p. 25)
+
+참고문헌 목록:
+{references}
+
+출력 형식:
+# 제목
+
+## 초록
+
+## 서론
+
+## 본론
+(필요한 섹션들)
+
+## 결론
+
+## 참고문헌
+1. 저자. (연도). 제목. 출처.
+2. ...
+""",
+    input_variables=["topic", "research_results", "outline", "references"],
+)

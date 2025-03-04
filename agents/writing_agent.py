@@ -726,3 +726,206 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         
         response = self.llm.invoke(prompt)
         return response.content
+
+    def generate_academic_paper(self, topic, research_data, outline, references, **kwargs):
+        """
+        학술 논문 생성
+        
+        Args:
+            topic: 논문 주제
+            research_data: 연구 데이터(자료 분석 결과)
+            outline: 논문 개요
+            references: 참고문헌 목록
+        
+        Returns:
+            str: 생성된 논문 내용
+        """
+        logger.info(f"논문 생성 시작: {topic}")
+        
+        try:
+            # 1. 인용 스타일 설정 (기본: APA)
+            citation_style = kwargs.get("citation_style", "APA")
+            
+            # 2. 참고문헌 ID 매핑 (인용에 사용)
+            ref_id_map = {}
+            for i, ref in enumerate(references):
+                ref_id = ref.get("id", f"ref_{i+1}")
+                ref_id_map[ref_id] = i + 1  # 1부터 시작하는 번호 부여
+            
+            # 3. 논문 구조에 따라 섹션별 생성
+            sections = []
+            
+            # 제목 및 초록
+            title_abstract = self.generate_section(
+                "title_abstract", topic, research_data, outline, ref_id_map, citation_style
+            )
+            sections.append(title_abstract)
+            
+            # 서론
+            introduction = self.generate_section(
+                "introduction", topic, research_data, outline, ref_id_map, citation_style
+            )
+            sections.append(introduction)
+            
+            # 본문 (각 섹션)
+            for section_idx, section in enumerate(outline.get("sections", [])):
+                section_title = section.get("title", f"Section {section_idx+1}")
+                section_content = self.generate_section(
+                    "body_section", topic, research_data, section, ref_id_map, citation_style,
+                    section_title=section_title
+                )
+                sections.append(section_content)
+            
+            # 결론
+            conclusion = self.generate_section(
+                "conclusion", topic, research_data, outline, ref_id_map, citation_style
+            )
+            sections.append(conclusion)
+            
+            # 4. 참고문헌 생성
+            references_section = self.format_references(references, citation_style)
+            sections.append(references_section)
+            
+            # 5. 전체 논문 통합
+            paper = "\n\n".join(sections)
+            
+            logger.info(f"논문 생성 완료: {len(paper)} 자")
+            return paper
+            
+        except Exception as e:
+            logger.error(f"논문 생성 중 오류: {str(e)}", exc_info=True)
+            return f"논문 생성 실패: {str(e)}"
+            
+    def generate_section(self, section_type, topic, research_data, section_info, ref_id_map, citation_style, **kwargs):
+        """
+        논문 섹션 생성
+        
+        Args:
+            section_type: 섹션 유형 (title_abstract, introduction, body_section, conclusion)
+            topic: 논문 주제
+            research_data: 연구 데이터
+            section_info: 섹션 정보
+            ref_id_map: 참고문헌 ID 매핑
+            citation_style: 인용 스타일
+        
+        Returns:
+            str: 생성된 섹션 내용
+        """
+        try:
+            # 섹션별 프롬프트 구성
+            if section_type == "title_abstract":
+                prompt = f"""
+                    당신은 학술 논문 작성 전문가입니다. 아래 연구 주제와 자료를 바탕으로 논문의 제목과 초록을 작성해주세요.
+                    
+                    논문 주제: {topic}
+                    
+                    연구 개요:
+                    {json.dumps(section_info, indent=2, ensure_ascii=False)}
+                    
+                    제목과 초록 작성 지침:
+                    1. 제목은 논문의 핵심을 명확하게 전달해야 합니다.
+                    2. 초록은 연구 목적, 방법, 결과, 결론을 간략히 포함해야 합니다.
+                    3. 초록은 200-300단어로 작성해주세요.
+                    4. 초록에는 참고문헌 인용을 포함하지 마세요.
+                    
+                    출력 형식:
+                    # [논문 제목]
+                    
+                    ## 초록
+                    [초록 내용]
+                """
+            elif section_type == "introduction":
+                # 인용 지침 추가
+                prompt = f"""
+                    당신은 학술 논문 작성 전문가입니다. 아래 연구 주제와 자료를 바탕으로 논문의 서론을 작성해주세요.
+                    
+                    논문 주제: {topic}
+                    
+                    연구 자료:
+                    {json.dumps(research_data[:3], indent=2, ensure_ascii=False)}
+                    
+                    연구 개요:
+                    {json.dumps(section_info, indent=2, ensure_ascii=False)}
+                    
+                    서론 작성 지침:
+                    1. 연구 배경, 문제 제기, 연구 목적을 명확히 설명해야 합니다.
+                    2. 관련 선행 연구를 소개하고 본 연구의 차별점을 언급해야 합니다.
+                    3. 연구의 구성을 간략히 안내해야 합니다.
+                    4. 적절한 참고문헌을 인용해주세요.
+                    
+                    인용 지침 ({citation_style} 스타일):
+                    - APA 형식: 인용할 내용 뒤에 (저자, 연도) 형태로 표기합니다. 예: (Smith, 2020)
+                    - 직접 인용은 "인용문" (저자, 연도, 페이지) 형태로 표기합니다.
+                    
+                    사용 가능한 참고문헌:
+                    {self._format_ref_list_for_prompt(references[:10], ref_id_map)}
+                    
+                    출력 형식:
+                    ## 서론
+                    [서론 내용]
+                """
+            # 다른 섹션 타입들에 대한 프롬프트 추가...
+            
+            # LLM으로 섹션 생성
+            response = self.llm.invoke(prompt)
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"섹션 생성 중 오류: {str(e)}", exc_info=True)
+            return f"## {kwargs.get('section_title', section_type.capitalize())}\n\n섹션 생성 중 오류가 발생했습니다."
+
+    def _format_ref_list_for_prompt(self, references, ref_id_map):
+        """프롬프트용 참고문헌 목록 형식화"""
+        ref_list = []
+        for ref in references:
+            ref_id = ref.get("id")
+            num = ref_id_map.get(ref_id, "?")
+            authors = ref.get("authors", "")
+            year = ref.get("year", "")
+            title = ref.get("title", "")
+            
+            ref_list.append(f"[{num}] {authors} ({year}). {title}")
+        
+        return "\n".join(ref_list)
+
+    def format_references(self, references, citation_style="APA"):
+        """
+        참고문헌 목록 형식화
+        
+        Args:
+            references: 참고문헌 목록
+            citation_style: 인용 스타일
+        
+        Returns:
+            str: 형식화된 참고문헌 섹션
+        """
+        # 참고문헌을 저자 이름 기준으로 정렬
+        sorted_refs = sorted(references, key=lambda x: x.get("authors", "Unknown").split(",")[0].lower())
+        
+        # 참고문헌 스타일에 따른 형식화
+        formatted_refs = []
+        
+        if citation_style.upper() == "APA":
+            for ref in sorted_refs:
+                authors = ref.get("authors", "")
+                year = ref.get("year", "")
+                title = ref.get("title", "")
+                source = ref.get("source", "")
+                url = ref.get("url", "")
+                
+                formatted_ref = f"{authors} ({year}). {title}. "
+                if source:
+                    formatted_ref += f"{source}. "
+                if url:
+                    formatted_ref += f"Retrieved from {url}"
+                
+                formatted_refs.append(formatted_ref)
+        
+        # 최종 참고문헌 섹션 생성
+        references_section = "## 참고문헌\n\n"
+        
+        for i, ref in enumerate(formatted_refs):
+            references_section += f"{i+1}. {ref}\n\n"
+        
+        return references_section

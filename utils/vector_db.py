@@ -136,7 +136,11 @@ def search_vector_db(
         logger.error(f"Vector database '{db_name}' does not exist")
         return []
     
-    vector_store = FAISS.load_local(db_path, embeddings)
+    vector_store = FAISS.load_local(
+        db_path, 
+        embeddings, 
+        allow_dangerous_deserialization=True
+    )
     
     # Search
     if filter_metadata:

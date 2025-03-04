@@ -1,0 +1,343 @@
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml"
+  xml:lang="pt-br" lang="pt-br" >
+<head>
+  <!-- Google Tag Manager -->
+  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+    new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+    j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+    'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+    })(window,document,'script','dataLayer','GTM-TK26HK5H');
+  </script>
+  <!-- End Google Tag Manager -->
+  <title>An application of graph neural networks on topic modelling with bi-partite graph...</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+  <meta name="robots" content="index, follow" />
+  <meta name="description" content="Graphs are data structures proper to represent real-world objects and their relationships having been widely studied in theory and with multiple examples of applications in industries and academic research...." />
+  <meta name="keywords" content="Aprendizado de máquina, Deep learning com grafos, Graph deep learning, Machine learning, Modelagem de tópicos, Neural networks, Redes neurais, Topic modelling" />
+  <meta name="generator" content="Biblioteca Digital de Teses e Disserta&ccedil;&otilde;es da USP" />
+  <meta name="date" content="2024-12-17T12:53:23-02:00" />
+  <link rel="shortcut icon" href="/templates/bdtd/favicon.ico" />
+  <link href="/templates/bdtd/favicon.ico" rel="shortcut icon" type="image/x-icon" />
+  <link rel="stylesheet" href="/modules/mod_jflanguageselection/tmpl/mod_jflanguageselection.css" type="text/css" />
+  <script type="text/javascript" src="/media/system/js/mootools.js"></script>
+  <script type="text/javascript" src="/media/system/js/caption.js"></script>
+  <link rel="stylesheet" href="/templates/bdtd/css/design.css" type="text/css" />
+  <link rel="stylesheet" href="/templates/bdtd/css/servicos.css" type="text/css" />
+  <link rel="stylesheet" href="/templates/bdtd/css/documento.css" type="text/css" />
+  <link rel="stylesheet" href="/estante/site/lib/jquery/css/flick/jquery-ui.css" type="text/css" />
+  <link rel="schema.DCTERMS" href="http://purl.org/dc/terms/" />
+  <link rel="schema.DC" href="http://purl.org/dc/elements/1.1/" />
+  <meta name="DC.language" content="por" xml:lang="pt-br" scheme="DCTERMS.RFC1766" />
+  <meta name="DC.creator" content="Oliveira, Bruno Fernandes Bessa de" xml:lang="pt-br" />
+
+  <meta name="DC.contributor" content="Lopes, Alneu de Andrade" xml:lang="pt-br" />
+
+  <meta name="DC.title" content="An application of graph neural networks on topic modelling with bi-partite graphs" xml:lang="en" />
+
+  <meta name="DC.title" content="Uma aplicação de redes neurais de grafos em modelagem de tópicos com grafos bipartidos" xml:lang="pt-br" />
+
+  <meta name="DCTERMS.abstract" content="Graphs are data structures proper to represent real-world objects and their relationships having been widely studied in theory and with multiple examples of applications in industries and academic research. Applying graph-based data in machine learning had a significant advance with the proposal of Graph Neural Networks (GNNs), allowing the representation of this type of data in algorithms that can retain features from the graph without the need for preprocessing stage. This master\'s dissertation presents an analysis of GNNs and proposes an application on text classification using topic modelling to create descriptive variables in bi-partite graphs." xml:lang="en" />
+
+  <meta name="DCTERMS.abstract" content="Grafos são estruturas de dados adequadas para representar objetos do mundo real e suas inter-relações, tendo sido amplamente estudados teoricamente e com múltiplos exemplos de aplicações na indústria e pesquisa acadêmica. A aplicação de dados originados de grafos em aprendizados de máquina teve um significante avanço com a proposta das Redes Neurais de Grafos (Graph Neural Networks, ou GNNs), permitindo a representação deste tipo de dados em algoritmos que são capazes de preservar as características do grafo sem necessidade de pré-processamento. Nesta dissertação apresentamos uma análise das redes neurais de grafos e uma proposta de aplicação no contexto de classificação de textos utilizando modelagem e tópicos para criação de variáveis descritivas em grafos bipartidos." xml:lang="pt-br" />
+
+
+  <meta name="DC.subject" content="Graph deep learning" xml:lang="en" />
+
+  <meta name="DC.subject" content="Machine learning" xml:lang="en" />
+
+  <meta name="DC.subject" content="Neural networks" xml:lang="en" />
+
+  <meta name="DC.subject" content="Topic modelling" xml:lang="en" />
+
+  <meta name="DC.subject" content="Aprendizado de máquina" xml:lang="pt-br" />
+
+  <meta name="DC.subject" content="Deep learning com grafos" xml:lang="pt-br" />
+
+  <meta name="DC.subject" content="Modelagem de tópicos" xml:lang="pt-br" />
+
+  <meta name="DC.subject" content="Redes neurais" xml:lang="pt-br" />
+
+  <meta name="DC.description" content="Dissertação de Mestrado" xml:lang="pt-br" />
+  <meta name="DC.description" content="Master's Dissertation" xml:lang="en" />
+  <meta name="DC.description" content="Instituto de Ciências Matemáticas e de Computação, 2023" xml:lang="pt-br" />
+  <meta name="DC.type" content="text" xml:lang="en" />
+  <meta name="DC.publisher" content="Biblioteca Digital de Teses e Dissertações da Universidade de São Paulo" xml:lang="pt-br" />
+  <meta name="DC.publisher" content="Universidade de São Paulo" xml:lang="pt-br" />
+  <meta name="DC.date" content="2024" xml:lang="pt-br" />
+  <meta name="DCTERMS.issued" content="2023-09-15" xml:lang="pt-br" />
+  <meta name="DCTERMS.available" content="2024-01-04" xml:lang="pt-br" />
+  <meta name="DC.identifier" content="tde-03012024-174804" xml:lang="pt-br" />
+
+  <meta name="DC.identifier" content="doi:10.11606/D.55.2023.tde-03012024-174804" xml:lang="pt-br" />
+
+
+  <meta name="citation_language" content="en" />
+  <meta name="citation_title" content="An application of graph neural networks on topic modelling with bi-partite graphs" />
+  <meta name="citation_keywords" content="Graph deep learning; Machine learning; Neural networks; Topic modelling" />
+  <meta name="citation_publication_date" content="2023-09-15" />
+  <meta name="citation_online_date" content="2024" />
+  <meta name="citation_author" content="Oliveira, Bruno Fernandes Bessa de" />
+  <meta name="citation_dissertation_institution" content="Universidade de São Paulo" />
+  <meta name="citation_publisher" content="Biblioteca Digital de Teses e Dissertações da Universidade de São Paulo" />
+  <meta name="citation_abstract_html_url" content="https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/" />
+
+  <meta name="citation_pdf_url" content="http://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/publico/BrunoFernandesBessadeOliveira_ME_revisada.pdf" />
+
+
+  <meta name="citation_doi" content="10.11606/D.55.2023.tde-03012024-174804" />
+
+  <script type="text/javascript" src="/templates/bdtd/js/nospam.js"></script>
+  <script type="text/javascript" src="/templates/bdtd/js/jquery-latest.js"></script>
+  <script type="text/javascript" src="/estante/site/lib/jquery/jquery-ui.min.js"></script>
+</head>
+<body>
+<!-- Google Tag Manager (noscript) -->
+<noscript>
+  <iframe src="https://www.googletagmanager.com/ns.html?id=GTM-TK26HK5H"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe>
+</noscript>
+  <!-- End Google Tag Manager (noscript) -->  
+<script type="text/javascript" src="/barra/barra.js"  charset="utf-8"></script>
+<div id="Site">
+  <div id="SiteBackground">
+    <div id="Cabecalho">
+      <div id="CabecalhoBarraUSP">&nbsp;</div>
+      <div id="CabecalhoTeses"><a id="HomeLink" href="/?lang=pt-br" title="Home"></a></div>
+
+      <div id="CabecalhoImagens">
+        <div class="moduletable"><noscript><div class="message">Sorry, but Javascript is not enabled in your browser!</div></noscript>
+<script language="javascript" type="text/javascript">
+<!--
+var embedSIRCSS = '<' + 'style type="text/css" media="all">'
++ '@import "/modules/mod_jw_sir/mod_jw_sir/mod_jw_sir.css";'
++ 'ul#jw-sir,ul#jw-sir li#jw-sir-loading {width:217px;height:90px;}'
++ '</' + 'style>';
+document.write(embedSIRCSS);
+-->
+</script>
+<script type="text/javascript" src="/modules/mod_jw_sir/mod_jw_sir/mod_jw_sir.js"></script>
+<script type="text/javascript">var delay=5000;var transition=40;var preLoader='jw-sir-loading';</script>
+        <ul id="jw-sir" class="">
+            <li id="jw-sir-loading"></li>
+            <li><img src="/templates/bdtd/banner/foto06.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto07.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto04.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto02.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto01.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto09.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto03.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto05.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto10.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+            <li><img src="/templates/bdtd/banner/foto08.png" style="width: 217px; height: 90px;" title="JoomlaWorks Simple Image Rotator" alt="JoomlaWorks Simple Image Rotator" /></li>
+          </ul>
+        </div>       
+      </div>
+    </div>
+    <div id="Corpo">
+      <div class="CorpoDivisao">
+        <div id="CorpoMenuTopo">&nbsp;</div>
+      </div>
+      <div class="CorpoDivisao">
+        <div id="CorpoReferencia"><span class="breadcrumbs pathway"><a href="/?&amp;lang=pt-br" class="pathway">Inic&iacute;o</a></span></div>
+        <div id="CorpoIdioma"><div id="jflanguageselection"><div class="rawimages"><span id="active_language"><a href="https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/?&amp;lang=pt-br"><img src="/components/com_joomfish/images/flags/pt-br.gif" alt="Português (Brasil)" title="Português (Brasil)" /></a></span><span ><a href="https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/?&amp;lang=en"><img src="/components/com_joomfish/images/flags/en.gif" alt="English (United Kingdom)" title="English (United Kingdom)" /></a></span><span ><a href="https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/?&amp;lang=es"><img src="/components/com_joomfish/images/flags/es.gif" alt="EspañSpanish Formal International)" title="EspañSpanish Formal International)" /></a></span><span ><a href="https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/?&amp;lang=fr"><img src="/components/com_joomfish/images/flags/fr.gif" alt="French (Fr)" title="French (Fr)" /></a></span></div></div>
+        </div>
+      </div>
+
+      <div class="BotoesCompartilhar" style="margin-top: 52px; margin-bottom: 6.5px">
+          <div style="font-size: 15.6px; font-weight: bold; margin-left: 6.5px;">Compartilhar:</div>
+
+          <div style="display: flex; justify-content: left; align-items: center; gap: 13px; margin: 13px 0; margin-left: 6.5px;">
+          <a href="#" id="share-whatsapp" target="_blank" title="Compartilhar link no WhatsApp">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/6/6b/WhatsApp.svg" alt="Compartilhar link no WhatsApp" style="width: 30px; height: 30px;">
+          </a>
+          <a href="#" id="share-facebook" target="_blank" title="Compartilhar link no Facebook">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/Facebook_icon.svg" alt="Compartilhar link no Facebook" style="width: 25px; height: 25px;">
+          </a>
+          <a id="share-x" target="_blank" title="Compartilhar link no X">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/c/cc/X_icon.svg" alt="Compartilhar link no X (Twitter)" style="width: 25px; height: 25px;" />
+          </a>
+          <a href="https://www.researchgate.net" target="_blank" title="Abrir ResearchGate">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/ResearchGate_icon_SVG.svg" alt="Abrir ResearchGate" style="width: 25px; height: 25px;">
+          </a>
+          <a href="#" id="share-linkedin" target="_blank" title="Compartilhar link no LinkedIn">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/e/e9/Linkedin_icon.svg" alt="Compartilhar link no LinkedIn" style="width: 25px; height: 25px;">
+        </a>
+      </div>
+
+    
+        <div class="bdPanel"><script type="text/javascript" src="http://www.teses.usp.br/estante/widget/estanteWidget.js"></script>
+          <div id="estante"></div>
+          <form action="" method="post">
+            <input type="hidden" name="evAutor" value="Oliveira, Bruno Fernandes Bessa de" />
+            <input type="hidden" name="evTitulo" value="An application of graph neural networks on topic modelling with bi-partite graphs" />
+            <input type="hidden" name="evAno" value="2023" />
+            <input type="hidden" name="evID" value="tde-03012024-174804" />
+            <input type="hidden" name="evIdioma" value="pt-br" />
+          </form>
+        </div>
+      </div>
+      <div class="CorpoDivisao">
+        <div class="CorpoServico">&nbsp;</div>
+        <div class="bdPanelServico">
+          <br />
+          <br />
+          <div class="menuTabServico"><a id="toogleServico" href="javascript: void(0);"><img src="/templates/bdtd/images/add.png" alt="Servi&ccedil;os" title="Servi&ccedil;os" border="0" /></a></div>
+          <div class="menuPanelServico" id="menuServico">
+            <div class="conteudoPanel">
+              <div class="menuTitulo">Servi&ccedil;os</div>
+              <hr class="servico"/>
+              <div class="menuItem"><a href="#referencias">Trabalhos decorrentes</a></div>
+              <!--
+              <hr class="servico"/>
+              <div class="menuItem"><a href="javascript: void(0);">Estatist&iacute;cas</a></div>
+              <div class="menuItem">&nbsp;&nbsp;<div class="menuItemTitulo"><a href="javascript: window.open('/stats.php?id=tde-03012024-174804&amp;t=v&amp;lang=pt-br','','');"><img width="12" height="13" src="/images/chart_bar.png" alt="Visitas" border="0" /> Visitas</a></div><div class="menuItemValor"></div></div>
+              <div class="menuItem">&nbsp;&nbsp;<div class="menuItemTitulo"><a href="javascript: window.open('/stats.php?id=tde-03012024-174804&amp;t=d&amp;lang=pt-br','','');"><img width="12" height="13" src="/images/chart_bar.png" alt="Downloads" border="0" /> Downloads</a></div><div class="menuItemValor"></div></div>
+              -->
+              <hr class="servico"/>
+              <div class="menuItem"><a href="javascript: window.open('/cite.php?id=tde-03012024-174804&amp;lang=pt-br','','width=640,height=480,resizable=yes,scrollbars=1,menubar=no');">Como citar</a></div>
+              <hr class="servico"/>
+              <div class="menuItem"><a href="javascript: window.open('/marc.php?id=tde-03012024-174804&amp;lang=pt-br','','width=640,height=480,resizable=yes,scrollbars=1,menubar=no');">Formato MARC</a></div>
+              <div class="menuItem"><a href="javascript: window.open('/xml.php?id=tde-03012024-174804','','width=640,height=480,resizable=yes,scrollbars=1,menubar=no');">Formato OAI DC</a></div>
+            </div>
+          </div>
+        </div>
+        <script type="text/javascript">
+          $("#toogleServico").click(function () {
+	    $("#menuServico").slideToggle("fast");
+	  });
+        </script>
+        <div class="CorpoServicoDivisao">&nbsp;</div>
+      </div>
+      <div class="CorpoDivisao">
+        <div id="CorpoConteudoDocumento">
+          <div id="CorpoTexto">
+<div class="DocumentoTitulo">Disserta&ccedil;&atilde;o de Mestrado</div>
+
+<div class="DocumentoTituloTexto">DOI</div><div class="DocumentoTexto">https://doi.org/10.11606/D.55.2023.tde-03012024-174804</div>
+
+<div class="DocumentoTituloTexto">Documento</div><div class="DocumentoTexto"><a href="/index.php?option=com_jumi&amp;fileid=11&amp;Itemid=76&amp;lang=pt-br">Disserta&ccedil;&atilde;o de Mestrado</a></div>
+<div class="DocumentoTituloTexto">Autor</div><div class="DocumentoTexto"><a href="/index.php?option=com_jumi&amp;fileid=17&amp;Itemid=160&amp;id=57A63DF19765&amp;lang=pt-br">Oliveira, Bruno Fernandes Bessa de</a> (<a href="http://dedalus.usp.br/F/?func=scan&amp;scan_code=AUT&amp;scan_start=Oliveira, Bruno Fernandes Bessa de" target="_blank">Cat&aacute;logo USP</a>)</div>
+<div class="DocumentoTituloTexto">Nome completo</div><div class="DocumentoTexto">Bruno Fernandes Bessa de Oliveira</div>
+
+<div class="DocumentoTituloTexto">Unidade da USP</div><div class="DocumentoTexto"><a href="/index.php?option=com_jumi&amp;fileid=30&amp;Itemid=162&amp;id=55&amp;lang=pt-br">Instituto de Ciências Matemáticas e de Computação</a></div>
+
+<div class="DocumentoTituloTexto">&Aacute;rea do Conhecimento</div><div class="DocumentoTexto"><a href="/index.php?option=com_jumi&amp;fileid=9&amp;Itemid=159&amp;id=55137&amp;prog=55005&amp;exp=0&amp;lang=pt-br">Matemática, Estatística e Computação</a></div>
+
+
+<div class="DocumentoTituloTexto">Data de Defesa</div><div class="DocumentoTexto"><a href="/index.php?option=com_jumi&amp;fileid=29&amp;Itemid=158&amp;id=2023&amp;lang=pt-br">2023-09-15</a></div>
+
+<div class="DocumentoTituloTexto">Imprenta</div><div class="DocumentoTexto">São Carlos, 2023</div>
+
+<div class="DocumentoTituloTexto">Orientador</div><div class="DocumentoTexto">
+
+<a href="/index.php?option=com_jumi&amp;fileid=14&amp;Itemid=161&amp;id=17A12528C181&amp;lang=pt-br">Lopes, Alneu de Andrade</a> (<a href="http://dedalus.usp.br/F/?func=scan&amp;scan_code=AUT&amp;scan_start=Lopes, Alneu de Andrade" target="_blank">Cat&aacute;logo USP</a>)<br />
+
+</div>
+
+
+<div class="DocumentoTituloTexto">Banca examinadora</div><div class="DocumentoTexto">
+
+Lopes, Alneu de Andrade (Presidente)<br />
+
+Faleiros, Thiago de Paulo<br />
+
+Liang, Zhao<br />
+
+Rodrigues, Francisco Aparecido<br />
+
+</div>
+
+<div>&nbsp;</div> <!-- Esta div vazia cria um espa�o -->
+<div class="DocumentoTituloTexto">T&iacute;tulo em ingl&ecirc;s</div><div class="DocumentoTexto"><strong>An application of graph neural networks on topic modelling with bi-partite graphs</strong></div>
+
+<div class="DocumentoTituloTexto">Palavras-chave em ingl&ecirc;s</div>
+<div class="DocumentoTexto">
+    
+    <em>Graph deep learning</em><br />
+    
+    <em>Machine learning</em><br />
+    
+    <em>Neural networks</em><br />
+    
+    <em>Topic modelling</em><br />
+    
+</div>
+
+
+<div class="DocumentoTituloTexto2">Resumo em ingl&ecirc;s</div>
+<div class="DocumentoTextoResumo">Graphs are data structures proper to represent real-world objects and their relationships having been widely studied in theory and with multiple examples of applications in industries and academic research. Applying graph-based data in machine learning had a significant advance with the proposal of Graph Neural Networks (GNNs), allowing the representation of this type of data in algorithms that can retain features from the graph without the need for preprocessing stage. This master's dissertation presents an analysis of GNNs and proposes an application on text classification using topic modelling to create descriptive variables in bi-partite graphs.</div>
+
+<div>&nbsp;</div> <!-- Esta div vazia cria um espa�o -->
+<div>&nbsp;</div>
+<div class="DocumentoTituloTexto">T&iacute;tulo em portugu&ecirc;s</div><div class="DocumentoTexto"><strong>Uma aplicação de redes neurais de grafos em modelagem de tópicos com grafos bipartidos</strong></div>
+
+<!-- BEGIN bl_palavras_chave_alternativo -->
+<div class="DocumentoTituloTexto">Palavras-chave em portugu&ecirc;s</div><div class="DocumentoTexto">
+  
+  <em>Aprendizado de máquina</em><br />
+  
+  <em>Deep learning com grafos</em><br />
+  
+  <em>Modelagem de tópicos</em><br />
+  
+  <em>Redes neurais</em><br />
+  
+</div>
+
+<div class="DocumentoTituloTexto2">Resumo em portugu&ecirc;s</div>
+<div class="DocumentoTextoResumo">Grafos são estruturas de dados adequadas para representar objetos do mundo real e suas inter-relações, tendo sido amplamente estudados teoricamente e com múltiplos exemplos de aplicações na indústria e pesquisa acadêmica. A aplicação de dados originados de grafos em aprendizados de máquina teve um significante avanço com a proposta das Redes Neurais de Grafos (Graph Neural Networks, ou GNNs), permitindo a representação deste tipo de dados em algoritmos que são capazes de preservar as características do grafo sem necessidade de pré-processamento. Nesta dissertação apresentamos uma análise das redes neurais de grafos e uma proposta de aplicação no contexto de classificação de textos utilizando modelagem e tópicos para criação de variáveis descritivas em grafos bipartidos.</div>
+
+<div class="DocumentoTituloTexto4">&nbsp;</div>
+<div class="DocumentoTituloTexto2"></div>
+
+<div class="DocumentoTituloTexto3"><b>AVISO - A consulta a este documento fica condicionada na aceita&ccedil;&atilde;o das seguintes condi&ccedil;&otilde;es de uso:</b><br />Este trabalho &eacute; somente para uso privado de atividades de pesquisa e ensino. N&atilde;o &eacute; autorizada sua reprodu&ccedil;&atilde;o para quaisquer fins lucrativos. Esta reserva de direitos abrange a todos os dados do documento bem como seu conte&uacute;do. Na utiliza&ccedil;&atilde;o ou cita&ccedil;&atilde;o de partes do documento &eacute; obrigat&oacute;rio mencionar nome da pessoa autora do trabalho.</div>
+
+
+<div class="DocumentoTituloTexto2"><a href="/teses/disponiveis/55/55137/tde-03012024-174804/publico/BrunoFernandesBessadeOliveira_ME_revisada.pdf">BrunoFernandesBessadeOliveira_ME_revisada.pdf</a>  (1.79 Mbytes)</div>
+
+
+
+
+<div class="DocumentoTituloTexto">Data de Publica&ccedil;&atilde;o</div><div class="DocumentoTexto">2024-01-04</div>
+<div class="DocumentoTituloTexto4">&nbsp;</div>
+<div class="CaixaReferencia">
+<div class="DocumentoTitulo"><a name="referencias">Trabalhos decorrentes</a></div>
+
+
+<div class="DocumentoTituloTexto3"><b>AVISO</b>: Saiba o que s&atilde;o os trabalhos decorrentes <a href='http://www.teses.usp.br/index.php?option=com_content&amp;view=article&amp;id=64&amp;Itemid=194&amp;lang=pt-br'>clicando aqui</a>.</div>
+
+</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="Rodape">
+      <div id="Direitos">
+        <div class="moduletable">
+          <div>Todos os direitos da tese/disserta&ccedil;&atilde;o s&atilde;o de seus autores.<br />
+          CeTI-SC/STI<br />
+          &#169; 2001-2025. Biblioteca Digital de Teses e Disserta&ccedil;&otilde;es da USP.<br /></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+      const currentUrl = "https://www.teses.usp.br/teses/disponiveis/55/55137/tde-03012024-174804/pt-br.php";
+      const currentTitle = "";
+
+      document.getElementById('share-whatsapp').href = `https://api.whatsapp.com/send?text=${encodeURIComponent(currentTitle)}%20${encodeURIComponent(currentUrl)}`;
+      document.getElementById('share-facebook').href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`;
+      document.getElementById('share-x').href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(currentTitle)}&url=${encodeURIComponent(currentUrl)}`;
+      document.getElementById('share-linkedin').href = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(currentUrl)}`;
+  });
+</script>
+
+</body>
+</html>

@@ -9,6 +9,7 @@ import os
 import re
 import json
 import time
+import uuid
 from typing import List, Dict, Any, Optional, Tuple
 
 from langchain.agents import AgentExecutor, create_openai_tools_agent
@@ -252,143 +253,139 @@ class ResearchAgent(BaseAgent):
             logger.error(f"Error evaluating source: {str(e)}", exc_info=True)
             return 0.7, f"Error evaluating source: {str(e)}. Using default relevance score."
     
-    def collect_research_materials(self, topic, max_queries=3, max_results_per_query=5):
+    def collect_research_materials(self, topic, max_queries=3, results_per_source=10, final_result_count=20):
         """
-        연구 자료 수집 통합 함수
+        연구 주제에 따른 자료 수집 (PDF 및 영어 자료만)
+        
+        Args:
+            topic: 연구 주제
+            max_queries: 생성할 최대 검색 쿼리 수
+            results_per_source: 각 소스별 최대 결과 수
+            final_result_count: 최종 선정할 결과 수
+        
+        Returns:
+            List[ResearchMaterial]: 수집된 연구 자료 리스트
         """
         logger.info(f"Collecting research materials for topic: {topic}")
         
-        # Generate search queries
-        search_queries = self.generate_search_queries(topic, n_queries=max_queries)
+        # 수집된 모든 자료
+        all_materials = []
         
-        all_sources = []
-        materials = []
-        
-        # 먼저 로컬 데이터에서 검색
         try:
-            local_results = self.search_local_papers(topic, max_results=max_results_per_query)
-            if local_results:
-                logger.info(f"로컬 데이터에서 {len(local_results)}개 논문 찾음")
-                
-                # 각 로컬 결과를 처리
-                for result in local_results:
-                    # 소스 평가
-                    relevance_score, explanation = self.evaluate_source(result, topic)
-                    
-                    if relevance_score >= 0.6:
-                        # 저자 처리: 문자열이면 리스트로 변환
-                        if isinstance(result.get('authors', ''), str):
-                            authors_list = [author.strip() for author in result.get('authors', '').split(',') if author.strip()]
-                        else:
-                            authors_list = result.get('authors', [])
-                        
-                        # 연도 처리: 날짜 형식이면 연도만 추출
-                        year_value = result.get('year', result.get('published_date', ''))
-                        if isinstance(year_value, str):
-                            # 연도만 추출 시도
-                            year_match = re.search(r'(19|20)\d{2}', year_value)
-                            if year_match:
-                                year_int = int(year_match.group(0))
-                            else:
-                                year_int = None
-                        else:
-                            year_int = year_value
-                        
-                        # 연구 자료 생성
-                        material = ResearchMaterial(
-                            id=result.get("id") or f"local_{len(materials)}",
-                            title=result.get("title", ""),
-                            authors=authors_list,  # 리스트로 변환된 저자
-                            year=year_int,  # 정수로 변환된 연도
-                            abstract=result.get("abstract", ""),
-                            url=result.get("url", ""),
-                            pdf_url=result.get("pdf_url", ""),
-                            relevance_score=relevance_score,
-                            evaluation=explanation,
-                            query_id="local",
-                            content=result.get("content", ""),
-                            summary=result.get("summary", "")
-                        )
-                        
-                        materials.append(material)
-                        all_sources.append(result)
-        except Exception as e:
-            logger.warning(f"로컬 데이터 검색 중 오류: {str(e)}")
-        
-        # 온라인 검색
-        for query in search_queries:
-            logger.info(f"Processing query: {query.text}")
+            # 1. 로컬 데이터베이스 검색 (PDF 자료만 필터링)
+            local_results = self.search_local_papers(topic, max_results=results_per_source)
+            local_results = [r for r in local_results if r.get('pdf_url') or 'pdf_path' in r]
             
-            # 학술 논문 검색
-            logger.info(f"검색 쿼리 '{query.text}'로 논문 검색 중...")
-            papers = self.search_academic_papers(query.text, max_results_per_query)
-            
-            # 웹 검색 (Google)
-            web_results = google_search(query.text, num_results=max_results_per_query)
-            
-            # 학술 및 웹 결과 결합
-            combined_results = papers + web_results
-            
-            # 각 결과 처리
-            for result in combined_results:
-                # 이미 처리된 결과면 건너뛰기
-                if any(s.get("url") == result.get("url") for s in all_sources):
-                    continue
-                
-                # 소스 평가
+            for result in local_results:
                 relevance_score, explanation = self.evaluate_source(result, topic)
                 
-                # 관련성 기준 이상인 경우만 포함
                 if relevance_score >= 0.6:
-                    # 저자 처리: 문자열이면 리스트로 변환
-                    if isinstance(result.get('authors', ''), str):
-                        authors_list = [author.strip() for author in result.get('authors', '').split(',') if author.strip()]
-                    else:
-                        authors_list = result.get('authors', [])
-                    
-                    # 연도 처리: 날짜 형식이면 연도만 추출
-                    year_value = result.get('year', result.get('published_date', ''))
-                    if isinstance(year_value, str):
-                        # 연도만 추출 시도
-                        year_match = re.search(r'(19|20)\d{2}', year_value)
-                        if year_match:
-                            year_int = int(year_match.group(0))
-                        else:
-                            year_int = None
-                    else:
-                        year_int = year_value
-                    
-                    # 연구 자료 생성
-                    material = ResearchMaterial(
-                        id=result.get("id") or f"paper_{len(materials)}",
-                        title=result.get("title", ""),
-                        authors=authors_list,  # 리스트로 변환된 저자
-                        year=year_int,  # 정수로 변환된 연도
-                        abstract=result.get("abstract", ""),
-                        url=result.get("url", ""),
-                        pdf_url=result.get("pdf_url", ""),
-                        relevance_score=relevance_score,
-                        evaluation=explanation,
-                        query_id=query.id,
-                        content="",
-                        summary=""
-                    )
-                    
-                    materials.append(material)
-                    all_sources.append(result)
+                    # 자료 처리 및 ResearchMaterial 생성
+                    material = self._create_research_material(result, "local", relevance_score, explanation)
+                    if material:
+                        all_materials.append(material)
             
-            # 충분한 자료를 수집했으면 중단
-            if len(materials) >= max_results_per_query * 2:
-                break
+            # 2. 검색 쿼리 생성
+            search_queries = self.generate_search_queries(topic, n_queries=max_queries)
+            
+            # 3. 논문 검색 (영어 자료만)
+            for query in search_queries:
+                # 'query_text' 대신 올바른 속성 이름 사용
+                # SearchQuery 모델의 실제 속성 이름 사용 (예: query, text)
+                query_text = query.text  # 'text'가 실제 속성일 경우
+                logger.info(f"Processing query: {query_text}")
+                
+                # 학술 검색 및 웹 검색 실행 (영어만)
+                academic_results = academic_search(query_text, max_results=results_per_source, language='en')
+                web_results = fallback_search(query_text, max_results=results_per_source, language='en')
+                
+                # PDF URL이 있는 결과만 유지
+                academic_results = [r for r in academic_results if r.get('pdf_url')]
+                web_results = [r for r in web_results if r.get('pdf_url')]
+                
+                # 결과 결합 및 평가
+                combined_results = academic_results + web_results
+                
+                # 각 결과 평가
+                evaluated_results = []
+                for result in combined_results:
+                    relevance_score, explanation = self.evaluate_source(result, topic)
+                    result['relevance_score'] = relevance_score
+                    result['evaluation'] = explanation
+                    evaluated_results.append(result)
+                
+                # 관련성 점수로 정렬하고 상위 결과만 선택
+                evaluated_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+                top_results = evaluated_results[:results_per_source]
+                
+                # 관련성 기준 이상인 결과만 최종 자료로 변환
+                for result in top_results:
+                    if result.get('relevance_score', 0) >= 0.6:
+                        material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
+                        if material:
+                            all_materials.append(material)
+            
+            # 4. 중복 제거 (제목 기준)
+            unique_materials = {}
+            for material in all_materials:
+                # 제목을 기준으로 중복 확인 (소문자 변환 및 공백 제거하여 비교)
+                normalized_title = material.title.lower().strip()
+                # 이미 있는 자료보다 관련성이 높은 경우 대체
+                if normalized_title not in unique_materials or material.relevance_score > unique_materials[normalized_title].relevance_score:
+                    unique_materials[normalized_title] = material
+            
+            # 5. 관련성 점수 기준 정렬 후 최종 선정
+            final_materials = list(unique_materials.values())
+            final_materials.sort(key=lambda x: x.relevance_score, reverse=True)
+            final_materials = final_materials[:final_result_count]  # 최종 개수로 제한
+            
+            logger.info(f"Collected {len(final_materials)} research materials after deduplication and filtering")
+            return final_materials
+            
+        except Exception as e:
+            logger.error(f"Error collecting research materials: {str(e)}", exc_info=True)
+            raise
+    
+    def _create_research_material(self, result, query_id, relevance_score, evaluation):
+        """자료로부터 ResearchMaterial 객체 생성 (helper 메서드)"""
+        # PDF URL 확인
+        pdf_url = result.get('pdf_url')
+        if not pdf_url:
+            return None
         
-        logger.info(f"Collected {len(materials)} research materials")
+        # 저자 처리
+        if isinstance(result.get('authors', ''), str):
+            authors_list = [author.strip() for author in result.get('authors', '').split(',') if author.strip()]
+        else:
+            authors_list = result.get('authors', [])
         
-        # 검색 결과가 없으면 오류 발생
-        if len(materials) == 0:
-            logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
-            raise ValueError("검색 결과가 없어 연구를 진행할 수 없습니다. 다른 주제나 검색어를 시도해보세요.")
+        # 연도 처리
+        year_value = result.get('year', result.get('published_date', ''))
+        if isinstance(year_value, str):
+            # 연도만 추출 시도
+            year_match = re.search(r'(19|20)\d{2}', year_value)
+            if year_match:
+                year_int = int(year_match.group(0))
+            else:
+                year_int = None
+        else:
+            year_int = year_value
         
-        return materials[:max_results_per_query * 2]
+        # 연구 자료 생성
+        return ResearchMaterial(
+            id=result.get("id") or f"paper_{uuid.uuid4().hex[:8]}",
+            title=result.get("title", ""),
+            authors=authors_list,
+            year=year_int,
+            abstract=result.get("abstract", ""),
+            url=result.get("url", ""),
+            pdf_url=pdf_url,
+            relevance_score=relevance_score,
+            evaluation=evaluation,
+            query_id=query_id,
+            content="",
+            summary=""
+        )
     
     def extract_content_from_pdf(self, pdf_url: str) -> str:
         """
@@ -495,7 +492,12 @@ class ResearchAgent(BaseAgent):
             # 벡터 DB에서 관련 정보 검색 추가
             if material.abstract:
                 try:
-                    similar_docs = search_vector_db(material.abstract, top_k=3)
+                    # 'collection_name' 대신 'db_name' 사용
+                    similar_docs = search_vector_db(
+                        db_name="research_papers",  # collection_name 대신 db_name
+                        query=material.abstract, 
+                        k=3
+                    )
                     
                     # 유사 문서 정보 추가
                     if similar_docs:
@@ -519,42 +521,47 @@ class ResearchAgent(BaseAgent):
         logger.info(f"Enriched {len(enriched_materials)} research materials")
         return enriched_materials
     
-    def analyze_research_materials(
-        self, 
-        materials: List[ResearchMaterial],
-        topic: str
-    ) -> Dict[str, Any]:
+    def analyze_research_materials(self, materials, topic):
         """
-        Analyze collected research materials.
+        연구 자료 분석
         
         Args:
-            materials (List[ResearchMaterial]): List of research materials
-            topic (str): Paper topic
-            
+            materials: 연구 자료 목록
+            topic: 연구 주제
+        
         Returns:
-            Dict[str, Any]: Analysis results
+            분석 결과
         """
         logger.info(f"Analyzing {len(materials)} research materials for topic: {topic}")
         
         try:
-            # Prepare materials for analysis
-            materials_data = []
-            
+            # 분석용 데이터 준비
+            research_data = []
             for material in materials:
-                material_info = {
+                # authors 필드가 문자열인 경우 처리
+                if isinstance(material.authors, str):
+                    authors = material.authors
+                else:
+                    try:
+                        authors = ", ".join(material.authors)
+                    except:
+                        authors = str(material.authors)
+                
+                data = {
                     "id": material.id,
                     "title": material.title,
-                    "authors": [a.name for a in material.authors],
+                    "authors": authors,  # 문자열로 변환된 저자 정보
                     "year": material.year,
+                    "abstract": material.abstract,
                     "relevance_score": material.relevance_score,
-                    "summary": material.summary or material.abstract
+                    "evaluation": material.evaluation
                 }
-                materials_data.append(material_info)
+                research_data.append(data)
             
             # Perform analysis
             result = self.analysis_chain.invoke({
                 "topic": topic,
-                "materials": json.dumps(materials_data, indent=2)
+                "materials": json.dumps(research_data, indent=2)
             })
             
             analysis_text = result['text']
@@ -747,12 +754,13 @@ class ResearchAgent(BaseAgent):
         
         try:
             # 1. 연구 자료 수집
-            max_sources = kwargs.get("max_sources", 10)
-            # 새로운 파라미터 구조 사용
+            max_sources = kwargs.get("max_sources", 20)  # 기본값 20으로 변경
+            # 각 소스별 10개 결과, 최종 max_sources개 선정
             materials = self.collect_research_materials(
                 topic, 
-                max_queries=3, 
-                max_results_per_query=max_sources//3
+                max_queries=5,  # 쿼리 수 증가 
+                results_per_source=10,  # 각 소스별 10개
+                final_result_count=max_sources  # 최종 선정 개수
             )
             
             # 명시적으로 검색 결과가 없는지 확인
@@ -776,15 +784,19 @@ class ResearchAgent(BaseAgent):
             keywords = self.extract_keywords(topic, analysis)
             references = self.extract_references(enriched_materials)
             
+            # 인용 스타일 설정 (기본값: APA)
+            citation_style = kwargs.get("citation_style", "APA")
+            
             # 결과 반환
             return {
                 "status": "completed",
                 "topic": topic,
-                "materials": [material.to_dict() for material in enriched_materials],
+                "materials": [material.dict() for material in enriched_materials],
                 "analysis": analysis,
                 "outline": outline,
                 "keywords": keywords,
-                "references": references
+                "references": references,
+                "citation_style": citation_style  # 인용 스타일 추가
             }
         except Exception as e:
             logger.error(f"연구 에이전트 실행 중 오류 발생: {str(e)}", exc_info=True)
@@ -955,3 +967,103 @@ class ResearchAgent(BaseAgent):
         except Exception as e:
             logger.error(f"로컬 논문 검색 중 오류: {str(e)}", exc_info=True)
             return []
+
+    def extract_keywords(self, topic, analysis):
+        """
+        주제와 분석 결과에서 중요 키워드 추출
+        
+        Args:
+            topic: 연구 주제
+            analysis: 분석 결과
+            
+        Returns:
+            List[str]: 키워드 목록
+        """
+        logger.info(f"주제 '{topic}'에 대한 키워드 추출 중")
+        
+        try:
+            # 슬라이싱 대신 문자열 길이 제한
+            analysis_text = analysis
+            if isinstance(analysis, str) and len(analysis) > 2000:
+                analysis_text = analysis[:2000] + "..."
+            
+            # LLM을 사용하여 중요 키워드 추출
+            messages = [
+                SystemMessage(content="You are a research assistant tasked with extracting important keywords."),
+                HumanMessage(content=f"""
+                    Extract the most important keywords from this research topic and analysis.
+                    
+                    TOPIC: {topic}
+                    
+                    ANALYSIS: {analysis_text}
+                    
+                    List 10-15 important keywords as a comma-separated list.
+                    Format: keyword1, keyword2, keyword3, ...
+                """)
+            ]
+            
+            response = self.llm.invoke(messages)
+            
+            # 응답에서 키워드 추출
+            keywords_text = response.content.strip()
+            keywords = [k.strip() for k in keywords_text.split(',')]
+            
+            # 중복 제거 및 빈 문자열 제외
+            keywords = [k for k in keywords if k]
+            keywords = list(dict.fromkeys(keywords))
+            
+            logger.info(f"{len(keywords)}개 키워드 추출됨")
+            return keywords
+        
+        except Exception as e:
+            logger.error(f"키워드 추출 중 오류 발생: {str(e)}", exc_info=True)
+            return ["인공지능", "머신러닝", "딥러닝", "AI", "연구동향"]  # 기본 키워드 반환
+
+    def extract_references(self, materials):
+        """
+        연구 자료에서 참고문헌 정보 추출
+        
+        Args:
+            materials: 연구 자료 목록
+            
+        Returns:
+            List[Dict]: 참고문헌 목록
+        """
+        logger.info(f"{len(materials)}개 자료에서 참고문헌 추출 중")
+        
+        references = []
+        
+        for material in materials:
+            # 각 자료를 참고문헌으로 변환
+            try:
+                # authors 필드가 문자열인지 리스트인지 확인
+                if isinstance(material.authors, str):
+                    author_text = material.authors
+                elif isinstance(material.authors, list):
+                    if all(isinstance(a, str) for a in material.authors):
+                        author_text = ", ".join(material.authors)
+                    else:
+                        # 복잡한 객체가 있을 경우 처리
+                        author_text = ", ".join(str(a) for a in material.authors)
+                else:
+                    author_text = "Unknown"
+                
+                # 연도 처리
+                year = material.year if material.year else "n.d."
+                
+                reference = {
+                    "id": material.id,
+                    "title": material.title,
+                    "authors": author_text,
+                    "year": year,
+                    "source": getattr(material, 'source', ''),
+                    "url": material.url
+                }
+                
+                references.append(reference)
+                
+            except Exception as e:
+                logger.error(f"참고문헌 변환 중 오류: {str(e)}")
+        
+        logger.info(f"{len(references)}개 참고문헌 추출됨")
+        return references

@@ -6,57 +6,61 @@ from utils.logger import logger
 GOOGLE_API_KEY = "AIzaSyD4QKVRA96r0lkIxUV5LrJwI732HA9rhtA"
 GOOGLE_CSE_ID = "075b324570149415f"
 
-def google_search(query, num_results=10):
+def google_search(query, num_results=10, language='en'):
     """
-    Google 검색을 수행하고 결과를 반환합니다.
+    구글 검색을 수행하고 결과를 반환
     
     Args:
-        query (str): 검색 쿼리
-        num_results (int): 반환할 최대 결과 수
-        
+        query: 검색 쿼리
+        num_results: 검색 결과 수
+        language: 검색 언어 코드 (기본값: 영어)
+    
     Returns:
         List[Dict]: 검색 결과 목록
     """
-    logger.info(f"Google 검색 시작: '{query}'")
+    logger.info(f"Google 검색: '{query}', 언어: {language}")
     
     try:
-        # 디버깅을 위한 로그 추가
-        logger.debug(f"검색 쿼리 전처리 전: {query}")
+        # 영어 검색 쿼리로 제한 (한글 검색 제외)
+        search_query = f"{query} filetype:pdf"
         
-        # 쿼리 전처리 - 따옴표 제거 및 길이 제한
-        if query.startswith('"') and query.endswith('"'):
-            query = query[1:-1]
+        # 검색 API 호출
+        search_url = f"https://www.googleapis.com/customsearch/v1"
+        params = {
+            'key': GOOGLE_API_KEY,
+            'cx': GOOGLE_CSE_ID,
+            'q': search_query,
+            'num': min(num_results, 10),  # Google API는 한 번에 최대 10개 결과
+            'lr': f'lang_{language}',  # 언어 제한
+        }
         
-        # 쿼리가 너무 길면 잘라내기
-        if len(query) > 100:
-            query = query[:100]
+        response = requests.get(search_url, params=params)
+        response.raise_for_status()
+        search_results = response.json()
         
-        logger.debug(f"검색 쿼리 전처리 후: {query}")
+        # 결과 형식화
+        results = []
+        if 'items' in search_results:
+            for item in search_results['items']:
+                # PDF 파일인지 확인
+                url = item.get('link', '')
+                is_pdf = url.lower().endswith('.pdf') or 'application/pdf' in item.get('mime', '')
+                
+                if is_pdf:
+                    result = {
+                        'title': item.get('title', ''),
+                        'url': url,
+                        'snippet': item.get('snippet', ''),
+                        'source': 'Google Search',
+                        'pdf_url': url  # PDF URL 필드 추가
+                    }
+                    results.append(result)
         
-        # Google Custom Search API 호출
-        service = build("customsearch", "v1", developerKey=GOOGLE_API_KEY)
-        result = service.cse().list(
-            q=query,
-            cx=GOOGLE_CSE_ID,
-            num=num_results
-        ).execute()
-        
-        # 검색 결과 형식 변환
-        search_results = []
-        if 'items' in result:
-            for item in result['items']:
-                search_results.append({
-                    "title": item.get('title', ''),
-                    "url": item.get('link', ''),
-                    "abstract": item.get('snippet', '')
-                })
-        
-        logger.info(f"Google 검색 결과 {len(search_results)}개 찾음")
-        return search_results
-        
+        logger.info(f"Google 검색 결과 {len(results)}개 찾음")
+        return results
+    
     except Exception as e:
-        logger.error(f"Google 검색 중 오류 발생: {str(e)}", exc_info=True)
-        # 오류 발생 시 빈 리스트 반환
+        logger.error(f"Google 검색 오류: {str(e)}", exc_info=True)
         return []
 
 """
