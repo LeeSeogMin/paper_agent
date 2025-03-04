@@ -27,16 +27,11 @@ def parse_arguments():
     return parser.parse_args()
 
 def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
-    """
-    사용자 요구사항 로드
-    
-    Args:
-        file_path: 요구사항 파일 경로 (없으면 대화형으로 입력 받음)
-        
-    Returns:
-        Dict[str, Any]: 사용자 요구사항
-    """
-    requirements = {}
+    """사용자 요구사항 로드"""
+    requirements = {
+        "constraints": [],  # 기본 제약사항 추가
+        "resources": [],    # 기본 리소스 추가
+    }
     
     if file_path and os.path.exists(file_path):
         logger.info(f"파일에서 사용자 요구사항 로드: {file_path}")
@@ -71,6 +66,7 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
         print("\n=== 논문 작성 요구사항 입력 ===")
         
         requirements["topic"] = input("연구 주제: ")
+        requirements["task"] = requirements["topic"]  # task 필드 추가
         
         print("\n논문 유형 (선택):")
         print("1. 문헌 리뷰")
@@ -90,6 +86,22 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
             requirements["paper_type"] = "theoretical_analysis"
         elif paper_type == "5":
             requirements["paper_type"] = input("논문 유형 직접 입력: ")
+        
+        # 제약사항 입력 추가
+        print("\n제약사항 (선택사항, 완료시 빈 입력):")
+        while True:
+            constraint = input("제약사항: ").strip()
+            if not constraint:
+                break
+            requirements["constraints"].append(constraint)
+            
+        # 참고자료 입력 추가
+        print("\n참고자료 (선택사항, 완료시 빈 입력):")
+        while True:
+            resource = input("참고자료 URL 또는 DOI: ").strip()
+            if not resource:
+                break
+            requirements["resources"].append(resource)
         
         requirements["additional_instructions"] = input("\n추가 지시사항 (없으면 Enter): ")
         
@@ -124,15 +136,31 @@ def main():
     
     # 사용자 요구사항 처리
     logger.info("총괄 에이전트에 사용자 요구사항 전달")
-    result = coordinator.process_user_requirements(user_requirements)
-    
-    # 결과 출력
-    logger.info(f"처리 결과: {result.get('status', 'unknown')}")
-    
-    if result.get("status") == "completed":
-        logger.info("논문 작성 프로세스 완료")
-    else:
-        logger.warning("논문 작성 프로세스 실패 또는 미완료")
+    try:
+        result = coordinator.process_user_requirements(user_requirements)
+        
+        # 결과 검증 추가
+        if not result.get("outline") or not result.get("content"):
+            logger.error("논문 생성 실패: 필수 결과물이 생성되지 않았습니다")
+            return 1
+            
+        # 결과 출력
+        logger.info(f"처리 결과: {result.get('status', 'unknown')}")
+        
+        if result.get("status") == "completed":
+            logger.info("논문 작성 프로세스 완료")
+            # 결과물 저장
+            output_path = Path(args.output) / f"paper_{result.get('id', 'output')}.md"
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(result.get("content"))
+            logger.info(f"논문이 저장되었습니다: {output_path}")
+        else:
+            logger.warning("논문 작성 프로세스 실패 또는 미완료")
+            return 1
+            
+    except Exception as e:
+        logger.error(f"논문 작성 중 오류 발생: {str(e)}")
+        return 1
     
     return 0
 

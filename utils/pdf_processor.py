@@ -18,6 +18,10 @@ from utils.logger import logger
 from utils.api_clients import download_pdf
 import fitz  # PyMuPDF
 from datetime import datetime
+import json
+from langchain.llms import OpenAI
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
 
 
 def extract_text_from_pdf(pdf_path_or_url: str) -> str:
@@ -176,109 +180,316 @@ def extract_references_from_pdf(pdf_path_or_url: str) -> List[str]:
 
 
 class PDFProcessor:
-    """고성능 PDF 처리 클래스"""
+    """PDF 처리 및 메타데이터 추출 클래스"""
     
-    def __init__(self, verbose: bool = False):
-        self.verbose = verbose
-        self.section_patterns = [
-            r'abstract', r'introduction', r'related\s+work',
-            r'methodology', r'experiment', r'results',
-            r'discussion', r'conclusion', r'references'
-        ]
-
-    def process_file(self, file_path: str) -> Tuple[bool, str, list, dict]:
-        """PDF 파일 처리 메인 메서드"""
+    def __init__(self, llm=None, use_llm=True):
+        """
+        PDF 프로세서 초기화
+        
+        Args:
+            llm: 사용할 LLM 객체 (기본값: None, 내부에서 생성)
+            use_llm: LLM 사용 여부 (기본값: True)
+        """
+        self.use_llm = use_llm
+        self.llm = llm if llm else OpenAI(temperature=0)
+        
+        # 메타데이터 추출 체인 초기화
+        self.metadata_chain = LLMChain(
+            llm=self.llm,
+            prompt=PromptTemplate(
+                template="""다음은 학술 논문의 텍스트입니다. 제목, 저자, 소속, 발행 연도, 주제어, 초록 등의 
+                메타데이터를 추출해 JSON 형식으로 반환해주세요:
+                
+                {text}
+                
+                출력 형식:
+                {
+                  "title": "논문 제목",
+                  "authors": ["저자1", "저자2"],
+                  "affiliations": ["소속1", "소속2"],
+                  "year": "출판 연도",
+                  "keywords": ["키워드1", "키워드2"],
+                  "abstract": "초록 내용"
+                }
+                """,
+                input_variables=["text"]
+            )
+        )
+        
+        # 메타데이터 캐시
+        self._metadata_cache = {}
+    
+    def extract_text_from_pdf(self, pdf_path: str) -> str:
+        """
+        PDF에서 텍스트 추출
+        
+        Args:
+            pdf_path: PDF 파일 경로
+            
+        Returns:
+            str: 추출된 텍스트
+        """
         try:
-            doc = fitz.open(file_path)
-            full_text, pages = self._extract_text_and_pages(doc)
-            metadata = self._process_metadata(doc.metadata)
-            sections = self._detect_sections(full_text)
-            references = self._extract_references(full_text)
+            doc = fitz.open(pdf_path)
+            text = ""
             
-            metadata.update({
-                "sections": sections,
-                "reference_count": len(references),
-                "processing_time": datetime.now().isoformat()
-            })
+            # 모든 페이지의 텍스트 추출
+            for page in doc:
+                text += page.get_text()
             
-            return True, full_text, pages, metadata
+            doc.close()
+            return text
+        except Exception as e:
+            logger.error(f"PDF 텍스트 추출 오류: {str(e)}")
+            return ""
+    
+    def extract_metadata_from_pdf(self, pdf_path: str) -> Dict[str, Any]:
+        """
+        PDF에서 메타데이터 추출 (하이브리드 접근법)
+        
+        Args:
+            pdf_path: PDF 파일 경로
+            
+        Returns:
+            Dict[str, Any]: 추출된 메타데이터
+        """
+        # 캐시 확인
+        if pdf_path in self._metadata_cache:
+            return self._metadata_cache[pdf_path]
+        
+        try:
+            # 1. PDF 내장 메타데이터 추출
+            doc = fitz.open(pdf_path)
+            embedded_metadata = doc.metadata
+            
+            # 기본 메타데이터 구조 생성
+            metadata = {
+                "title": embedded_metadata.get("title", ""),
+                "authors": [],
+                "year": embedded_metadata.get("creationDate", "")[:4] if embedded_metadata.get("creationDate") else "",
+                "abstract": "",
+                "keywords": [],
+                "source": "embedded"
+            }
+            
+            # 저자 정보 처리 (내장 메타데이터에서)
+            if embedded_metadata.get("author"):
+                # 여러 구분자로 저자 분리 시도
+                for separator in [";", ",", " and ", "&"]:
+                    if separator in embedded_metadata["author"]:
+                        metadata["authors"] = [a.strip() for a in embedded_metadata["author"].split(separator)]
+                        break
+                
+                # 구분자가 없는 경우 단일 저자로 처리
+                if not metadata["authors"]:
+                    metadata["authors"] = [embedded_metadata["author"].strip()]
+            
+            # 메타데이터가 충분한지 확인
+            if metadata["title"] and metadata["authors"]:
+                doc.close()
+                self._metadata_cache[pdf_path] = metadata
+                return metadata
+            
+            # 2. 휴리스틱 접근법 (첫 페이지 텍스트 분석)
+            first_page_text = doc[0].get_text()
+            doc.close()
+            
+            # 제목 추출 시도 (일반적으로 첫 페이지 상단에 큰 텍스트)
+            title_match = re.search(r'^(.+?)(?:\n|$)', first_page_text.strip())
+            if title_match and not metadata["title"]:
+                metadata["title"] = title_match.group(1).strip()
+            
+            # 저자 추출 시도 (일반적인 패턴)
+            if not metadata["authors"]:
+                # 여러 저자 패턴 시도
+                author_patterns = [
+                    r'(?:Authors?|By):\s*(.+?)(?:\n|$)',
+                    r'^.*?\n(.+?)(?:\n|$)',  # 제목 다음 줄
+                ]
+                
+                for pattern in author_patterns:
+                    author_match = re.search(pattern, first_page_text, re.IGNORECASE)
+                    if author_match:
+                        author_text = author_match.group(1).strip()
+                        # 저자 분리 시도
+                        for separator in [";", ",", " and ", "&"]:
+                            if separator in author_text:
+                                metadata["authors"] = [a.strip() for a in author_text.split(separator)]
+                                break
+                        
+                        if metadata["authors"]:
+                            break
+            
+            # 초록 추출 시도
+            abstract_match = re.search(r'(?:Abstract|ABSTRACT)[\s:]*(.+?)(?:\n\n|\n[A-Z]+\n|$)', 
+                                      first_page_text, re.DOTALL | re.IGNORECASE)
+            if abstract_match:
+                metadata["abstract"] = abstract_match.group(1).strip()
+            
+            # 연도 추출 시도 (아직 없는 경우)
+            if not metadata["year"]:
+                year_match = re.search(r'(?:19|20)\d{2}', first_page_text)
+                if year_match:
+                    metadata["year"] = year_match.group(0)
+            
+            # 키워드 추출 시도
+            keyword_match = re.search(r'(?:Keywords|Key\s*words|KEYWORDS)[\s:]*(.+?)(?:\n\n|\n[A-Z]+\n|$)', 
+                                     first_page_text, re.DOTALL | re.IGNORECASE)
+            if keyword_match:
+                keyword_text = keyword_match.group(1).strip()
+                # 키워드 분리 시도
+                for separator in [";", ","]:
+                    if separator in keyword_text:
+                        metadata["keywords"] = [k.strip() for k in keyword_text.split(separator)]
+                        break
+            
+            # 메타데이터 소스 업데이트
+            metadata["source"] = "heuristic"
+            
+            # 3. LLM 접근법 (필요한 경우)
+            if (self.use_llm and 
+                (not metadata["title"] or not metadata["authors"] or not metadata["abstract"])):
+                # 첫 페이지 또는 처음 2000자만 사용 (비용 절감)
+                text_for_llm = first_page_text[:2000]
+                
+                try:
+                    llm_result = self.metadata_chain.invoke({"text": text_for_llm})
+                    llm_metadata = json.loads(llm_result["text"])
+                    
+                    # LLM 결과로 빈 필드 채우기
+                    if not metadata["title"] and llm_metadata.get("title"):
+                        metadata["title"] = llm_metadata["title"]
+                    
+                    if not metadata["authors"] and llm_metadata.get("authors"):
+                        metadata["authors"] = llm_metadata["authors"]
+                    
+                    if not metadata["abstract"] and llm_metadata.get("abstract"):
+                        metadata["abstract"] = llm_metadata["abstract"]
+                    
+                    if not metadata["year"] and llm_metadata.get("year"):
+                        metadata["year"] = llm_metadata["year"]
+                    
+                    if not metadata["keywords"] and llm_metadata.get("keywords"):
+                        metadata["keywords"] = llm_metadata["keywords"]
+                    
+                    # 메타데이터 소스 업데이트
+                    metadata["source"] = "llm"
+                    
+                except Exception as e:
+                    logger.warning(f"LLM 메타데이터 추출 실패: {str(e)}")
+            
+            # 캐시에 저장
+            self._metadata_cache[pdf_path] = metadata
+            return metadata
             
         except Exception as e:
-            logger.error(f"PDF 처리 실패: {str(e)}", exc_info=self.verbose)
-            return False, "", [], {}
-
-    def _extract_text_and_pages(self, doc) -> Tuple[str, list]:
-        """텍스트 및 페이지 데이터 추출"""
-        full_text = []
-        pages = []
+            logger.error(f"PDF 메타데이터 추출 오류: {str(e)}")
+            return {
+                "title": os.path.basename(pdf_path),
+                "authors": [],
+                "year": "",
+                "abstract": "",
+                "keywords": [],
+                "source": "fallback"
+            }
+    
+    def extract_sections_from_pdf(self, pdf_path: str) -> List[Dict[str, str]]:
+        """
+        PDF에서 섹션 추출
         
-        for page in doc:
-            text = page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | 
-                                fitz.TEXT_MEDIABOX_CLIP | 
-                                fitz.TEXT_DEHYPHENATE)
-            full_text.append(text)
-            pages.append({
-                "number": page.number + 1,
-                "content": text,
-                "dimensions": page.rect,
-                "annotations": [self._process_annotation(a) for a in page.annots()]
-            })
+        Args:
+            pdf_path: PDF 파일 경로
             
-        return "\n".join(full_text), pages
-
-    def _process_metadata(self, meta: dict) -> dict:
-        """메타데이터 가공"""
-        return {
-            "title": meta.get("title", ""),
-            "authors": meta.get("author", "").split(';') if meta.get("author") else [],
-            "subject": meta.get("subject", ""),
-            "creation_date": meta.get("creationDate", ""),
-            "modification_date": meta.get("modDate", ""),
-            "keywords": meta.get("keywords", "").split(',') if meta.get("keywords") else []
-        }
-
-    def _process_annotation(self, annot) -> dict:
-        """주석 데이터 처리"""
-        return {
-            "type": annot.type[1],
-            "content": annot.info.get("content", ""),
-            "coordinates": annot.rect,
-            "color": annot.colors.get("fill", (0,0,0))
-        } if annot else {}
-
-    def _detect_sections(self, text: str) -> Dict[str, str]:
-        """섹션 구조 분석"""
-        section_pattern = re.compile(
-            r'\n\s*(' + '|'.join(self.section_patterns) + r')\s*\n',
-            re.IGNORECASE
-        )
-        matches = list(section_pattern.finditer(text))
-        sections = {}
+        Returns:
+            List[Dict[str, str]]: 추출된 섹션 목록
+        """
+        try:
+            doc = fitz.open(pdf_path)
+            full_text = ""
+            
+            # 모든 페이지의 텍스트 추출
+            for page in doc:
+                full_text += page.get_text()
+            
+            doc.close()
+            
+            # 섹션 헤더 패턴 (일반적인 학술 논문 섹션)
+            section_patterns = [
+                r'\n\s*(\d+\.?\s*[A-Z][A-Za-z\s]+)\s*\n',  # 번호가 있는 섹션 (예: "1. Introduction")
+                r'\n\s*([A-Z][A-Z\s]+)\s*\n',              # 대문자 섹션 (예: "INTRODUCTION")
+                r'\n\s*([A-Z][a-z]+(?:\s+[A-Za-z]+)*)\s*\n'  # 일반 섹션 (예: "Introduction")
+            ]
+            
+            sections = []
+            last_pos = 0
+            last_section = "Abstract"
+            
+            # 각 패턴으로 섹션 찾기
+            for pattern in section_patterns:
+                for match in re.finditer(pattern, full_text):
+                    section_title = match.group(1).strip()
+                    section_start = match.start()
+                    
+                    # 이전 섹션 내용 저장
+                    if section_start > last_pos:
+                        section_content = full_text[last_pos:section_start].strip()
+                        if section_content:
+                            sections.append({
+                                "title": last_section,
+                                "content": section_content
+                            })
+                    
+                    last_section = section_title
+                    last_pos = match.end()
+            
+            # 마지막 섹션 추가
+            if last_pos < len(full_text):
+                sections.append({
+                    "title": last_section,
+                    "content": full_text[last_pos:].strip()
+                })
+            
+            return sections
+            
+        except Exception as e:
+            logger.error(f"PDF 섹션 추출 오류: {str(e)}")
+            return [{
+                "title": "Full Text",
+                "content": self.extract_text_from_pdf(pdf_path)
+            }]
+    
+    def process_pdf(self, pdf_path: str) -> Dict[str, Any]:
+        """
+        PDF 처리 통합 메서드
         
-        for i, match in enumerate(matches):
-            title = match.group(1).lower().capitalize()
-            start = match.end()
-            end = matches[i+1].start() if i+1 < len(matches) else len(text)
-            sections[title] = text[start:end].strip()
+        Args:
+            pdf_path: PDF 파일 경로
             
-        return sections
-
-    def _extract_references(self, text: str) -> List[str]:
-        """참고문헌 추출"""
-        ref_section = self._detect_sections(text).get("References", "")
-        if not ref_section:
-            return []
+        Returns:
+            Dict[str, Any]: 처리 결과
+        """
+        try:
+            metadata = self.extract_metadata_from_pdf(pdf_path)
+            sections = self.extract_sections_from_pdf(pdf_path)
             
-        # 참고문헌 분할 로직
-        references = re.split(r'\n(?=\[?\d+\]?\s?)', ref_section)
-        return [ref.strip() for ref in references if ref.strip()]
-
-    def _clean_text(self, text: str) -> str:
-        """텍스트 정제"""
-        # 하이픈 연결 단어 복원
-        text = re.sub(r'(\w+)-\n(\w+)', r'\1\2', text)
-        # 머리글/꼬리글 제거
-        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
-        # 연속 공백 제거
-        text = re.sub(r'\s+', ' ', text)
-        return text.strip()
+            return {
+                "metadata": metadata,
+                "sections": sections,
+                "path": pdf_path,
+                "success": True
+            }
+        except Exception as e:
+            logger.error(f"PDF 처리 오류: {str(e)}")
+            return {
+                "metadata": {
+                    "title": os.path.basename(pdf_path),
+                    "authors": [],
+                    "year": "",
+                    "abstract": "",
+                    "source": "error"
+                },
+                "sections": [],
+                "path": pdf_path,
+                "success": False,
+                "error": str(e)
+            }

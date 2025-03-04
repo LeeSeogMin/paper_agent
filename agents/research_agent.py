@@ -25,6 +25,8 @@ from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db
 from utils.api_clients import search_semantic_scholar, search_google_scholar, search_academic_papers
 from utils.pdf_processor import extract_text_from_pdf
+from utils.search_utils import academic_search, fallback_search
+from utils.search import google_search
 
 from agents.base import BaseAgent
 from models.research import ResearchMaterial, SearchQuery
@@ -172,56 +174,57 @@ class ResearchAgent(BaseAgent):
             # 검색 실패 시 빈 결과 반환 대신 예외 전파
             raise
     
-    def evaluate_source(self, source: Dict[str, Any], topic: str) -> Tuple[float, str]:
+    def evaluate_source(self, source: Dict, topic: str) -> Tuple[float, str]:
         """
-        Evaluate a source for relevance and quality.
+        Evaluate a research source for relevance to the topic.
         
         Args:
-            source (Dict[str, Any]): Source metadata
-            topic (str): Paper topic
+            source (Dict): Source data
+            topic (str): Research topic
             
         Returns:
-            Tuple[float, str]: Relevance score (0-1) and explanation
+            Tuple[float, str]: (relevance score, explanation)
         """
+        logger.info(f"Evaluating source: {source.get('title', source.get('paperId', 'Unknown'))}")
+        
         try:
-            # Prepare source info
-            source_info = {
-                "title": source.get("title", ""),
-                "abstract": source.get("abstract", "No abstract available"),
-                "authors": ", ".join([
-                    author["name"] if isinstance(author, dict) else author
-                    for author in source.get("authors", [])
-                ]),
-                "year": source.get("year", "Unknown"),
-                "venue": source.get("venue", "Unknown"),
-                "citation_count": source.get("citationCount", 0)
-            }
-            
+            # Google 검색 결과인 경우 형식 변환
+            if 'title' in source and ('url' in source or 'link' in source):
+                # Google 검색 결과를 학술 논문 형식으로 변환
+                formatted_source = {
+                    "title": source.get('title', ''),
+                    "abstract": source.get('abstract', source.get('snippet', '')),
+                    "authors": [],  # Google 검색에는 저자 정보가 없을 수 있음
+                    "year": source.get('year', "Unknown"),
+                    "venue": "Web Source",
+                    "citationCount": 0
+                }
+            else:
+                # 이미 학술 논문 형식이면 그대로 사용
+                formatted_source = source
+
+            # 단일 'source' 키로 전달
             result = self.evaluation_chain.invoke({
-                "source": source_info,
+                "source": formatted_source,
                 "topic": topic
             })
             
-            # Extract score
-            score_match = re.search(r'Score:\s*(\d+\.?\d*)', result['text'])
+            explanation = result.get('explanation', '')
+            relevance_score = result.get('relevance_score', 0.0)
             
-            if score_match:
-                score = float(score_match.group(1))
-                # Normalize to 0-1 range if needed
-                if score > 1:
-                    score = score / 10
-            else:
-                score = 0.5  # Default middle score
-            
-            # Extract explanation (everything after the score)
-            explanation = result['text'].split("Score:", 1)[1]
-            explanation = re.sub(r'^\s*\d+\.?\d*\s*', '', explanation).strip()
-            
-            return score, explanation
-            
+            # 점수를 float로 변환
+            if isinstance(relevance_score, str):
+                try:
+                    relevance_score = float(relevance_score)
+                except ValueError:
+                    relevance_score = 0.0
+                
+            return relevance_score, explanation
+        
         except Exception as e:
             logger.error(f"Error evaluating source: {str(e)}", exc_info=True)
-            return 0.3, f"Error during evaluation: {str(e)}"
+            # 오류 발생 시 기본 점수 반환
+            return 0.7, f"Error evaluating source: {str(e)}. Using default relevance score."
     
     def collect_research_materials(
         self, 
@@ -250,14 +253,26 @@ class ResearchAgent(BaseAgent):
         for query in queries:
             logger.info(f"Processing query: {query.text}")
             
-            # Get search results
+            # Get search results from academic sources
             search_results = self.search_for_papers(
                 query.text, 
-                max_results=max_sources // len(queries)
+                max_results=max_sources // (2 * len(queries))
             )
             
+            # Get additional web results using Google search
+            web_results = []
+            try:
+                # 'num_results' 매개변수 사용 (max_results 대신)
+                web_results = google_search(query.text, num_results=max_sources // (2 * len(queries)))
+                logger.info(f"Found {len(web_results)} web results for query: {query.text}")
+            except Exception as e:
+                logger.error(f"Error during Google search: {str(e)}")
+            
+            # Combine academic and web results
+            combined_results = search_results + web_results
+            
             # Process each result
-            for result in search_results:
+            for result in combined_results:
                 # Skip if already processed
                 if any(s.get("paperId") == result.get("paperId") for s in all_sources):
                     continue
@@ -291,6 +306,12 @@ class ResearchAgent(BaseAgent):
                 break
         
         logger.info(f"Collected {len(materials)} research materials")
+        
+        # 검색 결과가 없으면 오류 발생
+        if len(materials) == 0:
+            logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
+            raise ValueError("검색 결과가 없어 연구를 진행할 수 없습니다. 다른 주제나 검색어를 시도해보세요.")
+        
         return materials[:max_sources]
     
     def extract_content_from_pdf(self, pdf_url: str) -> str:
@@ -614,6 +635,16 @@ class ResearchAgent(BaseAgent):
             max_sources = kwargs.get("max_sources", 10)
             materials = self.collect_research_materials(topic, max_sources=max_sources)
             
+            # 명시적으로 검색 결과가 없는지 확인
+            if not materials or len(materials) == 0:
+                logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
+                return {
+                    "status": "error",
+                    "message": "검색 결과가 없어 연구를 진행할 수 없습니다. 다른 주제나 검색어를 시도해보세요."
+                }
+            
+            # 검색 결과가 없으면 여기서 예외가 발생하여 아래 코드는 실행되지 않음
+            
             # 2. 연구 자료 강화 (내용 및 요약 추가)
             enriched_materials = self.enrich_research_materials(materials)
             
@@ -630,9 +661,44 @@ class ResearchAgent(BaseAgent):
                 "analysis": analysis,
                 "outline": outline
             }
+        except ValueError as e:
+            # 검색 결과 없음 등의 예상된 오류
+            logger.error(f"연구 프로세스 중단: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
         except Exception as e:
+            # 기타 예상치 못한 오류
             logger.error(f"연구 에이전트 실행 중 오류 발생: {str(e)}", exc_info=True)
             return {
                 "status": "error",
                 "message": f"연구 프로세스 중 오류: {str(e)}"
             }
+
+    def search_academic_sources(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+        """
+        학술 소스 검색
+        
+        Args:
+            query: 검색 쿼리
+            max_results: 최대 결과 수
+            
+        Returns:
+            List[Dict[str, Any]]: 검색 결과 목록
+        """
+        logger.info(f"학술 소스 검색: {query}")
+        
+        try:
+            # 학술 검색 수행
+            results = academic_search(query, num_results=max_results)
+            
+            if not results:
+                logger.warning(f"학술 검색 결과 없음: {query}")
+                # 폴백 검색 시도
+                results = fallback_search(query, num_results=max_results)
+            
+            return results
+        except Exception as e:
+            logger.error(f"학술 소스 검색 오류: {str(e)}")
+            return []
