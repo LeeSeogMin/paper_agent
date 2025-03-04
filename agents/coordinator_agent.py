@@ -25,6 +25,12 @@ from agents.base import BaseAgent
 from agents.research_agent import ResearchAgent
 from agents.writing_agent import WriterAgent
 from agents.editing_agent import EditorAgent, StyleGuide
+from prompts.agent_prompts import (
+    AGENT_PLANNING_PROMPT,
+    AGENT_COMMUNICATION_PROMPT,
+    AGENT_ERROR_HANDLING_PROMPT,
+    AGENT_SELF_EVALUATION_PROMPT
+)
 
 # 타입 힌트만을 위한 import
 from typing import TYPE_CHECKING
@@ -50,11 +56,12 @@ class WorkflowRunner:
 
 
 class ResearchPlan(BaseModel):
-    """연구 계획 형식"""
-    topic: str = Field(description="연구 주제")
-    research_questions: List[str] = Field(description="연구 질문 목록")
-    expected_outcomes: List[str] = Field(description="예상되는 결과")
-    rationale: str = Field(description="연구 계획 근거")
+    """문제 해결 계획 형식"""
+    problem_statement: str = Field(description="명확히 정의된 문제 진술")
+    analysis_approach: List[str] = Field(description="문제 분석을 위한 접근 방법")
+    required_data_sources: List[str] = Field(description="필요한 데이터 및 자료 유형")
+    implementation_steps: List[str] = Field(description="단계별 실행 계획")
+    expected_outcomes: List[str] = Field(description="예상되는 결과물")
 
 
 class ProjectStatus(BaseModel):
@@ -88,25 +95,14 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         """프롬프트와 체인 초기화"""
         self.research_plan_parser = PydanticOutputParser(pydantic_object=ResearchPlan)
         self.status_parser = PydanticOutputParser(pydantic_object=ProjectStatus)
+        
+        # 기존 프롬프트 대신 agent_prompts.py의 프롬프트 활용
         self.research_plan_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template="""당신은 학술 연구 계획 전문가입니다. 
-                주어진 주제에 대한 체계적인 연구 계획을 작성해 주세요.
-                
-                주제: {topic}
-                
-                연구 계획에는 다음이 포함되어야 합니다:
-                1. 주제
-                2. 주요 연구 질문 (3-5개)
-                3. 예상되는 연구 결과
-                4. 연구 계획의 근거
-                
-                {format_instructions}""",
-                input_variables=["topic", "format_instructions"],
-            ),
+            prompt=AGENT_PLANNING_PROMPT,
             verbose=self.verbose
         )
+        
         self.summary_chain = LLMChain(
             llm=self.llm,
             prompt=PromptTemplate(
@@ -122,44 +118,64 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             ),
             verbose=self.verbose
         )
+        
+        # 에러 처리 체인 추가
+        self.error_handling_chain = LLMChain(
+            llm=self.llm,
+            prompt=AGENT_ERROR_HANDLING_PROMPT,
+            verbose=self.verbose
+        )
+        
         logger.debug("총괄 에이전트 프롬프트 및 체인 초기화 완료")
 
-    def create_research_plan(self, topic: str) -> ResearchPlan:
-        """연구 주제에 대한 연구 계획을 생성"""
-        logger.info(f"주제 '{topic}'에 대한 연구 계획 생성 중...")
+    def create_research_plan(self, user_question: str) -> ResearchPlan:
+        """사용자 질문 기반 문제 해결 계획 생성"""
+        logger.info(f"질문 '{user_question}'에 대한 문제 해결 계획 수립 중...")
         try:
             format_instructions = self.research_plan_parser.get_format_instructions()
             result = self.research_plan_chain.invoke({
-                "topic": topic,
+                "task": user_question,
+                "constraints": "학술적 정확성, 시간 효율성, 자원 가용성",
+                "resources": "학술 데이터베이스, 연구 자료, AI 분석 도구",
                 "format_instructions": format_instructions
             })
             research_plan = self.research_plan_parser.parse(result["text"])
-            logger.info(f"연구 계획 생성 완료: {len(research_plan.research_questions)}개 연구 질문 포함")
+            logger.info(f"문제 해결 계획 수립 완료: {len(research_plan.implementation_steps)}개 실행 단계")
             return research_plan
         except Exception as e:
-            logger.error(f"연구 계획 생성 중 오류 발생: {str(e)}")
+            logger.error(f"계획 수립 실패: {str(e)}")
+            # 에러 처리 체인 활용
+            error_analysis = self.error_handling_chain.invoke({
+                "task": "연구 계획 수립",
+                "error": str(e),
+                "context": f"사용자 질문: {user_question}"
+            })
+            logger.info(f"에러 분석: {error_analysis['text']}")
+            
+            # 기본 계획 반환
             return ResearchPlan(
-                topic=topic,
-                research_questions=["이 주제의 주요 개념은 무엇인가?", "이 주제의 현재 연구 동향은 어떠한가?"],
-                expected_outcomes=["주제에 대한 포괄적인 이해", "향후 연구 방향 제안"],
-                rationale="기본 연구 계획"
+                problem_statement=user_question,
+                analysis_approach=["기본 문헌 분석", "관련 데이터 수집"],
+                required_data_sources=["학술 논문", "신뢰할 수 있는 온라인 자료"],
+                implementation_steps=["1. 초기 자료 수집", "2. 핵심 주제 분석", "3. 종합 보고서 작성"],
+                expected_outcomes=["질문에 대한 체계적인 답변", "추가 연구 방향 제시"]
             )
 
     def start_workflow(
         self,
-        topic: str,
+        user_question: str,
         template_name: Optional[str] = None,
         style_guide: Optional[str] = None,
         citation_style: Optional[str] = None,
         output_format: str = "markdown",
         verbose: bool = False
     ) -> PaperWorkflowState:
-        """논문 작성 워크플로우를 시작"""
-        logger.info(f"주제 '{topic}'에 대한 논문 작성 워크플로우 시작")
-        research_plan = self.create_research_plan(topic)
+        """사용자 질문 기반 워크플로우 시작"""
+        logger.info(f"질문 '{user_question}'에 대한 워크플로우 시작")
+        research_plan = self.create_research_plan(user_question)
         
         workflow_state = self.workflow_runner.run_workflow(
-            topic=topic,
+            user_question=user_question,
             template_name=template_name,
             style_guide=style_guide,
             citation_style=citation_style,
@@ -308,22 +324,168 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
     ) -> PaperWorkflowState:
         """총괄 에이전트 실행"""
         logger.info("총괄 에이전트 실행 중...")
-        topic = input_data.get("topic", "")
-        if not topic:
-            raise ValueError("논문 주제가 제공되지 않았습니다.")
-        template_name = input_data.get("template_name")
-        style_guide = input_data.get("style_guide")
-        citation_style = input_data.get("citation_style")
-        output_format = input_data.get("output_format", "markdown")
-        verbose = input_data.get("verbose", False)
+        user_question = input_data.get("user_question", "")
+        if not user_question:
+            raise ValueError("사용자 질문이 제공되지 않았습니다.")
         workflow_state = self.start_workflow(
-            topic=topic,
-            template_name=template_name,
-            style_guide=style_guide,
-            citation_style=citation_style,
-            output_format=output_format,
-            verbose=verbose
+            user_question=user_question,
+            template_name=input_data.get("template_name"),
+            style_guide=input_data.get("style_guide"),
+            citation_style=input_data.get("citation_style"),
+            output_format=input_data.get("output_format", "markdown"),
+            verbose=input_data.get("verbose", False)
         )
-        self.update_state({"topic": topic, "workflow_state": workflow_state})
+        self.update_state({"user_question": user_question, "workflow_state": workflow_state})
         logger.info("총괄 에이전트 실행 완료")
         return workflow_state
+
+    def execute_research_plan(self, research_plan: ResearchPlan, research_materials: List[ResearchMaterial]) -> Dict[str, Any]:
+        """Execute a research plan using available materials"""
+        
+        # 연구 계획에서 필요한 작업 유형 결정
+        if "literature review" in research_plan.implementation_steps[0].lower():
+            writing_task = {
+                "task_type": "literature_review",
+                "task_description": research_plan.problem_statement,
+                "additional_context": {
+                    "format": "thematic",
+                    "focus_areas": research_plan.analysis_approach
+                }
+            }
+        elif "full analysis" in research_plan.implementation_steps[0].lower():
+            writing_task = {
+                "task_type": "full_paper",
+                "task_description": research_plan.problem_statement,
+                "additional_context": {
+                    "template": "analytical",
+                    "key_questions": research_plan.expected_outcomes
+                }
+            }
+        else:
+            writing_task = {
+                "task_type": "custom",
+                "task_description": research_plan.implementation_steps[0],
+                "additional_context": {
+                    "expected_outcome": research_plan.expected_outcomes[0]
+                }
+            }
+        
+        # WriterAgent 호출
+        writer_result = self.writer_agent.process_writing_task(
+            task_type=writing_task["task_type"],
+            task_description=writing_task["task_description"],
+            research_materials=research_materials,
+            additional_context=writing_task["additional_context"]
+        )
+        
+        return {
+            "research_plan": research_plan.dict(),
+            "writing_result": writer_result if isinstance(writer_result, dict) else writer_result.dict(),
+            "status": "completed"
+        }
+
+    def handle_error(self, task: str, error: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """에러 처리 및 분석"""
+        try:
+            error_analysis = self.error_handling_chain.invoke({
+                "task": task,
+                "error": str(error),
+                "context": json.dumps(context)
+            })
+            return {
+                "success": False,
+                "error": str(error),
+                "analysis": error_analysis["text"],
+                "recovery_suggested": True if "해결 방법" in error_analysis["text"] else False
+            }
+        except Exception as e:
+            logger.error(f"에러 처리 중 추가 오류 발생: {str(e)}")
+            return {
+                "success": False,
+                "error": str(error),
+                "analysis": "에러 분석 실패",
+                "recovery_suggested": False
+            }
+
+    def process_user_requirements(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        사용자 요구사항 처리
+        
+        Args:
+            requirements: 사용자 요구사항 딕셔너리
+            
+        Returns:
+            Dict[str, Any]: 처리 결과
+        """
+        logger.info("사용자 요구사항 처리 시작")
+        
+        try:
+            # 요구사항 검증
+            required_fields = ["topic"]
+            for field in required_fields:
+                if field not in requirements or not requirements[field]:
+                    raise ValueError(f"필수 필드 누락: {field}")
+            
+            # 연구 계획 수립
+            research_plan = self.create_research_plan(requirements["topic"])
+            
+            # 연구 수행
+            research_materials = self.research_agent.conduct_research(
+                research_plan.problem_statement,
+                research_plan.required_data_sources
+            )
+            
+            # 논문 유형에 따른 작업 설정
+            paper_type = requirements.get("paper_type", "general")
+            
+            if paper_type == "literature_review":
+                writing_task = {
+                    "task_type": "literature_review",
+                    "task_description": "Create a comprehensive literature review",
+                    "additional_context": {
+                        "focus_areas": research_plan.analysis_approach,
+                        "key_themes": research_plan.expected_outcomes
+                    }
+                }
+            elif paper_type == "experimental_research":
+                writing_task = {
+                    "task_type": "methodology",
+                    "task_description": "Design an experimental methodology",
+                    "additional_context": {
+                        "research_questions": research_plan.problem_statement,
+                        "expected_outcomes": research_plan.expected_outcomes
+                    }
+                }
+            else:
+                writing_task = {
+                    "task_type": "custom",
+                    "task_description": requirements.get("research_question", research_plan.problem_statement),
+                    "additional_context": {
+                        "additional_instructions": requirements.get("additional_instructions", ""),
+                        "expected_outcome": research_plan.expected_outcomes[0] if research_plan.expected_outcomes else ""
+                    }
+                }
+            
+            # 작성 에이전트 호출
+            writer_result = self.writer_agent.process_writing_task(
+                task_type=writing_task["task_type"],
+                task_description=writing_task["task_description"],
+                research_materials=research_materials,
+                additional_context=writing_task["additional_context"]
+            )
+            
+            # 결과 반환
+            return {
+                "status": "completed",
+                "research_plan": research_plan.dict(),
+                "writing_result": writer_result if isinstance(writer_result, dict) else writer_result.dict(),
+                "requirements": requirements
+            }
+        
+        except Exception as e:
+            logger.error(f"사용자 요구사항 처리 중 오류 발생: {str(e)}")
+            return self.handle_error(
+                task="사용자 요구사항 처리",
+                error=str(e),
+                context={"requirements": requirements}
+            )

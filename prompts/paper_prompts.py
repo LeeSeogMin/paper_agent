@@ -4,6 +4,72 @@ Collection of prompt templates for paper writing and editing.
 """
 
 from langchain_core.prompts import PromptTemplate
+from typing import Dict, List, Optional, Any
+
+# 프롬프트 그룹화를 위한 클래스
+class PaperPrompts:
+    """Paper writing and editing prompts collection"""
+    
+    @staticmethod
+    def get_prompt(prompt_name: str, **kwargs) -> str:
+        """
+        Get formatted prompt by name
+        
+        Args:
+            prompt_name: Name of the prompt to retrieve
+            **kwargs: Variables to format the prompt with
+            
+        Returns:
+            Formatted prompt string
+        """
+        prompts = {
+            "research_topic": RESEARCH_TOPIC_SUGGESTION_PROMPT,
+            "research_plan": RESEARCH_PLAN_PROMPT,
+            "paper_outline": PAPER_OUTLINE_PROMPT,
+            "paper_section": PAPER_SECTION_PROMPT,
+            "paper_editing": PAPER_EDITING_PROMPT,
+            "paper_review": PAPER_REVIEW_PROMPT,
+            "paper_summary": PAPER_SUMMARY_PROMPT,
+            "paper_translation": PAPER_TRANSLATION_PROMPT,
+            "reference_formatting": REFERENCE_FORMATTING_PROMPT,
+            "keyword_extraction": KEYWORD_EXTRACTION_PROMPT,
+            "citation_generation": PAPER_CITATION_PROMPT,
+            "research_question": RESEARCH_QUESTION_PROMPT,
+            "critical_analysis": CRITICAL_ANALYSIS_PROMPT,
+            "paper_conclusion": PAPER_CONCLUSION_PROMPT
+        }
+        
+        if prompt_name not in prompts:
+            raise ValueError(f"Prompt '{prompt_name}' not found. Available prompts: {list(prompts.keys())}")
+        
+        prompt_template = prompts[prompt_name]
+        
+        # 입력 변수 검증
+        missing_vars = [var for var in prompt_template.input_variables if var not in kwargs]
+        if missing_vars:
+            raise ValueError(f"Missing required variables for prompt '{prompt_name}': {missing_vars}")
+        
+        return prompt_template.format(**kwargs)
+
+    @staticmethod
+    def validate_inputs(prompt_template: PromptTemplate, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate inputs for a prompt template
+        
+        Args:
+            prompt_template: The prompt template to validate inputs for
+            inputs: The input variables
+            
+        Returns:
+            Validated inputs
+        """
+        # 필수 변수 확인
+        missing_vars = [var for var in prompt_template.input_variables if var not in inputs]
+        if missing_vars:
+            raise ValueError(f"Missing required variables: {missing_vars}")
+        
+        # 불필요한 변수 제거
+        return {k: v for k, v in inputs.items() if k in prompt_template.input_variables}
 
 
 # Research topic suggestion prompt

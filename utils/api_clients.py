@@ -15,13 +15,58 @@ from utils.logger import logger
 from config.api_keys import SEMANTIC_SCHOLAR_API_KEY, GOOGLE_SCHOLAR_API_KEY
 
 
-def semantic_scholar_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+def search_academic_papers(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
+    """
+    Search for papers on Semantic Scholar and Google Scholar.
+    
+    Args:
+        query (str): Search query
+        max_results (int, optional): Maximum number of results to return. Default is 5.
+        
+    Returns:
+        List[Dict[str, Any]]: List of paper metadata
+        
+    Raises:
+        Exception: If all search APIs fail
+    """
+    semantic_scholar_error = None
+    google_scholar_error = None
+    
+    # 1. Try Semantic Scholar search
+    try:
+        logger.info(f"Searching Semantic Scholar for: {query}")
+        results = semantic_scholar_search(query, max_results)
+        if results:
+            logger.info(f"Found {len(results)} papers on Semantic Scholar")
+            return results
+    except Exception as e:
+        semantic_scholar_error = str(e)
+        logger.warning(f"Semantic Scholar search failed: {semantic_scholar_error}")
+    
+    # 2. Try Google Scholar search
+    try:
+        logger.info(f"Searching Google Scholar for: {query}")
+        results = google_scholar_search(query, max_results)
+        if results:
+            logger.info(f"Found {len(results)} papers on Google Scholar")
+            return results
+    except Exception as e:
+        google_scholar_error = str(e)
+        logger.warning(f"Google Scholar search failed: {google_scholar_error}")
+    
+    # 3. If both searches fail, raise an error
+    error_message = f"All academic search APIs failed. Semantic Scholar: {semantic_scholar_error}, Google Scholar: {google_scholar_error}"
+    logger.error(error_message)
+    raise Exception(error_message)
+
+
+def semantic_scholar_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     """
     Search for papers on Semantic Scholar.
     
     Args:
         query (str): Search query
-        max_results (int): Maximum number of results to return
+        max_results (int, optional): Maximum number of results to return. Default is 5.
         
     Returns:
         List[Dict[str, Any]]: List of paper metadata
@@ -94,7 +139,8 @@ def semantic_scholar_search(query: str, max_results: int = 10) -> List[Dict[str,
                 "venue": venue,
                 "citationCount": citation_count,
                 "url": url,
-                "pdfUrl": pdf_url
+                "pdfUrl": pdf_url,
+                "source": "Semantic Scholar"
             })
         
         logger.info(f"Found {len(results)} papers on Semantic Scholar")
@@ -102,10 +148,10 @@ def semantic_scholar_search(query: str, max_results: int = 10) -> List[Dict[str,
     
     except requests.exceptions.RequestException as e:
         logger.error(f"Error searching Semantic Scholar: {str(e)}")
-        return []
+        raise Exception(f"Semantic Scholar search failed: {str(e)}")
 
 
-def google_scholar_search(query: str, max_results: int = 10) -> List[Dict[str, Any]]:
+def google_scholar_search(query: str, max_results: int = 5) -> List[Dict[str, Any]]:
     """
     Search for papers on Google Scholar.
     
@@ -115,7 +161,7 @@ def google_scholar_search(query: str, max_results: int = 10) -> List[Dict[str, A
     
     Args:
         query (str): Search query
-        max_results (int): Maximum number of results to return
+        max_results (int, optional): Maximum number of results to return. Default is 5.
         
     Returns:
         List[Dict[str, Any]]: List of paper metadata

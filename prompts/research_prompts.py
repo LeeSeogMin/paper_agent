@@ -3,14 +3,84 @@ Research prompts module
 Defines prompt templates for conducting research and analyzing materials.
 """
 
-# Research topic analysis prompt
-RESEARCH_SYSTEM_PROMPT = """You are a research assistant specialized in academic literature review and analysis.
+from langchain_core.prompts import PromptTemplate
+from typing import Dict, List, Optional, Any
+
+# 프롬프트 그룹화를 위한 클래스
+class ResearchPrompts:
+    """Research-related prompts collection"""
+    
+    @staticmethod
+    def get_prompt(prompt_name: str, **kwargs) -> str:
+        """
+        Get formatted prompt by name
+        
+        Args:
+            prompt_name: Name of the prompt to retrieve
+            **kwargs: Variables to format the prompt with
+            
+        Returns:
+            Formatted prompt string
+        """
+        prompts = {
+            "research_system": RESEARCH_SYSTEM_PROMPT,
+            "query_generation": QUERY_GENERATION_PROMPT,
+            "source_evaluation": SOURCE_EVALUATION_PROMPT,
+            "search_results_analysis": SEARCH_RESULTS_ANALYSIS_PROMPT,
+            "literature_review": LITERATURE_REVIEW_PROMPT,
+            "research_methodology": RESEARCH_METHODOLOGY_PROMPT,
+            "data_analysis": DATA_ANALYSIS_PROMPT,
+            "research_interpretation": RESEARCH_INTERPRETATION_PROMPT,
+            "research_gap_identification": RESEARCH_GAP_IDENTIFICATION_PROMPT,
+            "research_proposal": RESEARCH_PROPOSAL_PROMPT
+        }
+        
+        if prompt_name not in prompts:
+            raise ValueError(f"Prompt '{prompt_name}' not found. Available prompts: {list(prompts.keys())}")
+        
+        prompt_template = prompts[prompt_name]
+        
+        # 입력 변수 검증
+        missing_vars = [var for var in prompt_template.input_variables if var not in kwargs]
+        if missing_vars:
+            raise ValueError(f"Missing required variables for prompt '{prompt_name}': {missing_vars}")
+        
+        return prompt_template.format(**kwargs)
+
+    @staticmethod
+    def validate_inputs(prompt_template: PromptTemplate, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Validate inputs for a prompt template
+        
+        Args:
+            prompt_template: The prompt template to validate inputs for
+            inputs: The input variables
+            
+        Returns:
+            Validated inputs
+        """
+        # 필수 변수 확인
+        missing_vars = [var for var in prompt_template.input_variables if var not in inputs]
+        if missing_vars:
+            raise ValueError(f"Missing required variables: {missing_vars}")
+        
+        # 불필요한 변수 제거
+        return {k: v for k, v in inputs.items() if k in prompt_template.input_variables}
+
+
+# Research system prompt
+RESEARCH_SYSTEM_PROMPT = PromptTemplate(
+    input_variables=[],
+    template="""You are a research assistant specialized in academic literature review and analysis.
 Your role is to help researchers gather, analyze, and organize scholarly information effectively.
 Provide thorough, accurate, and academically rigorous responses.
 """
+)
 
 # Query generation prompt
-QUERY_GENERATION_PROMPT = """Generate {n_queries} specific search queries to find academic papers on the following topic:
+QUERY_GENERATION_PROMPT = PromptTemplate(
+    input_variables=["n_queries", "topic"],
+    template="""Generate {n_queries} specific search queries to find academic papers on the following topic:
 
 TOPIC: {topic}
 
@@ -23,9 +93,12 @@ For each query:
 Format your response as a numbered list of queries, with each query on a new line.
 For each query, include a brief rationale explaining why this query would be valuable.
 """
+)
 
 # Source evaluation prompt
-SOURCE_EVALUATION_PROMPT = """Evaluate the following academic source for relevance and quality in relation to the research topic.
+SOURCE_EVALUATION_PROMPT = PromptTemplate(
+    input_variables=["source", "topic"],
+    template="""Evaluate the following academic source for relevance and quality in relation to the research topic.
 
 SOURCE INFORMATION:
 - Title: {source.title}
@@ -45,9 +118,12 @@ Provide an evaluation with:
 
 Format: Begin your response with "Score: X/10" followed by your detailed evaluation.
 """
+)
 
 # Search results analysis prompt
-SEARCH_RESULTS_ANALYSIS_PROMPT = """Analyze the following research materials collected on the topic.
+SEARCH_RESULTS_ANALYSIS_PROMPT = PromptTemplate(
+    input_variables=["topic", "materials"],
+    template="""Analyze the following research materials collected on the topic.
 
 TOPIC: {topic}
 
@@ -64,9 +140,12 @@ Provide a comprehensive analysis including:
 Format your analysis with clear section headings for each of the five areas.
 Be thorough but concise, highlighting the most significant points.
 """
+)
 
 # Literature review prompt
-LITERATURE_REVIEW_PROMPT = """Review the following academic literature and provide a comprehensive synthesis:
+LITERATURE_REVIEW_PROMPT = PromptTemplate(
+    input_variables=["literature_list"],
+    template="""Review the following academic literature and provide a comprehensive synthesis:
 
 Literature List:
 {literature_list}
@@ -81,9 +160,12 @@ Your review should include:
 
 Provide an objective and critical review.
 """
+)
 
 # Research methodology design prompt
-RESEARCH_METHODOLOGY_PROMPT = """Design a methodology for the following research question:
+RESEARCH_METHODOLOGY_PROMPT = PromptTemplate(
+    input_variables=["research_question", "research_objectives", "constraints"],
+    template="""Design a methodology for the following research question:
 
 Research Question: {research_question}
 Research Objectives: {research_objectives}
@@ -99,9 +181,12 @@ Your methodology should include:
 
 Provide a systematic and scientifically rigorous methodology.
 """
+)
 
 # Data analysis prompt
-DATA_ANALYSIS_PROMPT = """Analyze the following dataset:
+DATA_ANALYSIS_PROMPT = PromptTemplate(
+    input_variables=["data_description", "analysis_objectives", "analysis_constraints"],
+    template="""Analyze the following dataset:
 
 Data Description: {data_description}
 Analysis Objectives: {analysis_objectives}
@@ -117,9 +202,12 @@ Your analysis should include:
 
 Provide a systematic and rigorous data analysis.
 """
+)
 
 # Research findings interpretation prompt
-RESEARCH_INTERPRETATION_PROMPT = """Interpret the following research findings:
+RESEARCH_INTERPRETATION_PROMPT = PromptTemplate(
+    input_variables=["research_findings", "research_question", "research_context"],
+    template="""Interpret the following research findings:
 
 Research Findings: {research_findings}
 Research Question: {research_question}
@@ -135,9 +223,12 @@ Your interpretation should include:
 
 Provide an objective and balanced interpretation.
 """
+)
 
 # Research gap identification prompt
-RESEARCH_GAP_IDENTIFICATION_PROMPT = """Identify the main research gaps in the following research field:
+RESEARCH_GAP_IDENTIFICATION_PROMPT = PromptTemplate(
+    input_variables=["research_field", "current_knowledge"],
+    template="""Identify the main research gaps in the following research field:
 
 Research Field: {research_field}
 Current State of Knowledge: {current_knowledge}
@@ -152,9 +243,12 @@ Your identification should include:
 
 Provide a systematic and comprehensive analysis of research gaps.
 """
+)
 
 # Research proposal prompt
-RESEARCH_PROPOSAL_PROMPT = """Write a research proposal on the following topic:
+RESEARCH_PROPOSAL_PROMPT = PromptTemplate(
+    input_variables=["topic", "research_context", "constraints"],
+    template="""Write a research proposal on the following topic:
 
 Topic: {topic}
 Research Context: {research_context}
@@ -171,3 +265,4 @@ Your proposal should include:
 
 Provide a well-structured and academically sound research proposal.
 """
+)

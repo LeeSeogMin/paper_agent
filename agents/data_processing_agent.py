@@ -93,15 +93,25 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
         # PDF 처리기 초기화
         self.pdf_processor = PDFProcessor(verbose=verbose)
         
-        # 텍스트 분할기 초기화
+        # 텍스트 분할기 초기화 (계층적 분할 전략)
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
-            separators=["
-
-", "
-", ". ", " ", ""]
+            separators=[
+                "\n\n## ",  # 주요 섹션 헤딩 (Markdown-style)
+                "\n\n",     # 문단 구분
+                "\n",       # 개행 문자
+                ". ",       # 문장 종료
+                "! ",       # 감탄문 종료
+                "? ",       # 질문 종료
+                "; ",       # 세미콜론 구분
+                ": ",       # 콜론 구분
+                ", ",       # 쉼표 구분
+                " ",        # 단어 구분
+                ""          # 최종 문자 단위
+            ],
+            keep_separator=True  # 분할 기호 유지
         )
         
         # 임베딩 객체 초기화

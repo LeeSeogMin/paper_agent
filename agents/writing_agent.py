@@ -23,7 +23,12 @@ from models.research import ResearchMaterial
 from prompts.paper_prompts import (
     PAPER_OUTLINE_PROMPT,
     PAPER_SECTION_PROMPT,
-    PAPER_EDITING_PROMPT
+    PAPER_EDITING_PROMPT,
+    LITERATURE_REVIEW_PROMPT,
+    METHODOLOGY_PROMPT,
+    RESEARCH_SUMMARY_PROMPT,
+    ANALYSIS_PROMPT,
+    CUSTOM_WRITING_PROMPT
 )
 from agents.base import BaseAgent
 
@@ -48,13 +53,13 @@ class EditTask(BaseModel):
     changes_made: List[str] = Field(description="List of applied changes")
 
 
-class WriterAgent(BaseAgent[Paper]):
-    """Paper writing expert agent"""
+class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
+    """Flexible content writing agent that responds to coordinator instructions"""
 
     def __init__(
         self,
         name: str = "Writing Agent",
-        description: str = "Paper Writing Expert",
+        description: str = "Content Writing Expert",
         verbose: bool = False
     ):
         """
@@ -62,7 +67,7 @@ class WriterAgent(BaseAgent[Paper]):
 
         Args:
             name (str, optional): Agent name. Defaults to "Writing Agent"
-            description (str, optional): Agent description. Defaults to "Paper Writing Expert"
+            description (str, optional): Agent description. Defaults to "Content Writing Expert"
             verbose (bool, optional): Enable detailed logging. Defaults to False
         """
         super().__init__(name, description, verbose=verbose)
@@ -76,7 +81,17 @@ class WriterAgent(BaseAgent[Paper]):
         # Currently working paper
         self.current_paper = None
         
-        logger.info(f"{self.name} initialized")
+        # 추가: 작업 유형별 템플릿 초기화
+        self.task_templates = {
+            "full_paper": PAPER_SECTION_PROMPT,
+            "literature_review": LITERATURE_REVIEW_PROMPT,
+            "methodology": METHODOLOGY_PROMPT,
+            "research_summary": RESEARCH_SUMMARY_PROMPT,
+            "analysis": ANALYSIS_PROMPT,
+            "custom": CUSTOM_WRITING_PROMPT
+        }
+        
+        logger.info(f"{self.name} initialized with flexible task support")
 
     def _init_prompts(self) -> None:
         """Initialize prompts and chains"""
@@ -614,3 +629,73 @@ class WriterAgent(BaseAgent[Paper]):
             )
             
             return empty_paper
+
+    # 새로운 메소드: 작업 유형 처리
+    def process_writing_task(
+        self, 
+        task_type: str,
+        task_description: str,
+        research_materials: List[ResearchMaterial],
+        additional_context: Dict[str, Any] = None
+    ) -> Union[Paper, Dict[str, Any]]:
+        """
+        Process different types of writing tasks based on coordinator instructions
+        
+        Args:
+            task_type: Type of writing task (full_paper, literature_review, etc.)
+            task_description: Detailed description of the writing task
+            research_materials: Research materials to use
+            additional_context: Additional context or requirements
+            
+        Returns:
+            Either a Paper object or a Dict with the requested content
+        """
+        logger.info(f"Processing {task_type} writing task: {task_description[:50]}...")
+        
+        try:
+            if task_type == "full_paper":
+                return self.run(
+                    topic=task_description,
+                    research_materials=research_materials,
+                    template_name=additional_context.get("template", "academic")
+                )
+            
+            elif task_type == "literature_review":
+                return self._write_literature_review(
+                    topic=task_description,
+                    materials=research_materials,
+                    format=additional_context.get("format", "chronological")
+                )
+                
+            elif task_type == "research_summary":
+                return self._write_research_summary(
+                    materials=research_materials,
+                    focus=additional_context.get("focus", "key_findings")
+                )
+                
+            # 기타 작업 유형 처리...
+            
+            else:  # custom writing task
+                return self._handle_custom_task(
+                    task_description=task_description,
+                    materials=research_materials,
+                    context=additional_context
+                )
+                
+        except Exception as e:
+            logger.error(f"Error processing writing task: {str(e)}")
+            return {
+                "error": str(e),
+                "task_type": task_type,
+                "content": f"Failed to complete the {task_type} writing task."
+            }
+    
+    # 새로운 메소드: 문헌 리뷰 작성
+    def _write_literature_review(self, topic: str, materials: List[ResearchMaterial], format: str = "chronological") -> Dict[str, Any]:
+        """Generate a focused literature review"""
+        # 구현 코드...
+        
+    # 새로운 메소드: 연구 요약 작성
+    def _write_research_summary(self, materials: List[ResearchMaterial], focus: str = "key_findings") -> Dict[str, Any]:
+        """Generate a research summary with specified focus"""
+        # 구현 코드...

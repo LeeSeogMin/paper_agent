@@ -23,7 +23,7 @@ from langchain.chains.summarize import load_summarize_chain
 
 from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db
-from utils.api_clients import semantic_scholar_search, google_scholar_search
+from utils.api_clients import semantic_scholar_search, google_scholar_search, search_academic_papers
 from utils.pdf_processor import extract_text_from_pdf
 
 from agents.base import BaseAgent
@@ -159,26 +159,18 @@ class ResearchAgent(BaseAgent):
         Returns:
             List[Dict[str, Any]]: List of paper metadata
         """
-        logger.info(f"Searching for papers with query: {query}")
+        logger.info(f"검색 쿼리 '{query}'로 논문 검색 중...")
         
         try:
-            # First try Semantic Scholar
-            results = semantic_scholar_search(query, max_results=max_results)
-            
-            # Fallback to Google Scholar if needed
-            if not results or len(results) < max_results:
-                gs_results = google_scholar_search(
-                    query, 
-                    max_results=max_results - len(results)
-                )
-                results.extend(gs_results)
-            
-            logger.info(f"Found {len(results)} papers for query: {query}")
+            # 통합 검색 함수 사용 (Semantic Scholar와 Google Scholar 모두 시도)
+            results = search_academic_papers(query, max_results)
+            logger.info(f"검색 완료: {len(results)}개 결과 발견")
             return results
             
         except Exception as e:
-            logger.error(f"Error searching for papers: {str(e)}", exc_info=True)
-            return []
+            logger.error(f"논문 검색 실패: {str(e)}")
+            # 검색 실패 시 빈 결과 반환 대신 예외 전파
+            raise
     
     def evaluate_source(self, source: Dict[str, Any], topic: str) -> Tuple[float, str]:
         """

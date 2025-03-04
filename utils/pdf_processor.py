@@ -16,6 +16,8 @@ import requests
 # import PyPDF2
 from utils.logger import logger
 from utils.api_clients import download_pdf
+import fitz  # PyMuPDF
+from datetime import datetime
 
 
 def extract_text_from_pdf(pdf_path_or_url: str) -> str:
@@ -171,3 +173,112 @@ def extract_references_from_pdf(pdf_path_or_url: str) -> List[str]:
     
     logger.info(f"Extracted {len(references)} references from PDF")
     return references
+
+
+class PDFProcessor:
+    """고성능 PDF 처리 클래스"""
+    
+    def __init__(self, verbose: bool = False):
+        self.verbose = verbose
+        self.section_patterns = [
+            r'abstract', r'introduction', r'related\s+work',
+            r'methodology', r'experiment', r'results',
+            r'discussion', r'conclusion', r'references'
+        ]
+
+    def process_file(self, file_path: str) -> Tuple[bool, str, list, dict]:
+        """PDF 파일 처리 메인 메서드"""
+        try:
+            doc = fitz.open(file_path)
+            full_text, pages = self._extract_text_and_pages(doc)
+            metadata = self._process_metadata(doc.metadata)
+            sections = self._detect_sections(full_text)
+            references = self._extract_references(full_text)
+            
+            metadata.update({
+                "sections": sections,
+                "reference_count": len(references),
+                "processing_time": datetime.now().isoformat()
+            })
+            
+            return True, full_text, pages, metadata
+            
+        except Exception as e:
+            logger.error(f"PDF 처리 실패: {str(e)}", exc_info=self.verbose)
+            return False, "", [], {}
+
+    def _extract_text_and_pages(self, doc) -> Tuple[str, list]:
+        """텍스트 및 페이지 데이터 추출"""
+        full_text = []
+        pages = []
+        
+        for page in doc:
+            text = page.get_text("text", flags=fitz.TEXT_PRESERVE_LIGATURES | 
+                                fitz.TEXT_MEDIABOX_CLIP | 
+                                fitz.TEXT_DEHYPHENATE)
+            full_text.append(text)
+            pages.append({
+                "number": page.number + 1,
+                "content": text,
+                "dimensions": page.rect,
+                "annotations": [self._process_annotation(a) for a in page.annots()]
+            })
+            
+        return "\n".join(full_text), pages
+
+    def _process_metadata(self, meta: dict) -> dict:
+        """메타데이터 가공"""
+        return {
+            "title": meta.get("title", ""),
+            "authors": meta.get("author", "").split(';') if meta.get("author") else [],
+            "subject": meta.get("subject", ""),
+            "creation_date": meta.get("creationDate", ""),
+            "modification_date": meta.get("modDate", ""),
+            "keywords": meta.get("keywords", "").split(',') if meta.get("keywords") else []
+        }
+
+    def _process_annotation(self, annot) -> dict:
+        """주석 데이터 처리"""
+        return {
+            "type": annot.type[1],
+            "content": annot.info.get("content", ""),
+            "coordinates": annot.rect,
+            "color": annot.colors.get("fill", (0,0,0))
+        } if annot else {}
+
+    def _detect_sections(self, text: str) -> Dict[str, str]:
+        """섹션 구조 분석"""
+        section_pattern = re.compile(
+            r'\n\s*(' + '|'.join(self.section_patterns) + r')\s*\n',
+            re.IGNORECASE
+        )
+        matches = list(section_pattern.finditer(text))
+        sections = {}
+        
+        for i, match in enumerate(matches):
+            title = match.group(1).lower().capitalize()
+            start = match.end()
+            end = matches[i+1].start() if i+1 < len(matches) else len(text)
+            sections[title] = text[start:end].strip()
+            
+        return sections
+
+    def _extract_references(self, text: str) -> List[str]:
+        """참고문헌 추출"""
+        ref_section = self._detect_sections(text).get("References", "")
+        if not ref_section:
+            return []
+            
+        # 참고문헌 분할 로직
+        references = re.split(r'\n(?=\[?\d+\]?\s?)', ref_section)
+        return [ref.strip() for ref in references if ref.strip()]
+
+    def _clean_text(self, text: str) -> str:
+        """텍스트 정제"""
+        # 하이픈 연결 단어 복원
+        text = re.sub(r'(\w+)-\n(\w+)', r'\1\2', text)
+        # 머리글/꼬리글 제거
+        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+        # 연속 공백 제거
+        text = re.sub(r'\s+', ' ', text)
+        return text.strip()
