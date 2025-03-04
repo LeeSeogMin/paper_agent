@@ -37,6 +37,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from graphs.paper_writing import PaperWritingGraph
 
+from utils.academic_search import AcademicSearchManager
+from utils.rag_integration import RAGEnhancer
+
 
 class WorkflowRunner:
     """워크플로우 실행을 위한 래퍼 클래스"""
@@ -92,6 +95,9 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         
         # 필요한 에이전트들 초기화
         self._init_agents()
+        
+        self.search_manager = AcademicSearchManager()
+        self.rag_enhancer = RAGEnhancer()
         
         logger.info(f"{self.name} 초기화 완료")
 
@@ -155,26 +161,23 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         
         logger.info("에이전트 초기화 완료")
 
-    def create_research_plan(self, topic, resources=None, constraints=None):
+    def create_research_plan(self, topic, task_type):
         """
-        연구 주제에 대한 계획 수립
+        연구 계획을 생성합니다.
         """
         try:
-            # 누락된 키에 기본값 제공
-            resources = resources or []
-            constraints = constraints or []
-            
-            result = self.research_plan_chain.run(
-                topic=topic,
-                resources=resources,
-                constraints=constraints,
-                task="연구 주제에 대한 포괄적인 문헌 조사 수행"  # 기본 태스크 제공
-            )
+            # 필요한 모든 입력 키 제공
+            result = self.research_plan_chain.run({
+                "topic": topic,
+                "task": task_type,  # 누락된 'task' 키
+                "resources": [],    # 누락된 'resources' 키
+                "constraints": ""   # 누락된 'constraints' 키
+            })
             return result
         except Exception as e:
-            logger.error(f"계획 수립 실패: {str(e)}")
-            # 계획 실패 시에도 기본 계획 반환
-            return f"주제 '{topic}'에 대한 기본 연구 계획: 관련 논문 수집 및 분석"
+            logger.error(f"연구 계획 생성 중 오류: {str(e)}")
+            # 오류 발생 시 기본 템플릿 반환
+            return f"# 연구 계획: {topic}\n\n## 목표\n\n{topic}에 대한 연구 수행\n\n## 단계\n\n1. 문헌 조사\n2. 분석\n3. 정리"
 
     def start_workflow(
         self,
@@ -187,7 +190,7 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
     ) -> PaperWorkflowState:
         """사용자 질문 기반 워크플로우 시작"""
         logger.info(f"질문 '{user_question}'에 대한 워크플로우 시작")
-        research_plan = self.create_research_plan(user_question, [])
+        research_plan = self.create_research_plan(user_question, "literature_review")
         
         workflow_state = self.workflow_runner.run_workflow(
             user_question=user_question,
@@ -332,27 +335,63 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         from datetime import datetime
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    def run(
-        self,
-        input_data: Dict[str, Any],
-        config: Optional[RunnableConfig] = None
-    ) -> PaperWorkflowState:
-        """총괄 에이전트 실행"""
-        logger.info("총괄 에이전트 실행 중...")
-        user_question = input_data.get("user_question", "")
-        if not user_question:
-            raise ValueError("사용자 질문이 제공되지 않았습니다.")
-        workflow_state = self.start_workflow(
-            user_question=user_question,
-            template_name=input_data.get("template_name"),
-            style_guide=input_data.get("style_guide"),
-            citation_style=input_data.get("citation_style"),
-            output_format=input_data.get("output_format", "markdown"),
-            verbose=input_data.get("verbose", False)
-        )
-        self.update_state({"user_question": user_question, "workflow_state": workflow_state})
-        logger.info("총괄 에이전트 실행 완료")
-        return workflow_state
+    def run(self, topic, paper_type, constraints=None, references=None, instructions=None):
+        """
+        논문 작성 프로세스 실행
+        
+        Args:
+            topic: 연구 주제
+            paper_type: 논문 유형
+            constraints: 제약사항
+            references: 참고자료
+            instructions: 추가 지시사항
+            
+        Returns:
+            Dict: 생성된 논문 및 메타데이터
+        """
+        try:
+            logger.info(f"사용자 요구사항 처리 시작")
+            
+            # 1. 연구 계획 생성 (중앙집중형 모델의 핵심)
+            research_plan = self.create_research_plan(topic, paper_type, constraints, references)
+            
+            # 추가 지시사항 처리
+            if instructions:
+                self.process_instructions(instructions, research_plan)
+            
+            # 2. 연구 자료 수집 (연구 계획 전달)
+            materials = self.research_agent.run(
+                task="collect_materials",
+                topic=topic,
+                research_plan=research_plan,  # 연구 계획 전달
+                max_queries=5,
+                results_per_source=10,
+                constraints=constraints
+            )
+            
+            # 자료가 충분한지 확인
+            if not materials or len(materials) < 3:
+                # 계획 수정 - 로컬만 검색했다면 외부 검색 허용
+                if research_plan["search_strategy"].get("search_scope") == "local_only":
+                    logger.info("로컬 자료 부족, 외부 검색으로 확장")
+                    research_plan["search_strategy"]["search_scope"] = "all"
+                    # 다시 자료 수집
+                    materials = self.research_agent.run(
+                        task="collect_materials",
+                        topic=topic,
+                        research_plan=research_plan,
+                        max_queries=5
+                    )
+            
+            # 3. 논문 작성 (연구 계획 전달)
+            # ... (이하 다른 에이전트에도 연구 계획 전달)
+            
+            # 4. 최종 논문 통합 및 반환
+            # ... (기존 코드)
+            
+        except Exception as e:
+            logger.error(f"논문 생성 실패: {str(e)}", exc_info=True)
+            return {"error": str(e)}
 
     def execute_research_plan(self, research_plan: ResearchPlan, research_materials: List[ResearchMaterial]) -> Dict[str, Any]:
         """Execute a research plan using available materials"""
@@ -435,8 +474,23 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 if field not in requirements or not requirements[field]:
                     raise ValueError(f"필수 필드 누락: {field}")
             
+            # 주제와 관련된 학술 자료 검색 (요구사항에 topic이 있다고 가정)
+            if "topic" in requirements:
+                try:
+                    logger.info(f"주제에 대한 학술 검색 수행: {requirements['topic']}")
+                    research_summary = self.rag_enhancer.get_research_summary(
+                        topic=requirements['topic'],
+                        limit=5  # 적절한 수로 조정
+                    )
+                    
+                    # 검색 결과를 요구사항에 추가
+                    requirements["research_context"] = research_summary
+                    logger.info("학술 검색 결과가 요구사항에 추가되었습니다")
+                except Exception as e:
+                    logger.warning(f"학술 검색 중 오류 발생: {e}")
+            
             # 연구 계획 수립 (이제 문자열 반환)
-            research_plan_text = self.create_research_plan(requirements["topic"], [])
+            research_plan_text = self.create_research_plan(requirements["topic"], "literature_review")
             
             # 연구 수행 - 직접 topic 전달
             research_materials = self.research_agent.run(

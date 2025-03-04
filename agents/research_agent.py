@@ -25,7 +25,7 @@ from langchain.chains.summarize import load_summarize_chain
 from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db, process_and_vectorize_paper
 from utils.api_clients import search_google_scholar, search_academic_papers
-from utils.pdf_processor import extract_text_from_pdf
+from utils.pdf_processor import extract_text_from_pdf, process_local_pdfs
 from utils.search_utils import academic_search, fallback_search
 from utils.search import google_search, search_academic_resources, search_crossref, search_arxiv
 from utils.pdf_downloader import get_local_pdf_path
@@ -253,12 +253,13 @@ class ResearchAgent(BaseAgent):
             logger.error(f"Error evaluating source: {str(e)}", exc_info=True)
             return 0.7, f"Error evaluating source: {str(e)}. Using default relevance score."
     
-    def collect_research_materials(self, topic, max_queries=3, results_per_source=10, final_result_count=20):
+    def collect_research_materials(self, topic, research_plan=None, max_queries=3, results_per_source=10, final_result_count=20):
         """
-        연구 주제에 따른 자료 수집 (PDF 및 영어 자료만)
+        연구 주제 및 계획에 따른 자료 수집
         
         Args:
             topic: 연구 주제
+            research_plan: 총괄 에이전트의 연구 계획
             max_queries: 생성할 최대 검색 쿼리 수
             results_per_source: 각 소스별 최대 결과 수
             final_result_count: 최종 선정할 결과 수
@@ -272,60 +273,98 @@ class ResearchAgent(BaseAgent):
         all_materials = []
         
         try:
-            # 1. 로컬 데이터베이스 검색 (PDF 자료만 필터링)
-            local_results = self.search_local_papers(topic, max_results=results_per_source)
-            local_results = [r for r in local_results if r.get('pdf_url') or 'pdf_path' in r]
+            # 연구 계획 확인 (검색 전략 설정)
+            search_scope = "all"  # 기본값
+            if research_plan and "search_strategy" in research_plan:
+                search_scope = research_plan["search_strategy"].get("search_scope", "all")
+                if "min_papers" in research_plan["search_strategy"]:
+                    final_result_count = research_plan["search_strategy"]["min_papers"]
+                if "queries" in research_plan["search_strategy"] and research_plan["search_strategy"]["queries"]:
+                    predefined_queries = research_plan["search_strategy"]["queries"]
+                    max_queries = min(max_queries, len(predefined_queries))
             
-            for result in local_results:
-                relevance_score, explanation = self.evaluate_source(result, topic)
+            # 1. 로컬 PDF 파일 처리 및 벡터화 (로컬 검색 허용 시)
+            if search_scope in ["local_only", "all"]:
+                from utils.pdf_processor import process_local_pdfs
+                local_papers = process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db")
                 
-                if relevance_score >= 0.6:
-                    # 자료 처리 및 ResearchMaterial 생성
-                    material = self._create_research_material(result, "local", relevance_score, explanation)
-                    if material:
-                        all_materials.append(material)
-            
-            # 2. 검색 쿼리 생성
-            search_queries = self.generate_search_queries(topic, n_queries=max_queries)
-            
-            # 3. 논문 검색 (영어 자료만)
-            for query in search_queries:
-                # 'query_text' 대신 올바른 속성 이름 사용
-                # SearchQuery 모델의 실제 속성 이름 사용 (예: query, text)
-                query_text = query.text  # 'text'가 실제 속성일 경우
-                logger.info(f"Processing query: {query_text}")
+                # 로컬 PDF 관련성 평가 및 자료 생성
+                for paper in local_papers:
+                    relevance_score, explanation = self.evaluate_source(paper, topic)
+                    
+                    if relevance_score >= 0.6:  # 관련성 최소 기준
+                        material = self._create_research_material(paper, "local", relevance_score, explanation)
+                        if material:
+                            all_materials.append(material)
                 
-                # 학술 검색 및 웹 검색 실행 (영어만)
-                academic_results = academic_search(query_text, max_results=results_per_source, language='en')
-                web_results = fallback_search(query_text, max_results=results_per_source, language='en')
+                # 2. 로컬 데이터베이스 검색
+                local_results = self.search_local_papers(topic, max_results=results_per_source)
+                local_results = [r for r in local_results if r.get('pdf_url') or 'pdf_path' in r]
                 
-                # PDF URL이 있는 결과만 유지
-                academic_results = [r for r in academic_results if r.get('pdf_url')]
-                web_results = [r for r in web_results if r.get('pdf_url')]
-                
-                # 결과 결합 및 평가
-                combined_results = academic_results + web_results
-                
-                # 각 결과 평가
-                evaluated_results = []
-                for result in combined_results:
+                for result in local_results:
                     relevance_score, explanation = self.evaluate_source(result, topic)
-                    result['relevance_score'] = relevance_score
-                    result['evaluation'] = explanation
-                    evaluated_results.append(result)
-                
-                # 관련성 점수로 정렬하고 상위 결과만 선택
-                evaluated_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
-                top_results = evaluated_results[:results_per_source]
-                
-                # 관련성 기준 이상인 결과만 최종 자료로 변환
-                for result in top_results:
-                    if result.get('relevance_score', 0) >= 0.6:
-                        material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
+                    
+                    if relevance_score >= 0.6:
+                        material = self._create_research_material(result, "local_db", relevance_score, explanation)
                         if material:
                             all_materials.append(material)
             
-            # 4. 중복 제거 (제목 기준)
+            # 외부 검색이 허용된 경우에만 실행
+            if search_scope in ["web_only", "all"]:
+                # 3. 검색 쿼리 생성 또는 계획에서 가져오기
+                search_queries = []
+                if research_plan and "search_strategy" in research_plan and "queries" in research_plan["search_strategy"]:
+                    # 계획에서 제공된 쿼리 사용
+                    predefined_queries = research_plan["search_strategy"]["queries"]
+                    search_queries = [SearchQuery(id=f"q{i}", text=q) for i, q in enumerate(predefined_queries[:max_queries])]
+                else:
+                    # 자동 쿼리 생성
+                    search_queries = self.generate_search_queries(topic, n_queries=max_queries)
+                
+                # 4. 외부 학술 검색 (영어 자료만)
+                for query in search_queries:
+                    query_text = query.text
+                    logger.info(f"Processing query: {query_text}")
+                    
+                    # 학술 검색 및 웹 검색 실행 (영어만)
+                    academic_results = academic_search(query_text, max_results=results_per_source, language='en')
+                    web_results = fallback_search(query_text, max_results=results_per_source, language='en')
+                    
+                    # PDF URL이 있는 결과만 유지
+                    academic_results = [r for r in academic_results if r.get('pdf_url')]
+                    web_results = [r for r in web_results if r.get('pdf_url')]
+                    
+                    # 결과 결합 및 평가
+                    combined_results = academic_results + web_results
+                    
+                    # 각 결과 평가
+                    evaluated_results = []
+                    for result in combined_results:
+                        relevance_score, explanation = self.evaluate_source(result, topic)
+                        result['relevance_score'] = relevance_score
+                        result['evaluation'] = explanation
+                        evaluated_results.append(result)
+                    
+                    # 관련성 점수로 정렬하고 상위 결과만 선택
+                    evaluated_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
+                    top_results = evaluated_results[:results_per_source]
+                    
+                    # 관련성 기준 이상인 결과만 최종 자료로 변환
+                    for result in top_results:
+                        if result.get('relevance_score', 0) >= 0.6:
+                            material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
+                            if material:
+                                all_materials.append(material)
+            
+            # 자료가 없는 경우 처리
+            if not all_materials:
+                if search_scope == "local_only":
+                    logger.error("로컬 자료가 없습니다. 외부 검색을 고려하세요.")
+                else:
+                    logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
+                return []
+            
+            # 중복 제거 및 최종 선택
             unique_materials = {}
             for material in all_materials:
                 # 제목을 기준으로 중복 확인 (소문자 변환 및 공백 제거하여 비교)

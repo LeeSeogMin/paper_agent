@@ -15,10 +15,10 @@ from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.vectorstores import Chroma
 
 from utils.logger import logger
 from config.settings import VECTOR_DB_PATH, OPENAI_API_KEY
-from utils.pdf_processor import extract_text_from_pdf
 from utils.pdf_downloader import get_local_pdf_path
 
 
@@ -203,108 +203,115 @@ def ensure_vector_db_directory():
     os.makedirs(VECTOR_DB_PATH, exist_ok=True)
 
 
-def process_and_vectorize_paper(paper_info: Dict[str, Any], pdf_url: Optional[str] = None, 
-                                collection_name: str = "research_papers"):
+def process_and_vectorize_paper(pdf_path: str) -> Dict[str, Any]:
     """
-    논문 정보와 PDF를 처리하여 벡터 DB에 저장
+    PDF 파일을 처리하고 벡터화하여 저장
     
     Args:
-        paper_info: 논문 메타데이터 (제목, 저자, 초록 등)
-        pdf_url: PDF 다운로드 URL (없으면 로컬 파일만 시도)
-        collection_name: 벡터 DB 컬렉션 이름
-    
+        pdf_path: PDF 파일 경로
+        
     Returns:
-        처리 성공 여부
+        Dict[str, Any]: 처리된 논문 정보
     """
-    paper_id = paper_info.get("id") or paper_info.get("title", "")[:50].replace(" ", "_")
-    logger.info(f"논문 처리 및 벡터화: {paper_id}")
+    from utils.pdf_processor import extract_text_from_pdf
+    import os
+    import uuid
+    import re
+    import hashlib
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_community.vectorstores import Chroma
     
     try:
-        # 1. PDF 파일 확보 (로컬 또는 다운로드)
-        pdf_path = get_local_pdf_path(paper_id, pdf_url or paper_info.get("pdf_url"))
+        # 논문 ID 설정
+        paper_id = f"paper_{uuid.uuid4().hex[:8]}"
         
-        if not pdf_path:
-            # PDF 없이 메타데이터만으로 처리
-            logger.warning(f"PDF를 찾을 수 없음. 메타데이터만 벡터화: {paper_id}")
-            metadata = {
-                "title": paper_info.get("title", ""),
-                "authors": paper_info.get("authors", []),
-                "year": paper_info.get("year", ""),
-                "abstract": paper_info.get("abstract", ""),
-                "source": paper_info.get("source", "unknown"),
-                "url": paper_info.get("url", ""),
-                "paper_id": paper_id
+        # PDF 텍스트 추출
+        text = extract_text_from_pdf(pdf_path)
+        if not text or len(text) < 100:
+            logger.warning(f"PDF 텍스트 추출 실패 또는 내용 부족: {pdf_path}")
+            return None
+        
+        # 중복 체크 - 해시 값 생성
+        content_hash = hashlib.md5(text[:5000].encode()).hexdigest()
+        
+        # 이미 저장된 해시 값 확인
+        hash_file = os.path.join(VECTOR_DB_PATH, "content_hashes.json")
+        existing_hashes = {}
+        if os.path.exists(hash_file):
+            with open(hash_file, 'r') as f:
+                existing_hashes = json.load(f)
+        
+        # 중복 확인
+        if content_hash in existing_hashes:
+            logger.info(f"중복 문서 발견, 기존 ID 사용: {existing_hashes[content_hash]}")
+            return {
+                "id": existing_hashes[content_hash],
+                "title": "...",  # 기존 문서 정보 반환
+                "is_duplicate": True
             }
-            
-            # 메타데이터만으로 문서 생성
-            content = f"제목: {metadata['title']}\n\n저자: {metadata['authors']}\n\n연도: {metadata['year']}\n\n초록: {metadata['abstract']}"
-            documents = [Document(page_content=content, metadata=metadata)]
-            
-        else:
-            # 2. PDF에서 텍스트 추출
-            text = extract_text_from_pdf(pdf_path)
-            
-            if not text:
-                logger.warning(f"PDF에서 텍스트를 추출할 수 없음: {pdf_path}")
-                return False
-            
-            # 3. 문서 분할
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200
-            )
-            
-            splits = text_splitter.split_text(text)
-            
-            # 4. 메타데이터 준비
-            metadata = {
-                "title": paper_info.get("title", ""),
-                "authors": paper_info.get("authors", []),
-                "year": paper_info.get("year", ""),
-                "abstract": paper_info.get("abstract", ""),
-                "source": paper_info.get("source", "unknown"),
-                "url": paper_info.get("url", ""),
-                "pdf_path": pdf_path,
-                "paper_id": paper_id
-            }
-            
-            # 5. 문서 객체 생성
-            documents = [
-                Document(page_content=split, metadata=metadata) 
-                for split in splits
-            ]
         
-        # 6. 벡터 DB에 저장
-        db_path = os.path.join(VECTOR_DB_PATH, collection_name)
+        # 메타데이터 추출 (기본 정보)
+        file_name = os.path.basename(pdf_path)
+        title = os.path.splitext(file_name)[0].replace('_', ' ')
         
-        # 기존 DB가 있는지 확인
-        if os.path.exists(db_path):
-            # 기존 DB에 추가
-            embeddings = OpenAIEmbeddings()
-            vectordb = FAISS.load_local(db_path, embeddings)
-            vectordb.add_documents(documents)
-            vectordb.save_local(db_path)
-            logger.info(f"기존 벡터 DB에 문서 추가됨: {collection_name}, 문서 ID: {paper_id}")
-        else:
-            # 새 DB 생성
-            create_vector_db(documents, collection_name)
+        # 정규식으로 제목과 저자 추출 시도
+        title_match = re.search(r'(?:Title|TITLE):\s*([^\n]+)', text[:2000])
+        if title_match:
+            title = title_match.group(1).strip()
         
-        # 7. 처리된 논문 ID 저장 (중복 처리 방지)
-        processed_papers_path = os.path.join(VECTOR_DB_PATH, "processed_papers.json")
-        processed_papers = set()
+        authors = ""
+        authors_match = re.search(r'(?:Author|AUTHORS|authors)s?:\s*([^\n]+)', text[:2000])
+        if authors_match:
+            authors = authors_match.group(1).strip()
         
-        if os.path.exists(processed_papers_path):
-            with open(processed_papers_path, 'r', encoding='utf-8') as f:
-                processed_papers = set(json.load(f))
+        # 초록 추출 시도
+        abstract = ""
+        abstract_match = re.search(r'(?:Abstract|ABSTRACT):\s*([^\n]+(?:\n[^\n]+){1,10})', text[:5000])
+        if abstract_match:
+            abstract = abstract_match.group(1).strip()
         
-        processed_papers.add(paper_id)
+        # 텍스트 분할
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, 
+            chunk_overlap=200
+        )
+        chunks = text_splitter.split_text(text)
         
-        with open(processed_papers_path, 'w', encoding='utf-8') as f:
-            json.dump(list(processed_papers), f, ensure_ascii=False)
+        # 벡터 DB 저장 경로 생성
+        os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+        collection_name = f"paper_{paper_id}"
         
-        logger.info(f"논문 처리 및 벡터화 완료: {paper_id}")
-        return True
-    
+        # 임베딩 및 벡터 DB 저장
+        embeddings = OpenAIEmbeddings()
+        metadata = [{"source": pdf_path, "paper_id": paper_id, "chunk": i} for i in range(len(chunks))]
+        vectorstore = Chroma.from_texts(
+            texts=chunks,
+            embedding=embeddings,
+            metadatas=metadata,
+            persist_directory=VECTOR_DB_PATH,
+            collection_name=collection_name
+        )
+        vectorstore.persist()
+        
+        # 논문 메타데이터 반환
+        paper_info = {
+            "id": paper_id,
+            "title": title,
+            "authors": authors,
+            "abstract": abstract,
+            "pdf_path": pdf_path,
+            "vector_collection": collection_name,
+            "content_length": len(text),
+            "chunk_count": len(chunks)
+        }
+        
+        # 해시 값 저장
+        existing_hashes[content_hash] = paper_id
+        with open(hash_file, 'w') as f:
+            json.dump(existing_hashes, f)
+        
+        return paper_info
+        
     except Exception as e:
-        logger.error(f"논문 처리 및 벡터화 실패: {str(e)}", exc_info=True)
-        return False
+        logger.error(f"PDF 벡터화 중 오류: {str(e)}", exc_info=True)
+        return None

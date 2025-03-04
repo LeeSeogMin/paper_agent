@@ -254,3 +254,41 @@ Provide a final review report that includes:
 The final review should ensure that the paper represents the highest quality work possible and is fully prepared for the submission process.
 """
 )
+
+RESEARCH_PLAN_PROMPT = """
+너는 학술 연구 계획을 수립하는 전문가입니다. 사용자의 요구사항에 따라 상세한 연구 계획을 작성해주세요.
+
+주제: {topic}
+논문 유형: {paper_type}
+제약사항: {constraints}
+참고자료: {references}
+
+다음 요소를 포함한 연구 계획을 JSON 형식으로 작성해주세요:
+
+1. 연구 목표 (3-5개)
+2. 검색 전략
+   - 검색 범위 (local_only: 로컬 데이터만, web_only: 웹 검색만, all: 모두)
+   - 필요한 논문 수
+   - 권장 검색 쿼리 (5-10개)
+3. 논문 구조 (섹션 및 서브섹션)
+4. 일정 계획
+
+JSON 형식:
+{
+  "topic": "연구 주제",
+  "paper_type": "논문 유형",
+  "objectives": ["목표1", "목표2", "목표3"],
+  "search_strategy": {
+    "search_scope": "local_only|web_only|all",
+    "min_papers": 10,
+    "queries": ["쿼리1", "쿼리2", "쿼리3"]
+  },
+  "outline": ["섹션1", "섹션2", "섹션3"],
+  "timeline": {
+    "days": 7,
+    "milestones": ["자료 수집 (1-2일)", "초안 작성 (3-5일)", "검토 및 수정 (6-7일)"]
+  }
+}
+
+제약사항이나 참고자료가 있다면 이를 고려해서 계획을 세우세요.
+"""

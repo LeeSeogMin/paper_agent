@@ -22,6 +22,7 @@ import json
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
+from utils.vector_db import process_and_vectorize_paper
 
 
 def extract_text_from_pdf(pdf_path_or_url: str) -> str:
@@ -493,3 +494,69 @@ class PDFProcessor:
                 "success": False,
                 "error": str(e)
             }
+
+
+def process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db"):
+    """
+    data/local 폴더의 PDF 파일을 처리하여 벡터화
+    
+    Args:
+        local_dir: 로컬 PDF 파일 디렉토리
+        vector_db_path: 벡터 데이터베이스 저장 경로
+    
+    Returns:
+        List[Dict]: 처리된 PDF 정보 목록
+    """
+    # 로컬 디렉토리 확인
+    if not os.path.exists(local_dir):
+        os.makedirs(local_dir, exist_ok=True)
+        logger.info(f"로컬 PDF 디렉토리 생성됨: {local_dir}")
+        return []
+    
+    # PDF 파일 스캔
+    pdf_files = [f for f in os.listdir(local_dir) if f.lower().endswith('.pdf')]
+    
+    if not pdf_files:
+        logger.info(f"로컬 PDF 파일이 없음: {local_dir}")
+        return []
+    
+    logger.info(f"{len(pdf_files)}개의 로컬 PDF 파일 처리 시작")
+    
+    # 각 PDF 파일 처리
+    processed_papers = []
+    
+    # PDF 프로세서 초기화 (하이브리드 방식 사용)
+    pdf_processor = PDFProcessor(use_llm=True)
+    
+    for pdf_file in pdf_files:
+        pdf_path = os.path.join(local_dir, pdf_file)
+        try:
+            # 하이브리드 방식으로 PDF 처리
+            pdf_result = pdf_processor.process_pdf(pdf_path)
+            
+            if pdf_result["success"]:
+                metadata = pdf_result["metadata"]
+                
+                # 텍스트 추출 및 벡터화
+                # ...벡터화 코드...
+                
+                paper_info = {
+                    "id": f"local_{os.path.splitext(pdf_file)[0]}",
+                    "title": metadata.get("title", ""),
+                    "authors": metadata.get("authors", []),
+                    "abstract": metadata.get("abstract", ""),
+                    "year": metadata.get("year", ""),
+                    # ...기타 필드...
+                }
+                
+                processed_papers.append(paper_info)
+                logger.info(f"로컬 PDF 처리 완료: {pdf_file}")
+            else:
+                # 하이브리드 방식 실패시 기존 방식 시도
+                paper_info = process_and_vectorize_paper(pdf_path=pdf_path)
+                # ...기존 처리 코드...
+        except Exception as e:
+            logger.error(f"로컬 PDF 처리 중 오류: {pdf_file} - {str(e)}")
+    
+    logger.info(f"{len(processed_papers)}개의 로컬 PDF 파일 처리 완료")
+    return processed_papers

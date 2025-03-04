@@ -28,20 +28,21 @@ from agents.base import BaseAgent
 
 
 class EditingTask(BaseModel):
-    """편집 작업 정의"""
-    paper_id: str = Field(description="편집할 논문 ID")
-    style_guide: Optional[str] = Field(default="Standard Academic", description="적용할 스타일 가이드")
-    citation_style: Optional[str] = Field(default="APA", description="인용 스타일")
-    focus_areas: Optional[List[str]] = Field(default_factory=list, description="중점 편집 영역")
-    output_format: Optional[str] = Field(default="markdown", description="출력 형식")
+    """Editing task definition"""
+    paper_id: str = Field(description="ID of the paper to edit")
+    style_guide: Optional[str] = Field(default="Standard Academic", description="Style guide to apply")
+    citation_style: Optional[str] = Field(default="APA", description="Citation style")
+    focus_areas: Optional[List[str]] = Field(default_factory=list, description="Focus areas for editing")
+    output_format: Optional[str] = Field(default="markdown", description="Output format")
+    paper_format: Optional[str] = Field(default="standard", description="Paper format (standard, literature_review_only, custom)")
     
     @validator('paper_id')
     def paper_id_must_not_be_empty(cls, v):
         if not v:
-            raise ValueError('paper_id는 필수 항목입니다')
+            raise ValueError('paper_id is required')
         return v
     
-    @validator('style_guide', 'citation_style', 'output_format')
+    @validator('style_guide', 'citation_style', 'output_format', 'paper_format')
     def provide_defaults_for_empty_strings(cls, v, values, **kwargs):
         if not v:
             field_name = kwargs['field'].name
@@ -51,6 +52,8 @@ class EditingTask(BaseModel):
                 return "APA"
             elif field_name == 'output_format':
                 return "markdown"
+            elif field_name == 'paper_format':
+                return "standard"
         return v
 
 
@@ -192,15 +195,28 @@ class EditorAgent(BaseAgent[Paper]):
             )
         # ... other style guides
 
-    def edit_paper(self, paper: Paper, style_guide: StyleGuide) -> Paper:
+    def edit_paper(self, paper: Paper, style_guide: StyleGuide, paper_format: str = "standard") -> Paper:
         """Execute comprehensive paper editing"""
-        logger.info(f"Editing paper: {paper.title}")
+        logger.info(f"Editing paper: {paper.title} with format: {paper_format}")
         try:
             paper_content = self._compile_paper_content(paper)
+            
+            # Add paper format instructions
+            format_instructions = {
+                "standard": "Edit as a standard academic paper format (introduction, methodology, results, discussion, conclusion).",
+                "literature_review_only": "Edit as a literature review format only. No experimental results or methodology sections needed.",
+            }
+            
+            format_instruction = format_instructions.get(
+                paper_format, 
+                f"Edit using custom format: {paper_format}"
+            )
+            
             result = self.editing_chain.invoke({
                 "content": paper_content,
                 "style_guide": style_guide.json(),
-                "format_instructions": self.editing_parser.get_format_instructions()
+                "format_instructions": self.editing_parser.get_format_instructions(),
+                "paper_format": format_instruction
             })
             return self._process_edits(result, paper, style_guide)
         except Exception as e:
@@ -223,16 +239,26 @@ class EditorAgent(BaseAgent[Paper]):
 
     def format_references(self, references: List[Reference], citation_style: str = "APA") -> List[str]:
         """
-        참고 문헌을 지정된 인용 스타일로 형식화합니다.
+        Format references according to the specified citation style.
 
         Args:
-            references (List[Reference]): 참고 문헌 목록
-            citation_style (str, optional): 인용 스타일. 기본값은 "APA"
+            references (List[Reference]): List of references
+            citation_style (str, optional): Citation style. Defaults to "APA"
 
         Returns:
-            List[str]: 형식화된 참고 문헌 목록
+            List[str]: Formatted references list
         """
-        logger.info(f"{len(references)}개의 참고 문헌을 '{citation_style}' 스타일로 형식화 중...")
+        logger.info(f"Formatting {len(references)} references in '{citation_style}' style...")
+        
+        # Citation style guide information
+        citation_guides = {
+            "APA": "Citations in author(year) format or (author, year) format. Example: Davis(2023) asserted that... or ...asserts(Davis, 2023)",
+            "MLA": "Citations in author surname and page number format. Example: (Smith 45)",
+            "Chicago": "Citations as footnotes. Example: Use superscript numbers¹ in text and provide footnote information at the bottom of the page",
+            "Harvard": "Citations in author, year, page format. Example: (Smith, 2023, p.45)"
+        }
+        
+        citation_guide = citation_guides.get(citation_style, f"Custom citation style: {citation_style}")
         
         try:
             # 참고 문헌 정보 준비
@@ -252,7 +278,8 @@ class EditorAgent(BaseAgent[Paper]):
             # 참고 문헌 형식화 수행
             result = self.reference_chain.invoke({
                 "references": references_json,
-                "citation_style": citation_style
+                "citation_style": citation_style,
+                "citation_guide": citation_guide
             })
             
             # 결과 파싱
@@ -458,20 +485,24 @@ class EditorAgent(BaseAgent[Paper]):
         self,
         paper: Paper,
         style_guide_name: str = "Standard Academic",
-        output_format: str = "markdown"
+        output_format: str = "markdown",
+        paper_format: str = "standard",
+        citation_style: str = "APA"
     ) -> Paper:
         """
-        편집 에이전트를 실행하여 논문을 편집합니다.
+        Run the editor agent to edit a paper.
 
         Args:
-            paper (Paper): 편집할 논문
-            style_guide_name (str, optional): 적용할 스타일 가이드 이름. Defaults to "Standard Academic".
-            output_format (str, optional): 출력 형식. Defaults to "markdown".
+            paper (Paper): Paper to edit
+            style_guide_name (str, optional): Style guide name to apply. Defaults to "Standard Academic".
+            output_format (str, optional): Output format. Defaults to "markdown".
+            paper_format (str, optional): Paper format. Defaults to "standard".
+            citation_style (str, optional): Citation style. Defaults to "APA".
 
         Returns:
-            Paper: 편집된 논문
+            Paper: Edited paper
         """
-        logger.info(f"편집 에이전트 실행 중: {paper.title}")
+        logger.info(f"Running editor agent on: {paper.title}")
         
         try:
             # 스타일 가이드 이름이 비어있으면 기본값 사용
@@ -488,7 +519,7 @@ class EditorAgent(BaseAgent[Paper]):
             style_guide = self.create_style_guide(style_guide_name)
             
             # 2. 논문 편집
-            edited_paper = self.edit_paper(paper, style_guide)
+            edited_paper = self.edit_paper(paper, style_guide, paper_format)
             
             # 3. 논문 리뷰
             review_result = self.review_paper(edited_paper)
@@ -500,6 +531,11 @@ class EditorAgent(BaseAgent[Paper]):
             # 4. 논문 포맷팅
             formatted_file = self.save_formatted_paper(edited_paper, output_format)
             edited_paper.metadata["formatted_file"] = formatted_file
+            
+            # 4. Format references (using citation_style)
+            if edited_paper.references:
+                formatted_references = self.format_references(edited_paper.references, citation_style)
+                edited_paper.metadata["formatted_references"] = formatted_references
             
             logger.info(f"편집 에이전트 실행 완료: {paper.title}, 평점: {review_result['overall_rating']}/10")
             return edited_paper

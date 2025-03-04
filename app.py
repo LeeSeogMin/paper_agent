@@ -13,6 +13,8 @@ from agents.coordinator_agent import CoordinatorAgent
 from config.settings import OUTPUT_DIR
 from config.api_keys import check_required_api_keys
 from utils import ensure_directories_exist
+from utils.serpapi_scholar import ScholarSearchTool
+from utils.openalex_api import OpenAlexTool
 
 # 프로젝트 루트 디렉토리를 Python 경로에 추가
 project_root = Path(__file__).resolve().parent
@@ -163,6 +165,43 @@ def main():
         return 1
     
     return 0
+
+# Google Scholar 검색 예시
+def search_google_scholar(query, num_results=5, year_start=None, year_end=None):
+    scholar_tool = ScholarSearchTool()
+    results = scholar_tool.search_scholar(
+        query=query,
+        num_results=num_results,
+        year_start=year_start,
+        year_end=year_end
+    )
+    
+    formatted_results = scholar_tool.format_results(results)
+    return results, formatted_results
+
+# OpenAlex API 검색 예시
+def search_openalex(query, limit=10, filter_options=None):
+    openalex_tool = OpenAlexTool()
+    # 선택적으로 이메일 설정 (Polite Pool 사용)
+    # openalex_tool.set_email("your-email@example.com")
+    
+    results = openalex_tool.search_works(
+        query=query,
+        limit=limit,
+        filter_options=filter_options
+    )
+    
+    formatted_results = openalex_tool.format_paper_results(results)
+    return results, formatted_results
+
+# OpenAlex API로 저자 검색 예시
+def search_openalex_authors(author_name, limit=10):
+    openalex_tool = OpenAlexTool()
+    results = openalex_tool.search_authors(
+        query=author_name,
+        limit=limit
+    )
+    return results
 
 if __name__ == "__main__":
     exit(main())

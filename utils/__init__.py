@@ -4,9 +4,19 @@
 """
 
 from utils.logger import logger, configure_logging
-from utils.api_clients import search_academic_papers, download_pdf
-from utils.pdf_processor import extract_text_from_pdf, extract_sections_from_pdf, PDFProcessor
-from utils.vector_db import create_vector_db, search_vector_db, list_vector_dbs
+# 모듈만 노출하고 개별 함수는 노출하지 않음
+import utils.api_clients
+import utils.pdf_processor
+import utils.vector_db
+
+# 학술 검색 통합 인터페이스 - 새로 추가됨
+import utils.academic_search
+import utils.rag_integration
+import utils.serpapi_scholar
+import utils.openalex_api
+
+# 원래 이 파일에 정의되어 있던 함수 사용 (외부 파일로 옮기는 코드 제거)
+# from utils._directory_utils import ensure_directories_exist
 
 import os
 from pathlib import Path

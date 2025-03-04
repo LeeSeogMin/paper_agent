@@ -14,6 +14,7 @@ from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
+from langchain_community.llms import OpenAI
 
 from config.settings import OUTPUT_DIR, MAX_SECTION_TOKENS
 from config.templates import get_template
@@ -32,6 +33,7 @@ from prompts.paper_prompts import (
     LITERATURE_REVIEW_PROMPT
 )
 from agents.base import BaseAgent
+from utils.rag_integration import RAGEnhancer
 
 
 class OutlineTask(BaseModel):
@@ -91,6 +93,8 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             "analysis": ANALYSIS_PROMPT,
             "custom": CUSTOM_WRITING_PROMPT
         }
+        
+        self.rag_enhancer = RAGEnhancer()
         
         logger.info(f"{self.name} initialized with flexible task support")
 
@@ -269,17 +273,24 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             # Write section
             format_instructions = self.section_parser.get_format_instructions()
             
-            result = self.section_chain.invoke({
+            # 섹션 제목을 기반으로 관련 학술 자료 검색
+            enhanced_prompt = self.rag_enhancer.enhance_prompt_with_research(
+                topic=f"{outline['title']} {section_title}",
+                base_prompt=format_instructions,
+                num_sources=3
+            )
+            
+            response = self.section_chain.invoke({
                 "paper_title": outline["title"],
                 "section_title": section_title,
                 "section_purpose": section.get("description", ""),
                 "paper_outline": json.dumps(paper_outline, ensure_ascii=False),
                 "research_materials": research_materials_text,
-                "format_instructions": format_instructions
+                "format_instructions": enhanced_prompt
             })
             
             # Parse result
-            section_task = self.section_parser.parse(result["text"])
+            section_task = self.section_parser.parse(response.content)
             
             # Handle citations
             citations = section_task.citations
