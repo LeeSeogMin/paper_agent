@@ -7,13 +7,14 @@ import os
 import re
 import json
 from typing import Dict, Any, List, Optional, Tuple, Union
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from langchain_core.runnables import RunnableConfig
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
+from langchain_openai import ChatOpenAI
 
 from config.settings import OUTPUT_DIR
 from utils.logger import logger
@@ -27,9 +28,30 @@ from agents.base import BaseAgent
 
 
 class EditingTask(BaseModel):
-    """Editing task specification format"""
-    edited_content: str = Field(description="Revised content after editing")
-    changes_made: List[str] = Field(description="List of applied modifications")
+    """편집 작업 정의"""
+    paper_id: str = Field(description="편집할 논문 ID")
+    style_guide: Optional[str] = Field(default="Standard Academic", description="적용할 스타일 가이드")
+    citation_style: Optional[str] = Field(default="APA", description="인용 스타일")
+    focus_areas: Optional[List[str]] = Field(default_factory=list, description="중점 편집 영역")
+    output_format: Optional[str] = Field(default="markdown", description="출력 형식")
+    
+    @validator('paper_id')
+    def paper_id_must_not_be_empty(cls, v):
+        if not v:
+            raise ValueError('paper_id는 필수 항목입니다')
+        return v
+    
+    @validator('style_guide', 'citation_style', 'output_format')
+    def provide_defaults_for_empty_strings(cls, v, values, **kwargs):
+        if not v:
+            field_name = kwargs['field'].name
+            if field_name == 'style_guide':
+                return "Standard Academic"
+            elif field_name == 'citation_style':
+                return "APA"
+            elif field_name == 'output_format':
+                return "markdown"
+        return v
 
 
 class StyleGuide(BaseModel):
@@ -433,31 +455,34 @@ class EditorAgent(BaseAgent[Paper]):
         return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     def run(
-        self, 
+        self,
         paper: Paper,
         style_guide_name: str = "Standard Academic",
-        citation_style: str = "APA",
-        output_format: str = "markdown",
-        config: Optional[RunnableConfig] = None
+        output_format: str = "markdown"
     ) -> Paper:
         """
-        편집 에이전트를 실행하고 편집된 논문을 반환합니다.
+        편집 에이전트를 실행하여 논문을 편집합니다.
 
         Args:
             paper (Paper): 편집할 논문
-            style_guide_name (str, optional): 스타일 가이드 이름. 기본값은 "Standard Academic"
-            citation_style (str, optional): 인용 스타일. 기본값은 "APA"
-            output_format (str, optional): 출력 형식. 기본값은 "markdown"
-            config (Optional[RunnableConfig], optional): 실행 구성
+            style_guide_name (str, optional): 적용할 스타일 가이드 이름. Defaults to "Standard Academic".
+            output_format (str, optional): 출력 형식. Defaults to "markdown".
 
         Returns:
             Paper: 편집된 논문
         """
-        logger.info(f"편집 에이전트 실행 중: 논문 '{paper.title}'")
+        logger.info(f"편집 에이전트 실행 중: {paper.title}")
         
         try:
-            # 상태 초기화
-            self.reset()
+            # 스타일 가이드 이름이 비어있으면 기본값 사용
+            if not style_guide_name:
+                style_guide_name = "Standard Academic"
+                logger.warning("스타일 가이드가 지정되지 않아 기본값을 사용합니다.")
+            
+            # 출력 형식이 비어있으면 기본값 사용
+            if not output_format:
+                output_format = "markdown"
+                logger.warning("출력 형식이 지정되지 않아 기본값을 사용합니다.")
             
             # 1. 스타일 가이드 생성
             style_guide = self.create_style_guide(style_guide_name)

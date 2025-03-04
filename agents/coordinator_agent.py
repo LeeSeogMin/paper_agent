@@ -10,11 +10,11 @@ from typing import Dict, Any, List, Optional, Tuple, Union, Callable
 from pydantic import BaseModel, Field
 
 from langchain_core.runnables import RunnableConfig
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 
 from config.settings import OUTPUT_DIR
 from utils.logger import logger
@@ -89,6 +89,10 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         self._init_prompts()
         self.workflow_runner = WorkflowRunner("논문 작성 워크플로우")
         self.workflow_state = None
+        
+        # 필요한 에이전트들 초기화
+        self._init_agents()
+        
         logger.info(f"{self.name} 초기화 완료")
 
     def _init_prompts(self) -> None:
@@ -127,6 +131,17 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         )
         
         logger.debug("총괄 에이전트 프롬프트 및 체인 초기화 완료")
+
+    def _init_agents(self):
+        """필요한 에이전트들 초기화"""
+        from agents import ResearchAgent, WriterAgent, EditorAgent, ReviewAgent
+        
+        self.research_agent = ResearchAgent(verbose=self.verbose)
+        self.writer_agent = WriterAgent(verbose=self.verbose)
+        self.editor_agent = EditorAgent(verbose=self.verbose)
+        self.review_agent = ReviewAgent(verbose=self.verbose)
+        
+        logger.info("총괄 에이전트: 모든 하위 에이전트 초기화 완료")
 
     def create_research_plan(self, user_question: str) -> ResearchPlan:
         """사용자 질문 기반 문제 해결 계획 생성"""
@@ -489,3 +504,43 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 error=str(e),
                 context={"requirements": requirements}
             )
+
+    def handle_writing_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """작성 작업 처리"""
+        logger.info(f"작성 작업 처리 중: {task.get('task_type', 'unknown')}")
+        
+        try:
+            # 작성 에이전트 초기화
+            if not hasattr(self, 'writer_agent') or self.writer_agent is None:
+                from agents import WriterAgent
+                self.writer_agent = WriterAgent(verbose=self.verbose)
+            
+            # 작업 처리
+            result = self.writer_agent.process_writing_task(task)
+            
+            # 결과 타입 확인 및 처리
+            if isinstance(result, Paper):
+                # Paper 객체인 경우
+                return {
+                    "task_type": task.get("task_type", "unknown"),
+                    "paper": result.dict(),
+                    "status": "completed"
+                }
+            elif isinstance(result, dict):
+                # 딕셔너리인 경우
+                return result
+            else:
+                # 예상치 못한 타입인 경우
+                return {
+                    "task_type": task.get("task_type", "unknown"),
+                    "error": f"예상치 못한 결과 타입: {type(result)}",
+                    "status": "failed"
+                }
+            
+        except Exception as e:
+            logger.error(f"작성 작업 처리 중 오류 발생: {str(e)}")
+            return {
+                "task_type": task.get("task_type", "unknown"),
+                "error": str(e),
+                "status": "failed"
+            }

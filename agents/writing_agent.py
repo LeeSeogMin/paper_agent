@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 
 from langchain_core.runnables import RunnableConfig
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
@@ -630,72 +630,172 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             return empty_paper
 
-    # 새로운 메소드: 작업 유형 처리
-    def process_writing_task(
-        self, 
-        task_type: str,
-        task_description: str,
-        research_materials: List[ResearchMaterial],
-        additional_context: Dict[str, Any] = None
-    ) -> Union[Paper, Dict[str, Any]]:
+    def process_writing_task(self, task: Dict[str, Any]) -> Union[Paper, Dict[str, Any]]:
         """
-        Process different types of writing tasks based on coordinator instructions
-        
+        특정 작성 작업을 처리합니다.
+
         Args:
-            task_type: Type of writing task (full_paper, literature_review, etc.)
-            task_description: Detailed description of the writing task
-            research_materials: Research materials to use
-            additional_context: Additional context or requirements
-            
+            task (Dict[str, Any]): 작업 정의
+
         Returns:
-            Either a Paper object or a Dict with the requested content
+            Union[Paper, Dict[str, Any]]: 작업 결과 (Paper 또는 결과 딕셔너리)
         """
-        logger.info(f"Processing {task_type} writing task: {task_description[:50]}...")
+        logger.info(f"작성 작업 처리 중: {task.get('task_type', 'unknown')}")
         
         try:
+            task_type = task.get("task_type", "")
+            
             if task_type == "full_paper":
-                return self.run(
-                    topic=task_description,
-                    research_materials=research_materials,
-                    template_name=additional_context.get("template", "academic")
-                )
-            
-            elif task_type == "literature_review":
-                return self._write_literature_review(
-                    topic=task_description,
-                    materials=research_materials,
-                    format=additional_context.get("format", "chronological")
-                )
+                # 전체 논문 작성
+                topic = task.get("topic", "")
+                materials = task.get("materials", [])
+                template_name = task.get("template_name", "academic")
                 
-            elif task_type == "research_summary":
-                return self._write_research_summary(
-                    materials=research_materials,
-                    focus=additional_context.get("focus", "key_findings")
-                )
+                if not topic:
+                    raise ValueError("논문 주제가 제공되지 않았습니다.")
                 
-            # 기타 작업 유형 처리...
-            
-            else:  # custom writing task
-                return self._handle_custom_task(
-                    task_description=task_description,
-                    materials=research_materials,
-                    context=additional_context
-                )
+                return self.run(topic, materials, template_name)
+                
+            elif task_type == "section":
+                # 특정 섹션 작성
+                section_title = task.get("section_title", "")
+                section_content = task.get("section_content", "")
+                materials = task.get("materials", [])
+                
+                if not section_title:
+                    raise ValueError("섹션 제목이 제공되지 않았습니다.")
+                
+                return {
+                    "task_type": "section",
+                    "section_title": section_title,
+                    "section_content": self._write_section(section_title, section_content, materials),
+                    "status": "completed"
+                }
+                
+            # 다른 작업 유형 처리...
+                
+            else:
+                raise ValueError(f"지원되지 않는 작업 유형: {task_type}")
                 
         except Exception as e:
-            logger.error(f"Error processing writing task: {str(e)}")
+            logger.error(f"작성 작업 처리 중 오류 발생: {str(e)}")
             return {
+                "task_type": task.get("task_type", "unknown"),
                 "error": str(e),
-                "task_type": task_type,
-                "content": f"Failed to complete the {task_type} writing task."
+                "status": "failed"
             }
-    
+
     # 새로운 메소드: 문헌 리뷰 작성
     def _write_literature_review(self, topic: str, materials: List[ResearchMaterial], format: str = "chronological") -> Dict[str, Any]:
         """Generate a focused literature review"""
-        # 구현 코드...
+        logger.info(f"문헌 리뷰 작성 중: 주제 '{topic}', 형식 '{format}'")
         
+        try:
+            # 자료 정렬 (연대순 또는 주제별)
+            if format == "chronological":
+                # 연도별로 정렬
+                sorted_materials = sorted(materials, key=lambda m: m.year if m.year else 0)
+            elif format == "thematic":
+                # 주제별로 그룹화 (여기서는 간단히 구현)
+                sorted_materials = materials
+            else:
+                sorted_materials = materials
+            
+            # 문헌 리뷰 프롬프트 생성
+            prompt = f"""
+            다음 연구 자료들을 바탕으로 '{topic}'에 관한 문헌 리뷰를 작성해주세요.
+            
+            형식: {format} (연대순 또는 주제별)
+            
+            연구 자료:
+            """
+            
+            for i, material in enumerate(sorted_materials):
+                prompt += f"\n{i+1}. {material.title} ({material.year})"
+                prompt += f"\n   저자: {', '.join(material.authors)}"
+                prompt += f"\n   요약: {material.abstract[:200]}..." if material.abstract else ""
+                prompt += f"\n   키워드: {', '.join(material.keywords)}" if material.keywords else ""
+                prompt += "\n"
+            
+            # LLM을 사용하여 문헌 리뷰 생성
+            messages = [
+                SystemMessage(content="당신은 학술 논문 작성을 돕는 전문가입니다. 제공된 연구 자료를 바탕으로 체계적인 문헌 리뷰를 작성해주세요."),
+                HumanMessage(content=prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            literature_review = response.content
+            
+            # 결과 반환
+            return {
+                "topic": topic,
+                "format": format,
+                "content": literature_review,
+                "sources": [m.id for m in materials],
+                "word_count": len(literature_review.split())
+            }
+            
+        except Exception as e:
+            logger.error(f"문헌 리뷰 작성 중 오류 발생: {str(e)}")
+            return {
+                "topic": topic,
+                "format": format,
+                "content": f"문헌 리뷰 생성 중 오류가 발생했습니다: {str(e)}",
+                "sources": [m.id for m in materials],
+                "word_count": 0
+            }
+
     # 새로운 메소드: 연구 요약 작성
     def _write_research_summary(self, materials: List[ResearchMaterial], focus: str = "key_findings") -> Dict[str, Any]:
         """Generate a research summary with specified focus"""
-        # 구현 코드...
+        logger.info(f"연구 요약 작성 중: 초점 '{focus}'")
+        
+        try:
+            # 요약 초점에 따른 프롬프트 조정
+            focus_prompts = {
+                "key_findings": "각 연구의 주요 발견과 결론에 초점을 맞추세요.",
+                "methodology": "각 연구에서 사용된 방법론과 연구 설계에 초점을 맞추세요.",
+                "gaps": "연구 분야의 현재 지식 격차와 향후 연구 방향에 초점을 맞추세요.",
+                "comparison": "연구들 간의 유사점과 차이점을 비교하며 요약하세요."
+            }
+            
+            focus_instruction = focus_prompts.get(focus, focus_prompts["key_findings"])
+            
+            # 요약 프롬프트 생성
+            prompt = f"""
+            다음 연구 자료들을 요약해주세요. {focus_instruction}
+            
+            연구 자료:
+            """
+            
+            for i, material in enumerate(materials):
+                prompt += f"\n{i+1}. {material.title} ({material.year})"
+                prompt += f"\n   저자: {', '.join(material.authors)}"
+                prompt += f"\n   요약: {material.abstract[:200]}..." if material.abstract else ""
+                prompt += "\n"
+            
+            # LLM을 사용하여 연구 요약 생성
+            messages = [
+                SystemMessage(content="당신은 학술 연구 요약 전문가입니다. 제공된 연구 자료를 명확하고 간결하게 요약해주세요."),
+                HumanMessage(content=prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            research_summary = response.content
+            
+            # 결과 반환
+            return {
+                "focus": focus,
+                "content": research_summary,
+                "sources": [m.id for m in materials],
+                "word_count": len(research_summary.split())
+            }
+            
+        except Exception as e:
+            logger.error(f"연구 요약 작성 중 오류 발생: {str(e)}")
+            return {
+                "focus": focus,
+                "content": f"연구 요약 생성 중 오류가 발생했습니다: {str(e)}",
+                "sources": [m.id for m in materials],
+                "word_count": 0
+            }

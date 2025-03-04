@@ -9,9 +9,9 @@ from typing import Dict, Any, List, Optional, Union, Callable, TypeVar, Generic
 
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
-from langchain.chat_models import ChatOpenAI  # Changed from langchain_openai to langchain.chat_models
+from langchain_openai import ChatOpenAI
 
-from config.settings import OPENAI_MODEL, TEMPERATURE
+from config.settings import TEMPERATURE, OPENAI_MODEL
 from utils.logger import logger
 
 
@@ -29,8 +29,6 @@ class BaseAgent(Generic[T], ABC):
         self,
         name: str,
         description: str,
-        model: str = OPENAI_MODEL,
-        temperature: float = TEMPERATURE,
         verbose: bool = False
     ):
         """
@@ -39,23 +37,19 @@ class BaseAgent(Generic[T], ABC):
         Args:
             name (str): Agent name
             description (str): Agent description
-            model (str, optional): LLM model to use. Defaults to OPENAI_MODEL defined in settings.py
-            temperature (float, optional): LLM generation temperature. Defaults to TEMPERATURE defined in settings.py
             verbose (bool, optional): Enable detailed logging. Defaults to False
         """
         self.id = str(uuid.uuid4())
         self.name = name
         self.description = description
-        self.model = model
-        self.temperature = temperature
         self.verbose = verbose
         self.memory: List[BaseMessage] = []
         self.state: Dict[str, Any] = {}
         
-        # Initialize LLM
+        # Initialize LLM with OpenAI
         self.llm = ChatOpenAI(
-            model=self.model,
-            temperature=self.temperature,
+            model=OPENAI_MODEL,
+            temperature=TEMPERATURE,
             verbose=self.verbose
         )
         

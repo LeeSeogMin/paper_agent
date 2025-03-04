@@ -16,12 +16,14 @@ from langchain.schema import HumanMessage, AIMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
+from langchain.chat_models import ChatOpenAI
 
 from config.settings import OUTPUT_DIR
 from utils.logger import logger
 from models.paper import Paper
 from models.state import PaperWorkflowState
 from agents.base import BaseAgent
+from langchain_community.chat_models import ChatXAI
 
 
 class UserQuery(BaseModel):

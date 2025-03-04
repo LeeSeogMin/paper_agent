@@ -9,9 +9,11 @@ import json
 from typing import Dict, Any, List, Optional, Tuple, Union, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime
+import uuid
+import time
 
 from langchain_core.runnables import RunnableConfig
-from langchain.schema import HumanMessage, AIMessage
+from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.output_parsers import PydanticOutputParser
@@ -273,24 +275,147 @@ class ReviewAgent(BaseAgent):
 
     def analyze_feedback(self, feedback: UserFeedback) -> EnhancedFeedbackAnalysis:
         """Improved feedback analysis with contextual understanding"""
-        analysis_prompt = """Analyze academic feedback:
-        {feedback}
+        logger.info(f"사용자 피드백 분석 중: '{feedback.feedback_text[:50]}...'")
         
-        Analysis Requirements:
-        1. Determine sentiment polarity (-1.0 to 1.0)
-        2. Identify key discussion points
-        3. Tag relevant paper sections
-        4. Generate actionable items
-        5. Estimate confidence level
-        
-        {format_instructions}"""
-        # 분석 체인 업그레이드 (미완성 주석으로 남겨진 부분)
-        pass
+        try:
+            # 피드백 분석 프롬프트 생성
+            prompt = f"""
+            다음 사용자 피드백을 분석해주세요:
+            
+            피드백: "{feedback.feedback_text}"
+            
+            다음 항목을 분석해주세요:
+            1. 감정 분석 (긍정/부정/중립)
+            2. 주요 주제 및 관심사
+            3. 구체적인 요청 또는 제안
+            4. 우선순위가 높은 개선 사항
+            5. 피드백의 맥락 및 배경
+            
+            JSON 형식으로 응답해주세요.
+            """
+            
+            # LLM을 사용하여 피드백 분석
+            messages = [
+                SystemMessage(content="당신은 사용자 피드백 분석 전문가입니다. 제공된 피드백을 심층적으로 분석해주세요."),
+                HumanMessage(content=prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            analysis_text = response.content
+            
+            # JSON 추출
+            import json
+            import re
+            
+            json_match = re.search(r'```json\s*(.*?)\s*```', analysis_text, re.DOTALL)
+            if json_match:
+                analysis_json = json.loads(json_match.group(1))
+            else:
+                try:
+                    analysis_json = json.loads(analysis_text)
+                except:
+                    # JSON 파싱 실패 시 기본 구조 생성
+                    analysis_json = {
+                        "sentiment": "neutral",
+                        "topics": ["general feedback"],
+                        "requests": [],
+                        "priorities": [],
+                        "context": "No specific context identified"
+                    }
+            
+            # EnhancedFeedbackAnalysis 객체 생성
+            return EnhancedFeedbackAnalysis(
+                feedback_id=feedback.feedback_id if hasattr(feedback, 'feedback_id') else str(uuid.uuid4()),
+                sentiment=analysis_json.get("sentiment", "neutral"),
+                topics=analysis_json.get("topics", []),
+                requests=analysis_json.get("requests", []),
+                priorities=analysis_json.get("priorities", []),
+                context=analysis_json.get("context", ""),
+                timestamp=datetime.now().isoformat()
+            )
+            
+        except Exception as e:
+            logger.error(f"피드백 분석 중 오류 발생: {str(e)}")
+            return EnhancedFeedbackAnalysis(
+                feedback_id=str(uuid.uuid4()),
+                sentiment="neutral",
+                topics=["error"],
+                requests=[],
+                priorities=[],
+                context=f"Error during analysis: {str(e)}",
+                timestamp=datetime.now().isoformat()
+            )
 
     def generate_progress_update(self, workflow_state: PaperWorkflowState) -> ProgressUpdate:
         """Intelligent progress tracking with predictive analytics"""
-        # 주석으로 남겨진 미완성 메서드
-        pass
+        logger.info("작업 진행 상황 업데이트 생성 중")
+        
+        try:
+            # 워크플로우 상태에서 정보 추출
+            current_stage = workflow_state.current_stage
+            completed_stages = workflow_state.completed_stages
+            total_stages = len(workflow_state.stage_definitions)
+            completion_percentage = (len(completed_stages) / total_stages) * 100 if total_stages > 0 else 0
+            
+            # 남은 작업 예상
+            remaining_stages = [stage for stage in workflow_state.stage_definitions if stage not in completed_stages]
+            
+            # 예상 완료 시간 계산 (간단한 추정)
+            current_time = time.time()
+            start_time = workflow_state.start_time if hasattr(workflow_state, 'start_time') else current_time
+            
+            elapsed_time = current_time - start_time
+            if len(completed_stages) > 0:
+                avg_time_per_stage = elapsed_time / len(completed_stages)
+                estimated_remaining_time = avg_time_per_stage * len(remaining_stages)
+            else:
+                # 기본 예상 (각 단계당 10분)
+                estimated_remaining_time = len(remaining_stages) * 600
+            
+            # 진행 상황 요약 생성
+            summary_prompt = f"""
+            다음 논문 작성 워크플로우의 진행 상황을 요약해주세요:
+            
+            현재 단계: {current_stage}
+            완료된 단계: {', '.join(completed_stages)}
+            남은 단계: {', '.join(remaining_stages)}
+            전체 진행률: {completion_percentage:.1f}%
+            
+            간결하고 정보가 풍부한 진행 상황 요약을 제공해주세요.
+            """
+            
+            messages = [
+                SystemMessage(content="당신은 프로젝트 진행 상황 보고 전문가입니다."),
+                HumanMessage(content=summary_prompt)
+            ]
+            
+            response = self.llm.invoke(messages)
+            progress_summary = response.content
+            
+            # ProgressUpdate 객체 생성
+            return ProgressUpdate(
+                current_stage=current_stage,
+                completion_percentage=completion_percentage,
+                completed_stages=completed_stages,
+                remaining_stages=remaining_stages,
+                estimated_completion_time=datetime.fromtimestamp(current_time + estimated_remaining_time).isoformat(),
+                progress_summary=progress_summary,
+                bottlenecks=[],  # 실제 구현에서는 병목 현상 분석 추가
+                timestamp=datetime.now().isoformat()
+            )
+            
+        except Exception as e:
+            logger.error(f"진행 상황 업데이트 생성 중 오류 발생: {str(e)}")
+            return ProgressUpdate(
+                current_stage="unknown",
+                completion_percentage=0.0,
+                completed_stages=[],
+                remaining_stages=[],
+                estimated_completion_time=datetime.now().isoformat(),
+                progress_summary=f"진행 상황 업데이트 생성 중 오류가 발생했습니다: {str(e)}",
+                bottlenecks=[],
+                timestamp=datetime.now().isoformat()
+            )
 
     def format_progress_message(self, progress: ProgressUpdate) -> str:
         """

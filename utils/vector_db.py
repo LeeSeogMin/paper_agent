@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 
 import numpy as np
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter

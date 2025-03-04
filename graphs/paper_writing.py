@@ -14,6 +14,13 @@ from models.state import PaperWorkflowState
 from models.paper import Paper
 from models.research import ResearchMaterial
 from agents import (
+    ResearchAgent,
+    WriterAgent,
+    EditorAgent,
+    DataProcessingAgent,
+    UserInteractionAgent,
+    ReviewAgent,
+    CoordinatorAgent,
     get_coordinator_agent,
     get_research_agent,
     get_writer_agent,
@@ -40,7 +47,6 @@ def research_node(state: PaperWorkflowState, research_agent=None) -> PaperWorkfl
     try:
         # 연구 에이전트 초기화
         if research_agent is None:
-            ResearchAgent = get_research_agent()
             research_agent = ResearchAgent(verbose=state.verbose)
         
         # 연구 수행
@@ -352,11 +358,6 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
         Args:
             verbose: 상세 로깅 여부
         """
-        ResearchAgent = get_research_agent()
-        WriterAgent = get_writer_agent()
-        EditorAgent = get_editor_agent()
-        ReviewAgent = get_review_agent()
-        
         self.research_agent = ResearchAgent(verbose=verbose)
         self.writer_agent = WriterAgent(verbose=verbose)
         self.editor_agent = EditorAgent(verbose=verbose)

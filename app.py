@@ -5,10 +5,18 @@
 import os
 import argparse
 from typing import Dict, Any
+import sys
+from pathlib import Path
 
 from utils.logger import logger, configure_logging
 from agents.coordinator_agent import CoordinatorAgent
 from config.settings import OUTPUT_DIR
+from config.api_keys import check_required_api_keys
+from utils import ensure_directories_exist
+
+# 프로젝트 루트 디렉토리를 Python 경로에 추가
+project_root = Path(__file__).resolve().parent
+sys.path.insert(0, str(project_root))
 
 def parse_arguments():
     """명령줄 인수 파싱"""
@@ -92,15 +100,22 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
 
 def main():
     """메인 애플리케이션 함수"""
+    # 필요한 API 키 확인
+    api_keys_available, missing_keys = check_required_api_keys()
+    if not api_keys_available:
+        logger.error(f"Cannot start application. Missing required API keys: {', '.join(missing_keys)}")
+        logger.error("Please set the required API keys in your environment or .env file.")
+        return
+    
+    # 필요한 디렉토리 생성
+    ensure_directories_exist()
+    
     # 인수 파싱
     args = parse_arguments()
     
     # 로깅 설정
     log_level = "DEBUG" if args.verbose else "INFO"
     configure_logging(log_level=log_level)
-    
-    # 출력 디렉토리 생성
-    os.makedirs(args.output, exist_ok=True)
     
     # 사용자 요구사항 로드
     user_requirements = load_user_requirements(args.requirements)

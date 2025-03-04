@@ -76,7 +76,7 @@ class StateTransitionModel(VersionedModel, Generic[T]):
         """Check if the model is in one of the specified statuses"""
         return self.status in statuses
     
-    def validate_transition(self, current_status: str, allowed_statuses: list[str]) -> None:
+    def validate_transition(self, current_status: str, allowed_statuses: List[str]) -> None:
         """Validate that a transition is allowed"""
         if current_status not in allowed_statuses:
             allowed = ", ".join(allowed_statuses)
