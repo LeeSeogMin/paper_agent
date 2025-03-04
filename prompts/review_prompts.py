@@ -683,3 +683,127 @@ Provide a detailed review of the ethical aspects of this research by addressing 
 Your review should be detailed, constructive, and objective, providing specific examples from the paper to support your evaluation. Focus on helping the authors strengthen the ethical dimensions of their research rather than simply identifying shortcomings.
 """
 )
+
+# 피드백 분석 프롬프트
+FEEDBACK_ANALYSIS_PROMPT = PromptTemplate(
+    template="""사용자가 제공한 피드백을 분석해 주세요.
+    
+    피드백:
+    {feedback}
+    
+    다음 항목을 분석해주세요:
+    1. 이 피드백이 전반적으로 긍정적인지 부정적인지 (is_positive)
+    2. -1.0부터 1.0 사이의 감정 점수 (sentiment_score)
+    3. 피드백에서 언급된 주요 요점 목록 (main_points)
+    4. 필요한 조치 항목 목록 (action_items)
+    5. 조치의 우선순위 (높음, 중간, 낮음) (priority)
+    
+    {format_instructions}
+    """,
+    input_variables=["feedback", "format_instructions"],
+)
+
+# 논문 리뷰 프롬프트
+PAPER_REVIEW_PROMPT = PromptTemplate(
+    template="""다음 논문을 철저히 검토하고 종합적인 학술 리뷰를 제공해 주세요.
+    
+    논문 제목: {paper_title}
+    
+    논문 내용:
+    {paper_content}
+    
+    다음 항목을 포함한 철저한 학술 리뷰를 작성해 주세요:
+    1. 전체 평가 점수 (1-10)
+    2. 주요 장점 목록
+    3. 주요 약점 목록
+    4. 구체적인 개선 제안 목록
+    5. 주요 섹션별 피드백
+    6. 구조적 의견 (논문 구성, 흐름, 논리적 일관성)
+    7. 언어적 의견 (명확성, 간결성, 학술적 표현)
+    
+    리뷰는 객관적이고 건설적이어야 하며, 논문의 학술적 가치를 향상시키는 데 도움이 되어야 합니다.
+    
+    {format_instructions}
+    """,
+    input_variables=["paper_title", "paper_content", "format_instructions"],
+)
+
+# 리뷰 조치 프롬프트
+REVIEW_ACTION_PROMPT = PromptTemplate(
+    template="""논문 리뷰 결과를 바탕으로 구체적인 조치 사항을 제안해 주세요.
+    
+    논문 제목: {paper_title}
+    리뷰 결과:
+    {review_result}
+    
+    다음 형식으로 가장 중요한 조치 사항을 제안해 주세요:
+    1. 조치 유형 (수정, 추가, 삭제, 재구성 등)
+    2. 관련 섹션 (해당되는 경우)
+    3. 상세한 조치 설명
+    4. 우선순위 (높음, 중간, 낮음)
+    5. 이 조치가 필요한 근거
+    
+    {format_instructions}
+    """,
+    input_variables=["paper_title", "review_result", "format_instructions"],
+)
+
+# 진행 상황 업데이트 프롬프트
+PROGRESS_UPDATE_PROMPT = PromptTemplate(
+    template="""현재 워크플로우 상태를 분석하고 사용자에게 적합한 진행 상황 업데이트를 생성해 주세요.
+    
+    워크플로우 상태:
+    {workflow_state}
+    
+    다음 형식으로 진행 상황 업데이트를 생성해 주세요:
+    1. 현재 진행 중인 단계
+    2. 현재 진행률 (%)
+    3. 완료된 작업 목록
+    4. 대기 중인 작업 목록
+    5. 예상 완료 시간 (있는 경우)
+    6. 현재 이슈 목록 (있는 경우)
+    
+    업데이트는 명확하고 간결하게 작성해 주세요.
+    """,
+    input_variables=["workflow_state"],
+)
+
+# 피드백 프롬프트
+FEEDBACK_PROMPT = PromptTemplate(
+    template="""사용자 피드백에 대한 응답을 생성해 주세요.
+    
+    피드백:
+    {feedback}
+    
+    다음 사항을 고려하여 응답해 주세요:
+    1. 피드백의 주요 요점 인정
+    2. 구체적인 질문에 대한 답변
+    3. 제안된 변경 사항에 대한 의견
+    4. 다음 단계 제안
+    
+    응답은 전문적이고 도움이 되어야 합니다.
+    """,
+    input_variables=["feedback"],
+)
+
+# 협업 프롬프트
+COLLABORATION_PROMPT = PromptTemplate(
+    template="""다음 논문에 대한 협업 세션을 진행해 주세요.
+    
+    논문 제목: {paper_title}
+    현재 섹션: {section_title}
+    섹션 내용:
+    {section_content}
+    
+    협업 목표: {collaboration_goal}
+    
+    다음 사항을 고려하여 협업 세션을 진행해 주세요:
+    1. 현재 내용의 강점과 약점 식별
+    2. 구체적인 개선 제안
+    3. 대안적 접근 방식 제시
+    4. 질문에 대한 명확한 답변
+    
+    협업 세션은 건설적이고 생산적이어야 합니다.
+    """,
+    input_variables=["paper_title", "section_title", "section_content", "collaboration_goal"],
+)

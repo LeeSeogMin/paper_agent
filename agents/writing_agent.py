@@ -24,11 +24,12 @@ from prompts.paper_prompts import (
     PAPER_OUTLINE_PROMPT,
     PAPER_SECTION_PROMPT,
     PAPER_EDITING_PROMPT,
-    LITERATURE_REVIEW_PROMPT,
     METHODOLOGY_PROMPT,
     RESEARCH_SUMMARY_PROMPT,
     ANALYSIS_PROMPT,
-    CUSTOM_WRITING_PROMPT
+    CUSTOM_WRITING_PROMPT,
+    PAPER_CONCLUSION_PROMPT,
+    LITERATURE_REVIEW_PROMPT
 )
 from agents.base import BaseAgent
 
@@ -107,30 +108,20 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         # Initialize outline writing chain
         self.outline_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=PAPER_OUTLINE_PROMPT,
-                input_variables=["topic", "paper_type", "research_materials", "format_instructions"],
-            ),
+            prompt=PAPER_OUTLINE_PROMPT,
             verbose=self.verbose
         )
         
         # Initialize section writing chain
         self.section_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=PAPER_SECTION_PROMPT,
-                input_variables=["paper_title", "section_title", "section_purpose", "paper_outline", "research_materials", "format_instructions"],
-            ),
-            verbose=self.verbose
+            prompt=PAPER_SECTION_PROMPT
         )
         
         # Initialize editing chain
         self.edit_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=PAPER_EDITING_PROMPT,
-                input_variables=["editing_type", "style_guide", "paper_content", "format_instructions"],
-            ),
+            prompt=PAPER_EDITING_PROMPT,
             verbose=self.verbose
         )
         

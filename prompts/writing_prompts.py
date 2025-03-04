@@ -132,24 +132,26 @@ Write an introduction that captures reader interest and clearly establishes the 
 )
 
 # Literature review writing prompt
-LITERATURE_REVIEW_WRITING_PROMPT = PromptTemplate(
-    template="""Write a literature review section for an academic paper based on the following information:
+LITERATURE_REVIEW_PROMPT = PromptTemplate(
+    template="""당신은 학술 논문의 문헌 리뷰 섹션을 작성하는 전문가입니다.
+다음 연구 자료를 바탕으로 주제 '{topic}'에 관한 체계적인 문헌 리뷰를 작성해 주세요.
 
-Research Topic: {research_topic}
-Key Concepts: {key_concepts}
-Related Studies: {related_studies}
-Theoretical Framework: {theoretical_framework}
+## 형식
+{format}
 
-The literature review should meet the following criteria:
-1. Systematic and critical analysis of relevant literature
-2. Explanation of key theories and concepts related to the topic
-3. Identification of strengths and limitations in existing research
-4. Emphasis on research gaps
-5. Explanation of the relationship between the current research and existing literature
+## 연구 자료
+{materials}
 
-Write a comprehensive and well-organized literature review.
+## 지침
+1. 각 연구의 핵심 주장, 방법론, 결과를 요약하세요.
+2. 연구들 간의 관계와 발전 과정을 보여주세요.
+3. 현재 연구 분야의 동향과 격차를 식별하세요.
+4. 학술적이고 객관적인 어조를 유지하세요.
+5. 적절한 인용 형식을 사용하세요.
+
+문헌 리뷰:
 """,
-    input_variables=["research_topic", "key_concepts", "related_studies", "theoretical_framework"],
+    input_variables=["topic", "format", "materials"],
 )
 
 # Methodology writing prompt

@@ -14,6 +14,8 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
+from langchain.chains import LLMChain
+from langchain.prompts import PromptTemplate
 
 from config.settings import VECTOR_DB_DIR, PDF_STORAGE_DIR, CHUNK_SIZE, CHUNK_OVERLAP
 from config.api_keys import OPENAI_API_KEY, XAI_API_KEY

@@ -36,7 +36,13 @@ class PaperPrompts:
             "citation_generation": PAPER_CITATION_PROMPT,
             "research_question": RESEARCH_QUESTION_PROMPT,
             "critical_analysis": CRITICAL_ANALYSIS_PROMPT,
-            "paper_conclusion": PAPER_CONCLUSION_PROMPT
+            "paper_conclusion": PAPER_CONCLUSION_PROMPT,
+            "literature_review": LITERATURE_REVIEW_PROMPT,
+            "paper_introduction": PAPER_INTRODUCTION_PROMPT,
+            "methodology": METHODOLOGY_PROMPT,
+            "research_summary": RESEARCH_SUMMARY_PROMPT,
+            "analysis": ANALYSIS_PROMPT,
+            "custom_writing": CUSTOM_WRITING_PROMPT
         }
         
         if prompt_name not in prompts:
@@ -393,4 +399,158 @@ The conclusion creates the "last impression" of the paper. Write a clear, impres
 Conclusion:
 """,
     input_variables=["paper_title", "paper_content"],
+)
+
+
+# 문헌 리뷰 프롬프트 추가
+LITERATURE_REVIEW_PROMPT = PromptTemplate(
+    template="""당신은 학술 논문의 문헌 리뷰 섹션을 작성하는 전문가입니다.
+다음 연구 자료를 바탕으로 주제 '{topic}'에 관한 체계적인 문헌 리뷰를 작성해 주세요.
+
+## 형식
+{format}
+
+## 연구 자료
+{materials}
+
+## 지침
+1. 각 연구의 핵심 주장, 방법론, 결과를 요약하세요.
+2. 연구들 간의 관계와 발전 과정을 보여주세요.
+3. 현재 연구 분야의 동향과 격차를 식별하세요.
+4. 학술적이고 객관적인 어조를 유지하세요.
+5. 적절한 인용 형식을 사용하세요.
+
+문헌 리뷰:
+""",
+    input_variables=["topic", "format", "materials"],
+)
+
+# 별칭 추가
+SECTION_WRITING_PROMPT = PAPER_SECTION_PROMPT 
+
+# 논문 서론 작성 프롬프트 추가
+PAPER_INTRODUCTION_PROMPT = PromptTemplate(
+    template="""당신은 학술 논문의 서론을 작성하는 전문가입니다.
+다음 정보를 바탕으로 논문 '{paper_title}'의 서론을 작성해 주세요.
+
+## 연구 주제
+{topic}
+
+## 연구 배경
+{background}
+
+## 연구 목적
+{purpose}
+
+## 지침
+1. 연구 주제의 중요성과 관련성을 설명하세요.
+2. 현재까지의 연구 동향과 한계점을 간략히 설명하세요.
+3. 본 연구의 목적과 의의를 명확히 제시하세요.
+4. 연구 질문 또는 가설을 포함하세요.
+5. 논문의 구성을 간략히 소개하세요.
+
+서론:
+""",
+    input_variables=["paper_title", "topic", "background", "purpose"],
+) 
+
+# 연구 방법론 작성 프롬프트 추가
+METHODOLOGY_PROMPT = PromptTemplate(
+    template="""당신은 학술 논문의 연구 방법론 섹션을 작성하는 전문가입니다.
+다음 정보를 바탕으로 논문 '{paper_title}'의 연구 방법론을 작성해 주세요.
+
+## 연구 주제
+{topic}
+
+## 연구 질문/가설
+{research_questions}
+
+## 연구 설계
+{research_design}
+
+## 지침
+1. 연구 접근법과 설계를 명확히 설명하세요.
+2. 데이터 수집 방법과 도구를 상세히 기술하세요.
+3. 분석 방법과 절차를 체계적으로 설명하세요.
+4. 연구의 타당성과 신뢰성을 확보하기 위한 조치를 설명하세요.
+5. 연구 윤리적 고려사항을 포함하세요.
+
+연구 방법론:
+""",
+    input_variables=["paper_title", "topic", "research_questions", "research_design"],
+) 
+
+# 연구 요약 프롬프트 추가
+RESEARCH_SUMMARY_PROMPT = PromptTemplate(
+    template="""당신은 연구 자료를 요약하는 전문가입니다.
+다음 연구 자료를 간결하고 명확하게 요약해 주세요.
+
+## 연구 자료
+{research_material}
+
+## 요약 지침
+1. 연구의 주요 목적과 연구 질문을 명시하세요.
+2. 사용된 방법론을 간략히 설명하세요.
+3. 핵심 결과와 발견을 요약하세요.
+4. 연구의 의의와 한계점을 포함하세요.
+5. 300단어 이내로 작성하세요.
+
+연구 요약:
+""",
+    input_variables=["research_material"],
+)
+
+# 분석 프롬프트 추가
+ANALYSIS_PROMPT = PromptTemplate(
+    template="""당신은 연구 데이터 분석 전문가입니다.
+다음 데이터와 정보를 바탕으로 체계적인 분석을 수행해 주세요.
+
+## 분석 주제
+{topic}
+
+## 데이터 설명
+{data_description}
+
+## 분석 목표
+{analysis_goals}
+
+## 분석 지침
+1. 데이터의 주요 패턴과 경향을 식별하세요.
+2. 핵심 통계와 수치를 계산하고 해석하세요.
+3. 데이터 간의 관계와 상관성을 분석하세요.
+4. 발견한 내용의 의미와 시사점을 설명하세요.
+5. 분석의 한계점을 명시하세요.
+
+분석 결과:
+""",
+    input_variables=["topic", "data_description", "analysis_goals"],
+)
+
+# 맞춤형 작성 프롬프트 추가
+CUSTOM_WRITING_PROMPT = PromptTemplate(
+    template="""당신은 학술 논문 작성 전문가입니다.
+다음 요구사항에 따라 맞춤형 학술 콘텐츠를 작성해 주세요.
+
+## 작성 주제
+{topic}
+
+## 작성 유형
+{content_type}
+
+## 세부 요구사항
+{requirements}
+
+## 참고 자료
+{reference_materials}
+
+## 작성 지침
+1. 요구사항에 정확히 부합하는 콘텐츠를 작성하세요.
+2. 학술적이고 전문적인 어조를 유지하세요.
+3. 논리적 구조와 명확한 논지를 개발하세요.
+4. 적절한 인용과 참조를 포함하세요.
+5. 요청된 형식과 길이를 준수하세요.
+
+작성 결과:
+""",
+    input_variables=["topic", "content_type", "requirements", "reference_materials"],
 ) 

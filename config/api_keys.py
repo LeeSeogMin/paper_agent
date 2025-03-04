@@ -33,9 +33,13 @@ if not SEMANTIC_SCHOLAR_API_KEY:
     logger.warning("Semantic Scholar API key not found. Using unauthorized access with lower rate limits.")
 
 # Google Scholar API key
-GOOGLE_SCHOLAR_API_KEY = os.environ.get("GOOGLE_SCHOLAR_API_KEY", "")
-if not GOOGLE_SCHOLAR_API_KEY:
-    logger.warning("Google Scholar API key not found. Google Scholar search may not be available.")
+# Google Scholar API는 GOOGLE_API_KEY와 GOOGLE_CSE_ID를 사용할 수 있음
+GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")
+GOOGLE_CSE_ID = os.environ.get("GOOGLE_CSE_ID", "")
+GOOGLE_SCHOLAR_API_KEY = GOOGLE_API_KEY  # GOOGLE_API_KEY를 GOOGLE_SCHOLAR_API_KEY로 사용
+
+if not GOOGLE_API_KEY or not GOOGLE_CSE_ID:
+    logger.warning("Google API key or CSE ID not found. Google Scholar search may not be available.")
 
 # Function to check if required API keys are available
 def check_required_api_keys():

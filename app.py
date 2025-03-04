@@ -71,7 +71,6 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
         print("\n=== 논문 작성 요구사항 입력 ===")
         
         requirements["topic"] = input("연구 주제: ")
-        requirements["research_question"] = input("연구 질문: ")
         
         print("\n논문 유형 (선택):")
         print("1. 문헌 리뷰")

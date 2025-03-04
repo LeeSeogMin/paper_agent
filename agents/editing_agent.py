@@ -100,72 +100,72 @@ class EditorAgent(BaseAgent[Paper]):
         self.review_parser = PydanticOutputParser(pydantic_object=ReviewResult)
 
         # Paper editing prompt
-        PAPER_EDITING_PROMPT = """Act as an expert academic editor. Improve this paper:
-        {content}
-        
-        Style Guide:
-        {style_guide}
-        
-        Output Requirements:
-        {format_instructions}
-        
-        Key Focus Areas:
-        1. Technical accuracy preservation
-        2. Style guide compliance
-        3. Clarity enhancement
-        4. Structural optimization"""
+        PAPER_EDITING_PROMPT = PromptTemplate(
+            template="""Act as an expert academic editor. Improve this paper:
+            {content}
+            
+            Style Guide:
+            {style_guide}
+            
+            Output Requirements:
+            {format_instructions}
+            
+            Key Focus Areas:
+            1. Technical accuracy preservation
+            2. Style guide compliance
+            3. Clarity enhancement
+            4. Structural optimization""",
+            input_variables=["content", "style_guide", "format_instructions"],
+        )
 
         # Paper review prompt  
-        PAPER_REVIEW_PROMPT = """Critique this academic paper:
-        {paper_content}
-        
-        Evaluation Criteria:
-        1. Technical rigor
-        2. Presentation clarity  
-        3. Argument structure
-        4. Contribution significance
-        5. Literature integration
-        
-        {format_instructions}"""
+        PAPER_REVIEW_PROMPT = PromptTemplate(
+            template="""Critique this academic paper:
+            {paper_content}
+            
+            Evaluation Criteria:
+            1. Technical rigor
+            2. Presentation clarity  
+            3. Argument structure
+            4. Contribution significance
+            5. Literature integration
+            
+            {format_instructions}""",
+            input_variables=["paper_content", "format_instructions"],
+        )
 
         # Reference formatting prompt
-        REFERENCE_FORMATTING_PROMPT = """Format references in {citation_style} style:
-        {references}
-        
-        Required Elements:
-        - Author names
-        - Publication year
-        - Title formatting
-        - Source details
-        - DOI/URL if available"""
+        REFERENCE_FORMATTING_PROMPT = PromptTemplate(
+            template="""Format references in {citation_style} style:
+            {references}
+            
+            Required Elements:
+            - Author names
+            - Publication year
+            - Title formatting
+            - Source details
+            - DOI/URL if available""",
+            input_variables=["citation_style", "references"],
+        )
 
         # Initialize processing chains
         self.editing_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=PAPER_EDITING_PROMPT,
-                input_variables=["content", "style_guide", "format_instructions"],
-            ),
+            prompt=PAPER_EDITING_PROMPT,
             verbose=self.verbose
         )
         
         # 리뷰 체인 초기화
         self.review_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=PAPER_REVIEW_PROMPT,
-                input_variables=["paper_content", "format_instructions"],
-            ),
+            prompt=PAPER_REVIEW_PROMPT,
             verbose=self.verbose
         )
         
         # 참고 문헌 형식 체인 초기화
         self.reference_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template=REFERENCE_FORMATTING_PROMPT,
-                input_variables=["references", "citation_style"],
-            ),
+            prompt=REFERENCE_FORMATTING_PROMPT,
             verbose=self.verbose
         )
         

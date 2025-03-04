@@ -104,6 +104,7 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         self.research_plan_chain = LLMChain(
             llm=self.llm,
             prompt=AGENT_PLANNING_PROMPT,
+            output_key="text",
             verbose=self.verbose
         )
         
@@ -127,21 +128,32 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         self.error_handling_chain = LLMChain(
             llm=self.llm,
             prompt=AGENT_ERROR_HANDLING_PROMPT,
+            output_key="text",
             verbose=self.verbose
         )
         
         logger.debug("총괄 에이전트 프롬프트 및 체인 초기화 완료")
 
     def _init_agents(self):
-        """필요한 에이전트들 초기화"""
-        from agents import ResearchAgent, WriterAgent, EditorAgent, ReviewAgent
+        """Initialize agent instances"""
+        logger.info("에이전트 초기화 중...")
         
-        self.research_agent = ResearchAgent(verbose=self.verbose)
-        self.writer_agent = WriterAgent(verbose=self.verbose)
-        self.editor_agent = EditorAgent(verbose=self.verbose)
-        self.review_agent = ReviewAgent(verbose=self.verbose)
+        # 에이전트 임포트
+        from agents import ResearchAgent, WriterAgent, EditorAgent  # ReviewAgent 제거
         
-        logger.info("총괄 에이전트: 모든 하위 에이전트 초기화 완료")
+        # 연구 에이전트 초기화
+        self.research_agent = ResearchAgent()
+        
+        # 작성 에이전트 초기화
+        self.writer_agent = WriterAgent()
+        
+        # 편집 에이전트 초기화
+        self.editor_agent = EditorAgent()
+        
+        # 리뷰 에이전트 초기화 (필요하다면 다른 방식으로 처리)
+        # self.review_agent = ReviewAgent()  # 주석 처리 또는 제거
+        
+        logger.info("에이전트 초기화 완료")
 
     def create_research_plan(self, user_question: str) -> ResearchPlan:
         """사용자 질문 기반 문제 해결 계획 생성"""
@@ -445,9 +457,8 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             research_plan = self.create_research_plan(requirements["topic"])
             
             # 연구 수행
-            research_materials = self.research_agent.conduct_research(
-                research_plan.problem_statement,
-                research_plan.required_data_sources
+            research_materials = self.research_agent.run(
+                topic=research_plan.problem_statement
             )
             
             # 논문 유형에 따른 작업 설정

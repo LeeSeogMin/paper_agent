@@ -23,6 +23,14 @@ from utils.logger import logger
 from models.paper import Paper
 from models.state import PaperWorkflowState
 from agents.base import BaseAgent
+from prompts.review_prompts import (
+    FEEDBACK_ANALYSIS_PROMPT,
+    PAPER_REVIEW_PROMPT,
+    REVIEW_ACTION_PROMPT,
+    PROGRESS_UPDATE_PROMPT,
+    FEEDBACK_PROMPT,
+    COLLABORATION_PROMPT
+)
 
 
 class UserFeedback(BaseModel):
@@ -116,100 +124,42 @@ class ReviewAgent(BaseAgent):
         # 피드백 분석 체인 초기화
         self.feedback_analysis_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template="""사용자가 제공한 피드백을 분석해 주세요.
-                
-                피드백:
-                {feedback}
-                
-                다음 항목을 분석해주세요:
-                1. 이 피드백이 전반적으로 긍정적인지 부정적인지 (is_positive)
-                2. -1.0부터 1.0 사이의 감정 점수 (sentiment_score)
-                3. 피드백에서 언급된 주요 요점 목록 (main_points)
-                4. 필요한 조치 항목 목록 (action_items)
-                5. 조치의 우선순위 (높음, 중간, 낮음) (priority)
-                
-                {format_instructions}
-                """,
-                input_variables=["feedback", "format_instructions"],
-            ),
+            prompt=FEEDBACK_ANALYSIS_PROMPT,
             verbose=self.verbose
         )
 
         # 논문 리뷰 체인 초기화
         self.paper_review_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template="""다음 논문을 철저히 검토하고 종합적인 학술 리뷰를 제공해 주세요.
-                
-                논문 제목: {paper_title}
-                
-                논문 내용:
-                {paper_content}
-                
-                다음 항목을 포함한 철저한 학술 리뷰를 작성해 주세요:
-                1. 전체 평가 점수 (1-10)
-                2. 주요 장점 목록
-                3. 주요 약점 목록
-                4. 구체적인 개선 제안 목록
-                5. 주요 섹션별 피드백
-                6. 구조적 의견 (논문 구성, 흐름, 논리적 일관성)
-                7. 언어적 의견 (명확성, 간결성, 학술적 표현)
-                
-                리뷰는 객관적이고 건설적이어야 하며, 논문의 학술적 가치를 향상시키는 데 도움이 되어야 합니다.
-                
-                {format_instructions}
-                """,
-                input_variables=["paper_title", "paper_content", "format_instructions"],
-            ),
+            prompt=PAPER_REVIEW_PROMPT,
             verbose=self.verbose
         )
 
         # 리뷰 조치 체인 초기화
         self.review_action_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template="""논문 리뷰 결과를 바탕으로 구체적인 조치 사항을 제안해 주세요.
-                
-                논문 제목: {paper_title}
-                리뷰 결과:
-                {review_result}
-                
-                다음 형식으로 가장 중요한 조치 사항을 제안해 주세요:
-                1. 조치 유형 (수정, 추가, 삭제, 재구성 등)
-                2. 관련 섹션 (해당되는 경우)
-                3. 상세한 조치 설명
-                4. 우선순위 (높음, 중간, 낮음)
-                5. 이 조치가 필요한 근거
-                
-                {format_instructions}
-                """,
-                input_variables=["paper_title", "review_result", "format_instructions"],
-            ),
+            prompt=REVIEW_ACTION_PROMPT,
             verbose=self.verbose
         )
 
         # 진행 상황 생성 체인 초기화
         self.progress_update_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate(
-                template="""현재 워크플로우 상태를 분석하고 사용자에게 적합한 진행 상황 업데이트를 생성해 주세요.
-                
-                워크플로우 상태:
-                {workflow_state}
-                
-                다음 형식으로 진행 상황 업데이트를 생성해 주세요:
-                1. 현재 진행 중인 단계
-                2. 현재 진행률 (%)
-                3. 완료된 작업 목록
-                4. 대기 중인 작업 목록
-                5. 예상 완료 시간 (있는 경우)
-                6. 현재 이슈 목록 (있는 경우)
-                
-                업데이트는 명확하고 간결하게 작성해 주세요.
-                """,
-                input_variables=["workflow_state"],
-            ),
+            prompt=PROGRESS_UPDATE_PROMPT,
+            verbose=self.verbose
+        )
+
+        # 피드백 체인 초기화
+        self.feedback_chain = LLMChain(
+            llm=self.llm,
+            prompt=FEEDBACK_PROMPT,
+            verbose=self.verbose
+        )
+
+        # 협업 체인 초기화
+        self.collaboration_chain = LLMChain(
+            llm=self.llm,
+            prompt=COLLABORATION_PROMPT,
             verbose=self.verbose
         )
         logger.debug("리뷰 및 상호작용 에이전트 프롬프트 및 체인 초기화 완료")

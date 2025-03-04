@@ -23,7 +23,7 @@ from langchain.chains.summarize import load_summarize_chain
 
 from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db
-from utils.api_clients import semantic_scholar_search, google_scholar_search, search_academic_papers
+from utils.api_clients import search_semantic_scholar, search_google_scholar, search_academic_papers
 from utils.pdf_processor import extract_text_from_pdf
 
 from agents.base import BaseAgent
@@ -59,17 +59,17 @@ class ResearchAgent(BaseAgent):
         # Initialize chains
         self.query_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate.from_template(QUERY_GENERATION_PROMPT)
+            prompt=QUERY_GENERATION_PROMPT
         )
         
         self.evaluation_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate.from_template(SOURCE_EVALUATION_PROMPT)
+            prompt=SOURCE_EVALUATION_PROMPT
         )
         
         self.analysis_chain = LLMChain(
             llm=self.llm,
-            prompt=PromptTemplate.from_template(SEARCH_RESULTS_ANALYSIS_PROMPT)
+            prompt=SEARCH_RESULTS_ANALYSIS_PROMPT
         )
         
         # Initialize text splitter for handling large documents
@@ -589,4 +589,47 @@ class ResearchAgent(BaseAgent):
                 "title": f"Research on {topic}",
                 "sections": sections,
                 "references": [m.id for m in materials]
+            }
+
+    def run(self, topic=None, **kwargs):
+        """
+        연구 에이전트 실행 메서드
+        
+        Args:
+            topic (str): 연구 주제
+            **kwargs: 추가 매개변수
+            
+        Returns:
+            dict: 연구 결과
+        """
+        if not topic:
+            logger.error("연구 주제가 제공되지 않았습니다.")
+            return {"status": "error", "message": "연구 주제가 필요합니다."}
+        
+        try:
+            # 1. 연구 자료 수집
+            max_sources = kwargs.get("max_sources", 10)
+            materials = self.collect_research_materials(topic, max_sources=max_sources)
+            
+            # 2. 연구 자료 강화 (내용 및 요약 추가)
+            enriched_materials = self.enrich_research_materials(materials)
+            
+            # 3. 연구 자료 분석
+            analysis = self.analyze_research_materials(enriched_materials, topic)
+            
+            # 4. 논문 개요 생성
+            outline = self.create_paper_outline(topic, analysis, enriched_materials)
+            
+            # 결과 반환
+            return {
+                "status": "success",
+                "materials": [material.dict() for material in enriched_materials],
+                "analysis": analysis,
+                "outline": outline
+            }
+        except Exception as e:
+            logger.error(f"연구 에이전트 실행 중 오류 발생: {str(e)}", exc_info=True)
+            return {
+                "status": "error",
+                "message": f"연구 프로세스 중 오류: {str(e)}"
             }
