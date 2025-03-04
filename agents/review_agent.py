@@ -428,24 +428,38 @@ class ReviewAgent(BaseAgent[Dict[str, Any]]):
         Returns:
             str: 포맷팅된 메시지
         """
-        message = f"## 현재 진행 상황: {progress.current_stage}\n\n"
-        message += f"전체 진행률: **{progress.progress_percentage:.1f}%**\n\n"
+        message = f"## 현재 진행 상황: {progress.current_stage}
+
+"
+        message += f"전체 진행률: **{progress.progress_percentage:.1f}%**
+
+"
         
-        message += "### 완료된 작업:\n"
+        message += "### 완료된 작업:
+"
         for task in progress.completed_tasks:
-            message += f"- ✅ {task}\n"
+            message += f"- ✅ {task}
+"
         
-        message += "\n### 대기 중인 작업:\n"
+        message += "
+### 대기 중인 작업:
+"
         for task in progress.pending_tasks:
-            message += f"- ⏳ {task}\n"
+            message += f"- ⏳ {task}
+"
         
         if progress.estimated_completion:
-            message += f"\n예상 완료 시간: **{progress.estimated_completion}**\n"
+            message += f"
+예상 완료 시간: **{progress.estimated_completion}**
+"
         
         if progress.issues:
-            message += "\n### 현재 이슈:\n"
+            message += "
+### 현재 이슈:
+"
             for issue in progress.issues:
-                message += f"- ⚠️ {issue}\n"
+                message += f"- ⚠️ {issue}
+"
         
         return message
 
@@ -472,17 +486,26 @@ class ReviewAgent(BaseAgent[Dict[str, Any]]):
         
         try:
             # 논문 전체 내용 생성
-            paper_content = f"# {paper.title}\n\n"
+            paper_content = f"# {paper.title}
+
+"
             
             for section in paper.sections:
-                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+                paper_content += f"## {section.title}
+
+{section.content}
+
+"
             
             # 참고 문헌 섹션 추가
             if paper.references:
-                paper_content += "## 참고 문헌\n\n"
+                paper_content += "## 참고 문헌
+
+"
                 for i, ref in enumerate(paper.references, 1):
                     authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
-                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.
+"
             
             # 논문 리뷰 수행
             format_instructions = self.paper_review_parser.get_format_instructions()
@@ -551,7 +574,8 @@ class ReviewAgent(BaseAgent[Dict[str, Any]]):
             for weakness in review.weaknesses[:3]:  # 상위 3개 약점만 처리
                 result = self.review_action_chain.invoke({
                     "paper_title": paper.title,
-                    "review_result": f"약점: {weakness}\n{review_result}",
+                    "review_result": f"약점: {weakness}
+{review_result}",
                     "format_instructions": format_instructions
                 })
                 
@@ -587,39 +611,83 @@ class ReviewAgent(BaseAgent[Dict[str, Any]]):
         Returns:
             str: 포맷팅된 리뷰 보고서
         """
-        report = f"# 논문 리뷰 보고서: {review.paper_title}\n\n"
-        report += f"## 전체 평가\n\n"
-        report += f"**점수**: {review.overall_score}/10\n\n"
+        report = f"# 논문 리뷰 보고서: {review.paper_title}
+
+"
+        report += f"## 전체 평가
+
+"
+        report += f"**점수**: {review.overall_score}/10
+
+"
         
-        report += "## 장점\n\n"
+        report += "## 장점
+
+"
         for strength in review.strengths:
-            report += f"- ✓ {strength}\n"
+            report += f"- ✓ {strength}
+"
         
-        report += "\n## 약점\n\n"
+        report += "
+## 약점
+
+"
         for weakness in review.weaknesses:
-            report += f"- ✗ {weakness}\n"
+            report += f"- ✗ {weakness}
+"
         
-        report += "\n## 개선 제안\n\n"
+        report += "
+## 개선 제안
+
+"
         for suggestion in review.improvement_suggestions:
-            report += f"- 💡 {suggestion}\n"
+            report += f"- 💡 {suggestion}
+"
         
         if review.section_feedback:
-            report += "\n## 섹션별 피드백\n\n"
+            report += "
+## 섹션별 피드백
+
+"
             for section, feedback in review.section_feedback.items():
-                report += f"### {section}\n\n{feedback}\n\n"
+                report += f"### {section}
+
+{feedback}
+
+"
         
-        report += f"## 구조적 의견\n\n{review.structural_comments}\n\n"
-        report += f"## 언어적 의견\n\n{review.language_comments}\n\n"
+        report += f"## 구조적 의견
+
+{review.structural_comments}
+
+"
+        report += f"## 언어적 의견
+
+{review.language_comments}
+
+"
         
         if actions:
-            report += "## 권장 조치 사항\n\n"
+            report += "## 권장 조치 사항
+
+"
             for i, action in enumerate(actions, 1):
-                report += f"### 조치 {i}: {action.action_type}\n\n"
+                report += f"### 조치 {i}: {action.action_type}
+
+"
                 if action.section:
-                    report += f"**관련 섹션**: {action.section}\n\n"
-                report += f"**설명**: {action.description}\n\n"
-                report += f"**우선순위**: {action.priority}\n\n"
-                report += f"**근거**: {action.rationale}\n\n"
+                    report += f"**관련 섹션**: {action.section}
+
+"
+                report += f"**설명**: {action.description}
+
+"
+                report += f"**우선순위**: {action.priority}
+
+"
+                report += f"**근거**: {action.rationale}
+
+"
         
         return report
 

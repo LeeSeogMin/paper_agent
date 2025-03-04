@@ -247,17 +247,26 @@ class EditorAgent(BaseAgent[Paper]):
         
         try:
             # 논문 전체 내용 생성
-            paper_content = f"# {paper.title}\n\n"
+            paper_content = f"# {paper.title}
+
+"
             
             for section in paper.sections:
-                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+                paper_content += f"## {section.title}
+
+{section.content}
+
+"
             
             # 참고 문헌 섹션 추가
             if paper.references:
-                paper_content += "## 참고 문헌\n\n"
+                paper_content += "## 참고 문헌
+
+"
                 for i, ref in enumerate(paper.references, 1):
                     authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
-                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.
+"
             
             # 스타일 가이드 정보 준비
             style_guide_info = json.dumps(style_guide.dict(), ensure_ascii=False)
@@ -312,17 +321,26 @@ class EditorAgent(BaseAgent[Paper]):
         
         try:
             # 논문 전체 내용 생성
-            paper_content = f"# {paper.title}\n\n"
+            paper_content = f"# {paper.title}
+
+"
             
             for section in paper.sections:
-                paper_content += f"## {section.title}\n\n{section.content}\n\n"
+                paper_content += f"## {section.title}
+
+{section.content}
+
+"
             
             # 참고 문헌 섹션 추가
             if paper.references:
-                paper_content += "## 참고 문헌\n\n"
+                paper_content += "## 참고 문헌
+
+"
                 for i, ref in enumerate(paper.references, 1):
                     authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
-                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+                    paper_content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.
+"
             
             # 검토 수행
             format_instructions = self.review_parser.get_format_instructions()
@@ -390,7 +408,8 @@ class EditorAgent(BaseAgent[Paper]):
             
             # 결과 파싱
             formatted_references = []
-            for line in result["text"].strip().split("\n"):
+            for line in result["text"].strip().split("
+"):
                 line = line.strip()
                 if line and not line.startswith("#") and not line.startswith("```"):
                     formatted_references.append(line)
@@ -426,17 +445,26 @@ class EditorAgent(BaseAgent[Paper]):
             
             try:
                 # 마크다운 형식으로 논문 내용 생성
-                content = f"# {paper.title}\n\n"
+                content = f"# {paper.title}
+
+"
                 
                 for section in paper.sections:
-                    content += f"## {section.title}\n\n{section.content}\n\n"
+                    content += f"## {section.title}
+
+{section.content}
+
+"
                 
                 # 참고 문헌 섹션 추가
                 if paper.references:
-                    content += "## 참고 문헌\n\n"
+                    content += "## 참고 문헌
+
+"
                     for i, ref in enumerate(paper.references, 1):
                         authors = ", ".join(ref.authors) if ref.authors else "알 수 없음"
-                        content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n"
+                        content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.
+"
                 
                 # 파일 저장
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -455,30 +483,51 @@ class EditorAgent(BaseAgent[Paper]):
             
             try:
                 # LaTeX 형식으로 논문 내용 생성
-                content = "\\documentclass{article}\n"
-                content += "\\usepackage[utf8]{inputenc}\n"
-                content += "\\usepackage{natbib}\n"
-                content += "\\usepackage{graphicx}\n"
-                content += "\\usepackage{hyperref}\n\n"
+                content = "\documentclass{article}
+"
+                content += "\usepackage[utf8]{inputenc}
+"
+                content += "\usepackage{natbib}
+"
+                content += "\usepackage{graphicx}
+"
+                content += "\usepackage{hyperref}
+
+"
                 
-                content += f"\\title{{{paper.title}}}\n"
+                content += f"\title{{{paper.title}}}
+"
                 
                 # 저자 정보 (없으므로 기본값 사용)
-                content += "\\author{AI Paper Writer}\n"
-                content += "\\date{\\today}\n\n"
+                content += "\author{AI Paper Writer}
+"
+                content += "\date{\today}
+
+"
                 
-                content += "\\begin{document}\n\n"
-                content += "\\maketitle\n\n"
+                content += "\begin{document}
+
+"
+                content += "\maketitle
+
+"
                 
                 # 초록 섹션 (있는 경우)
                 abstract_section = next((s for s in paper.sections if s.title.lower() == "초록" or s.title.lower() == "abstract"), None)
                 if abstract_section:
-                    content += "\\begin{abstract}\n"
-                    content += abstract_section.content + "\n"
-                    content += "\\end{abstract}\n\n"
+                    content += "\begin{abstract}
+"
+                    content += abstract_section.content + "
+"
+                    content += "\end{abstract}
+
+"
                 
                 # 목차
-                content += "\\tableofcontents\n\\newpage\n\n"
+                content += "\tableofcontents
+\newpage
+
+"
                 
                 # 각 섹션
                 for section in paper.sections:
@@ -486,29 +535,40 @@ class EditorAgent(BaseAgent[Paper]):
                     if section.title.lower() == "초록" or section.title.lower() == "abstract":
                         continue
                         
-                    content += f"\\section{{{section.title}}}\n\n"
+                    content += f"\section{{{section.title}}}
+
+"
                     
                     # LaTeX 특수 문자 이스케이프
                     section_content = section.content
-                    section_content = section_content.replace("_", "\\_")
-                    section_content = section_content.replace("%", "\\%")
-                    section_content = section_content.replace("&", "\\&")
-                    section_content = section_content.replace("#", "\\#")
+                    section_content = section_content.replace("_", "\_")
+                    section_content = section_content.replace("%", "\%")
+                    section_content = section_content.replace("&", "\&")
+                    section_content = section_content.replace("#", "\#")
                     
-                    content += section_content + "\n\n"
+                    content += section_content + "
+
+"
                 
                 # 참고 문헌
                 if paper.references:
-                    content += "\\begin{thebibliography}{99}\n\n"
+                    content += "\begin{thebibliography}{99}
+
+"
                     
                     for i, ref in enumerate(paper.references, 1):
                         authors = ", ".join(ref.authors) if ref.authors else "Unknown"
-                        content += f"\\bibitem{{{i}}}\n"
-                        content += f"{authors} ({ref.year}). {ref.title}. {ref.source}.\n\n"
+                        content += f"\bibitem{{{i}}}
+"
+                        content += f"{authors} ({ref.year}). {ref.title}. {ref.source}.
+
+"
                     
-                    content += "\\end{thebibliography}\n\n"
+                    content += "\end{thebibliography}
+
+"
                 
-                content += "\\end{document}"
+                content += "\end{document}"
                 
                 # 파일 저장
                 with open(file_path, 'w', encoding='utf-8') as f:
@@ -538,12 +598,17 @@ class EditorAgent(BaseAgent[Paper]):
         """
         try:
             # 제목 추출
-            title_match = re.search(r"#\s+(.+?)(?:\n|$)", edited_content)
+            title_match = re.search(r"#\s+(.+?)(?:
+|$)", edited_content)
             title = title_match.group(1).strip() if title_match else original_paper.title
             
             # 섹션 추출
             sections = []
-            section_pattern = re.compile(r"##\s+(.+?)\n\n([\s\S]+?)(?=\n##|\n# |$)")
+            section_pattern = re.compile(r"##\s+(.+?)
+
+([\s\S]+?)(?=
+##|
+# |$)")
             
             for match in section_pattern.finditer(edited_content):
                 section_title = match.group(1).strip()

@@ -279,33 +279,51 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         
         research_summary = self.workflow_state.research_summary
         
-        summary_text = f"## 연구 주제: {research_summary.topic}\n\n"
+        summary_text = f"## 연구 주제: {research_summary.topic}
+
+"
         
         # 주요 발견 추가
-        summary_text += "### 주요 발견\n\n"
+        summary_text += "### 주요 발견
+
+"
         for finding in research_summary.key_findings:
-            summary_text += f"- {finding}\n"
+            summary_text += f"- {finding}
+"
         
         # 수집된 자료 추가
-        summary_text += f"\n### 수집된 자료 ({len(research_summary.collected_materials)}개)\n\n"
+        summary_text += f"
+### 수집된 자료 ({len(research_summary.collected_materials)}개)
+
+"
         for i, material in enumerate(research_summary.collected_materials, 1):
             summary_text += f"{i}. **{material.title}**"
             if material.authors:
                 summary_text += f" - {', '.join(material.authors)}"
             if material.year:
                 summary_text += f" ({material.year})"
-            summary_text += f"\n   {material.summary[:150]}...\n\n"
+            summary_text += f"
+   {material.summary[:150]}...
+
+"
         
         # 연구 격차 및 다음 단계 추가
         if research_summary.gaps:
-            summary_text += "### 식별된 연구 격차\n\n"
+            summary_text += "### 식별된 연구 격차
+
+"
             for gap in research_summary.gaps:
-                summary_text += f"- {gap}\n"
+                summary_text += f"- {gap}
+"
         
         if research_summary.next_steps:
-            summary_text += "\n### 권장 다음 단계\n\n"
+            summary_text += "
+### 권장 다음 단계
+
+"
             for step in research_summary.next_steps:
-                summary_text += f"- {step}\n"
+                summary_text += f"- {step}
+"
         
         return summary_text
 
@@ -322,14 +340,24 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         paper = self.workflow_state.paper
         
         # 논문 내용 추출
-        paper_content = f"# {paper.title}\n\n"
-        paper_content += f"## 초록\n\n{paper.abstract}\n\n"
+        paper_content = f"# {paper.title}
+
+"
+        paper_content += f"## 초록
+
+{paper.abstract}
+
+"
         
         for section in paper.sections:
-            paper_content += f"## {section.title}\n\n"
+            paper_content += f"## {section.title}
+
+"
             # 섹션 내용을 요약을 위해 최대 1000자로 제한
             content_preview = section.content[:1000] + "..." if len(section.content) > 1000 else section.content
-            paper_content += f"{content_preview}\n\n"
+            paper_content += f"{content_preview}
+
+"
         
         try:
             # 요약 생성
@@ -341,17 +369,27 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             summary = result["text"]
             
             # 추가 메타데이터 포함
-            full_summary = f"## 논문 요약: {paper.title}\n\n"
-            full_summary += f"{summary}\n\n"
+            full_summary = f"## 논문 요약: {paper.title}
+
+"
+            full_summary += f"{summary}
+
+"
             
             # 섹션 구조 추가
-            full_summary += "### 논문 구조\n\n"
+            full_summary += "### 논문 구조
+
+"
             for i, section in enumerate(paper.sections, 1):
-                full_summary += f"{i}. {section.title}\n"
+                full_summary += f"{i}. {section.title}
+"
             
             # 참고 문헌 정보 추가
             if paper.references:
-                full_summary += f"\n### 참고 문헌 ({len(paper.references)}개)\n\n"
+                full_summary += f"
+### 참고 문헌 ({len(paper.references)}개)
+
+"
             
             return full_summary
             
@@ -359,7 +397,9 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             logger.error(f"논문 요약 생성 중 오류 발생: {str(e)}")
             
             # 기본 요약 반환
-            return f"논문 제목: {paper.title}\n섹션 수: {len(paper.sections)}\n참고 문헌 수: {len(paper.references)}"
+            return f"논문 제목: {paper.title}
+섹션 수: {len(paper.sections)}
+참고 문헌 수: {len(paper.references)}"
 
     def handle_user_feedback(self, feedback: str) -> Dict[str, Any]:
         """

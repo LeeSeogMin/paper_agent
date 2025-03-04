@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 
 """
-프로젝트 내 모든 Python 파일에서 null 바이트를 제거하는 스크립트
+Script to remove null bytes from all Python files in the project
 """
 
 import os
 import fnmatch
 
 def remove_null_bytes(directory, patterns=['*.py']):
-    """모든 Python 파일에서 null 바이트를 제거하는 함수"""
+    """Function to remove null bytes from all Python files"""
     fixed_files = []
     
     for root, dirnames, filenames in os.walk(directory):
@@ -17,18 +17,18 @@ def remove_null_bytes(directory, patterns=['*.py']):
                 file_path = os.path.join(root, filename)
                 
                 try:
-                    # 파일 내용 읽기
+                    # Read file contents
                     with open(file_path, 'rb') as file:
                         content = file.read()
                     
-                    # null 바이트 검사
+                    # Check for null bytes
                     if b'\x00' in content:
-                        print(f"null 바이트 발견: {file_path}")
+                        print(f"Null bytes found: {file_path}")
                         
-                        # null 바이트 제거
+                        # Remove null bytes
                         content = content.replace(b'\x00', b'')
                         
-                        # 새 파일로 저장
+                        # Save to new file
                         backup_path = file_path + '.bak'
                         os.rename(file_path, backup_path)
                         
@@ -36,20 +36,20 @@ def remove_null_bytes(directory, patterns=['*.py']):
                             file.write(content)
                         
                         fixed_files.append(file_path)
-                        print(f"파일 수정 완료: {file_path}")
+                        print(f"File modified: {file_path}")
                         
                 except Exception as e:
-                    print(f"오류 발생: {file_path} - {str(e)}")
+                    print(f"Error occurred: {file_path} - {str(e)}")
     
     return fixed_files
 
 if __name__ == "__main__":
-    # 현재 디렉토리를 기준으로 모든 Python 파일 검사
+    # Check all Python files in the current directory
     fixed = remove_null_bytes('.')
     
     if fixed:
-        print(f"\n총 {len(fixed)}개 파일 수정 완료:")
+        print(f"\nTotal {len(fixed)} files fixed:")
         for file in fixed:
             print(f"- {file}")
     else:
-        print("\n수정할 파일이 없습니다.") 
+        print("\nNo files need fixing.") 

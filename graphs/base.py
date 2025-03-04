@@ -1,133 +1,118 @@
 """
-기본 그래프 클래스
-모든 워크플로우 그래프의 기반 클래스입니다.
+Base graph module for workflow definitions.
+
+This module provides base classes for defining workflow graphs
+used in the AI paper writing process.
 """
 
-from typing import Dict, Any, List, Optional, Type, TypeVar, Generic, Callable
+from typing import Dict, Any, List, Optional, Union, Callable
+import json
 
-from langchain_core.runnables import Runnable, RunnableConfig
-from langgraph.graph import StateGraph, END
+from langchain.graphs import StateGraph
+from langchain.schema.prompt_template import PromptTemplate
+from langchain.chat_models import ChatOpenAI
 
-from models.state import WorkflowState
 from utils.logger import logger
 
 
-# 상태 타입 정의
-T = TypeVar('T', bound=WorkflowState)
-
-
-class BaseGraph(Generic[T]):
-    """모든 워크플로우 그래프의 기본 클래스"""
+class BaseWorkflowGraph:
+    """
+    Base class for workflow graphs used in the paper writing process.
     
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        state_type: Type[T]
-    ):
+    This class provides common functionality for creating and managing
+    workflow graphs that orchestrate the paper writing process.
+    """
+    
+    def __init__(self, model_name: str = "gpt-4", temperature: float = 0.2):
         """
-        기본 그래프 초기화
+        Initialize the workflow graph.
         
         Args:
-            name: 그래프 이름
-            description: 그래프 설명
-            state_type: 그래프 상태 타입
+            model_name (str): Name of the language model to use
+            temperature (float): Temperature setting for the language model
         """
-        self.name = name
-        self.description = description
-        self.state_type = state_type
-        self.graph = StateGraph(state_type)
+        self.model_name = model_name
+        self.temperature = temperature
+        self.graph = None
+        self.llm = ChatOpenAI(model_name=model_name, temperature=temperature)
         
-        # 노드 및 엣지 초기화
-        self.nodes: Dict[str, Callable] = {}
-        
-        logger.info(f"그래프 '{name}' 초기화됨: {description}")
+        logger.info(f"Initialized BaseWorkflowGraph with model: {model_name}")
     
-    def add_node(self, name: str, node: Callable) -> None:
+    def create_graph(self) -> StateGraph:
         """
-        그래프에 노드 추가
-        
-        Args:
-            name: 노드 이름
-            node: 노드 함수
-        """
-        self.nodes[name] = node
-        self.graph.add_node(name, node)
-        logger.info(f"노드 '{name}' 추가됨")
-    
-    def set_entry_point(self, node_name: str) -> None:
-        """
-        그래프 진입점 설정
-        
-        Args:
-            node_name: 진입점 노드 이름
-        """
-        self.graph.set_entry_point(node_name)
-        logger.info(f"진입점 설정됨: {node_name}")
-    
-    def add_edge(self, start: str, end: str) -> None:
-        """
-        두 노드 사이에 직접 엣지 추가
-        
-        Args:
-            start: 시작 노드 이름
-            end: 끝 노드 이름
-        """
-        self.graph.add_edge(start, end)
-        logger.info(f"엣지 추가됨: {start} -> {end}")
-    
-    def add_conditional_edges(
-        self, 
-        source: str, 
-        condition_func: Callable[[T], str],
-        destinations: List[str]
-    ) -> None:
-        """
-        조건에 따른 엣지 추가
-        
-        Args:
-            source: 소스 노드 이름
-            condition_func: 조건 함수 (어떤 노드로 이동할지 결정)
-            destinations: 가능한 목적지 노드 이름 목록
-        """
-        if "END" in destinations:
-            # END가 목적지에 포함된 경우 대체
-            destinations = [d if d != "END" else END for d in destinations]
-            
-        self.graph.add_conditional_edges(
-            source,
-            condition_func,
-            destinations
-        )
-        logger.info(f"조건부 엣지 추가됨: {source} -> {', '.join(str(d) for d in destinations)}")
-    
-    def compile(self) -> Runnable:
-        """
-        그래프 컴파일
+        Create the workflow graph structure.
         
         Returns:
-            Runnable: 컴파일된 그래프
+            StateGraph: The created workflow graph
         """
-        compiled_graph = self.graph.compile()
-        logger.info(f"그래프 '{self.name}' 컴파일됨")
-        return compiled_graph
+        # This method should be implemented by subclasses
+        raise NotImplementedError("Subclasses must implement create_graph()")
     
-    def run(self, initial_state: T, config: Optional[RunnableConfig] = None) -> T:
+    def add_node(self, name: str, action: Any, description: str) -> None:
         """
-        그래프 실행
+        Add a node to the workflow graph.
         
         Args:
-            initial_state: 초기 상태
-            config: 실행 설정
+            name (str): Name of the node
+            action (Any): Action to be performed at this node
+            description (str): Description of the node
+        """
+        if self.graph is None:
+            raise ValueError("Graph has not been created. Call create_graph() first.")
+        
+        logger.info(f"Adding node to workflow: {name}")
+        self.graph.add_node(name, action, description=description)
+    
+    def add_edge(self, start: str, end: str, condition: Optional[Callable] = None) -> None:
+        """
+        Add an edge between nodes in the workflow graph.
+        
+        Args:
+            start (str): Name of the starting node
+            end (str): Name of the ending node
+            condition (Optional[Callable]): Optional condition for traversing the edge
+        """
+        if self.graph is None:
+            raise ValueError("Graph has not been created. Call create_graph() first.")
+        
+        logger.info(f"Adding edge to workflow: {start} -> {end}")
+        if condition:
+            self.graph.add_conditional_edges(start, condition, {True: end, False: end})
+        else:
+            self.graph.add_edge(start, end)
+    
+    def compile(self) -> None:
+        """
+        Compile the workflow graph.
+        """
+        if self.graph is None:
+            raise ValueError("Graph has not been created. Call create_graph() first.")
+        
+        logger.info("Compiling workflow graph")
+        self.graph.compile()
+    
+    def run_workflow(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Run the workflow with the given inputs.
+        
+        Args:
+            inputs (Dict[str, Any]): Input data for the workflow
             
         Returns:
-            T: 최종 상태
+            Dict[str, Any]: Output data from the workflow
         """
-        compiled_graph = self.compile()
-        final_state = compiled_graph.invoke(initial_state, config)
-        logger.info(f"그래프 '{self.name}' 실행 완료")
-        return final_state
-    
-    def __str__(self) -> str:
-        """그래프 문자열 표현"""
-        return f"{self.name}: {self.description} (노드: {len(self.nodes)}개)" 
+        if self.graph is None:
+            raise ValueError("Graph has not been created. Call create_graph() first.")
+        
+        logger.info(f"Running workflow with inputs: {json.dumps(inputs, default=str)[:200]}...")
+        
+        # Check if the graph is compiled
+        if not hasattr(self.graph, "_compiled") or not self.graph._compiled:
+            logger.info("Graph not compiled, compiling now")
+            self.compile()
+        
+        # Run the graph
+        result = self.graph.invoke(inputs)
+        
+        logger.info("Workflow execution completed")
+        return result

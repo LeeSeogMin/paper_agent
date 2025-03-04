@@ -98,7 +98,10 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
             chunk_size=chunk_size,
             chunk_overlap=chunk_overlap,
             length_function=len,
-            separators=["\n\n", "\n", ". ", " ", ""]
+            separators=["
+
+", "
+", ". ", " ", ""]
         )
         
         # 임베딩 객체 초기화

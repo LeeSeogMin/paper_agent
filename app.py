@@ -1,17 +1,16 @@
-
-# 필요한 모듈 임포트
+# Required module imports
 import os
 import sys
 from dotenv import load_dotenv
 
-# 프로젝트 루트 경로 설정
+# Set project root path
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 
-# 환경 변수 로드
+# Load environment variables
 load_dotenv()
 
-# (임시) 에이전트 임포트 주석 처리
+# (temporary) Agent imports commented out
 # from agents.research_agent import ResearchAgent
 # from agents.writing_agent import WritingAgent
 # from agents.review_agent import ReviewAgent
@@ -20,7 +19,7 @@ import argparse
 import json
 from typing import Dict, Any, List, Optional, Union
 
-# (임시) 설정 임포트 주석 처리
+# (temporary) Settings imports commented out
 # from config.settings import OPENAI_MODEL, DEFAULT_TEMPLATE, OUTPUT_DIR
 from utils.logger import logger, configure_logging
 from models.state import PaperWorkflowState
@@ -29,53 +28,53 @@ from graphs.paper_writing import PaperWritingGraph
 
 def parse_arguments():
     """
-    명령줄 인수 파싱
+    Parse command line arguments
     
     Returns:
-        argparse.Namespace: 파싱된 인수
+        argparse.Namespace: Parsed arguments
     """
-    parser = argparse.ArgumentParser(description="AI 논문 작성 에이전트")
+    parser = argparse.ArgumentParser(description="AI Paper Writing Agent")
     
-    # 임시로 DEFAULT_TEMPLATE 등의 상수를 주석 처리했으므로, 기본값을 문자열로 처리합니다.
-    parser.add_argument("--topic", type=str, required=True, help="논문 주제")
-    parser.add_argument("--template", type=str, default="academic", help="논문 템플릿 이름")
-    parser.add_argument("--style", type=str, default="Standard Academic", help="스타일 가이드 이름") 
-    parser.add_argument("--citation", type=str, default="APA", help="인용 스타일")
-    parser.add_argument("--format", type=str, default="markdown", choices=["markdown", "latex"], help="출력 형식")
-    parser.add_argument("--output", type=str, default=None, help="출력 파일 경로 (기본값: 자동 생성)")
-    parser.add_argument("--verbose", action="store_true", help="상세 로깅 활성화")
+    # Since DEFAULT_TEMPLATE and other constants are commented out, we handle default values as strings
+    parser.add_argument("--topic", type=str, required=True, help="Paper topic")
+    parser.add_argument("--template", type=str, default="academic", help="Paper template name")
+    parser.add_argument("--style", type=str, default="Standard Academic", help="Style guide name") 
+    parser.add_argument("--citation", type=str, default="APA", help="Citation style")
+    parser.add_argument("--format", type=str, default="markdown", choices=["markdown", "latex"], help="Output format")
+    parser.add_argument("--output", type=str, default=None, help="Output file path (default: auto-generated)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     parser.add_argument("--log-level", type=str, default="INFO", 
-                        choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="로깅 레벨")
+                        choices=["DEBUG", "INFO", "WARNING", "ERROR"], help="Logging level")
     
     return parser.parse_args()
 
 
 def main():
     """
-    메인 애플리케이션 함수
+    Main application function
     """
     args = parse_arguments()
     
-    # 로깅 설정
+    # Configure logging
     configure_logging(args.log_level)
     
-    # 주제가 제공되지 않은 경우 사용자에게 요청
+    # Request topic from user if not provided
     if not args.topic:
-        args.topic = input("논문 주제를 입력하세요: ")
+        args.topic = input("Graph Neural Network Topic Modeling: ")
     
-    # 템플릿이 제공되지 않은 경우
+    # If template not provided
     if not args.template:
-        args.template = input("논문 템플릿을 입력하세요 (기본값: academic): ") or "academic"
+        args.template = input("Enter paper template (default: academic): ") or "academic"
     
-    # (임시) OUTPUT_DIR을 임의로 지정 (config.settings 임포트가 주석 처리됨)
+    # (temporary) Set OUTPUT_DIR manually (config.settings import is commented out)
     OUTPUT_DIR = os.path.join(BASE_DIR, "output")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     
     try:
-        # 논문 작성 그래프 생성
+        # Create paper writing graph
         paper_graph = PaperWritingGraph()
         
-        # 워크플로우 실행
+        # Run workflow
         final_state = paper_graph.run_workflow(
             topic=args.topic,
             template_name=args.template,
@@ -85,34 +84,34 @@ def main():
             verbose=args.verbose
         )
         
-        # 결과 출력
+        # Output results
         if final_state.error:
-            logger.error(f"워크플로우 오류: {final_state.error}")
-            print(f"오류: {final_state.error}")
+            logger.error(f"Workflow error: {final_state.error}")
+            print(f"Error: {final_state.error}")
             return 1
         
-        # 성공적인 실행
+        # Successful execution
         print("\n" + "=" * 50)
-        print(f"논문 작성 완료: {final_state.paper.title}")
-        print(f"섹션 수: {len(final_state.paper.sections)}")
-        print(f"참고 문헌 수: {len(final_state.paper.references)}")
+        print(f"Paper writing completed: {final_state.paper.title}")
+        print(f"Number of sections: {len(final_state.paper.sections)}")
+        print(f"Number of references: {len(final_state.paper.references)}")
         
         if final_state.output_file:
-            print(f"출력 파일: {final_state.output_file}")
+            print(f"Output file: {final_state.output_file}")
         
-        # 리뷰 정보 출력
+        # Output review information
         if final_state.review:
-            print("\n[논문 리뷰]")
+            print("\n[Paper Review]")
             review = final_state.review
-            print(f"평가 점수: {review.get('overall_rating', 'N/A')}/10")
+            print(f"Overall rating: {review.get('overall_rating', 'N/A')}/10")
             
             if 'strengths' in review and review['strengths']:
-                print("\n강점:")
+                print("\nStrengths:")
                 for strength in review['strengths'][:3]:
                     print(f"- {strength}")
             
             if 'suggestions' in review and review['suggestions']:
-                print("\n개선 제안:")
+                print("\nImprovement suggestions:")
                 for suggestion in review['suggestions'][:3]:
                     print(f"- {suggestion}")
         
@@ -120,8 +119,8 @@ def main():
         return 0
         
     except Exception as e:
-        logger.error(f"예상치 못한 오류: {str(e)}", exc_info=True)
-        print(f"오류: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        print(f"Error: {str(e)}")
         return 1
 
 

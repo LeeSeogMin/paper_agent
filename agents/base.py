@@ -1,6 +1,6 @@
 """
-기본 에이전트 클래스
-모든 에이전트의 기본 기능을 정의한 추상 클래스입니다.
+Base Agent Class
+An abstract class that defines the basic functionality for all agents.
 """
 
 import uuid
@@ -9,20 +9,20 @@ from typing import Dict, Any, List, Optional, Union, Callable, TypeVar, Generic
 
 from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import ChatOpenAI
+from langchain.chat_models import ChatOpenAI  # Changed from langchain_openai to langchain.chat_models
 
 from config.settings import OPENAI_MODEL, TEMPERATURE
 from utils.logger import logger
 
 
-# 에이전트 출력 타입 정의
+# Define agent output type
 T = TypeVar('T')
 
 
 class BaseAgent(Generic[T], ABC):
     """
-    모든 에이전트의 기본 기능을 정의한 추상 기본 클래스.
-    각 에이전트는 이 클래스를 상속하여 구체적인 기능을 구현해야 합니다.
+    Abstract base class defining the basic functionality for all agents.
+    Each agent must inherit from this class and implement its specific functionality.
     """
 
     def __init__(
@@ -34,14 +34,14 @@ class BaseAgent(Generic[T], ABC):
         verbose: bool = False
     ):
         """
-        BaseAgent 클래스 초기화
+        Initialize the BaseAgent class
 
         Args:
-            name (str): 에이전트 이름
-            description (str): 에이전트 설명
-            model (str, optional): 사용할 LLM 모델. 기본값은 settings.py에서 정의된 OPENAI_MODEL
-            temperature (float, optional): LLM 생성 온도. 기본값은 settings.py에서 정의된 TEMPERATURE
-            verbose (bool, optional): 상세 로깅 활성화 여부. 기본값은 False
+            name (str): Agent name
+            description (str): Agent description
+            model (str, optional): LLM model to use. Defaults to OPENAI_MODEL defined in settings.py
+            temperature (float, optional): LLM generation temperature. Defaults to TEMPERATURE defined in settings.py
+            verbose (bool, optional): Enable detailed logging. Defaults to False
         """
         self.id = str(uuid.uuid4())
         self.name = name
@@ -52,98 +52,98 @@ class BaseAgent(Generic[T], ABC):
         self.memory: List[BaseMessage] = []
         self.state: Dict[str, Any] = {}
         
-        # LLM 초기화
+        # Initialize LLM
         self.llm = ChatOpenAI(
             model=self.model,
             temperature=self.temperature,
             verbose=self.verbose
         )
         
-        logger.info(f"에이전트 초기화: {self.name} (ID: {self.id})")
+        logger.info(f"Agent initialized: {self.name} (ID: {self.id})")
 
     def reset(self) -> None:
         """
-        에이전트 상태를 초기화합니다. 메모리와 상태를 지웁니다.
+        Reset agent state. Clears memory and state.
         """
         self.memory = []
         self.state = {}
-        logger.debug(f"에이전트 {self.name} 초기화됨")
+        logger.debug(f"Agent {self.name} reset")
 
     def add_message(self, message: BaseMessage) -> None:
         """
-        에이전트 메모리에 메시지를 추가합니다.
+        Add a message to the agent's memory.
 
         Args:
-            message (BaseMessage): 추가할 메시지
+            message (BaseMessage): Message to add
         """
         self.memory.append(message)
         if self.verbose:
-            logger.debug(f"메시지 추가됨: {message.type}: {message.content[:50]}...")
+            logger.debug(f"Message added: {message.type}: {message.content[:50]}...")
 
     def add_human_message(self, content: str) -> None:
         """
-        에이전트 메모리에 사용자 메시지를 추가합니다.
+        Add a human message to the agent's memory.
 
         Args:
-            content (str): 메시지 내용
+            content (str): Message content
         """
         message = HumanMessage(content=content)
         self.add_message(message)
         if self.verbose:
-            logger.debug(f"사용자 메시지 추가됨: {content[:50]}...")
+            logger.debug(f"Human message added: {content[:50]}...")
 
     def add_ai_message(self, content: str) -> None:
         """
-        에이전트 메모리에 AI 메시지를 추가합니다.
+        Add an AI message to the agent's memory.
 
         Args:
-            content (str): 메시지 내용
+            content (str): Message content
         """
         message = AIMessage(content=content)
         self.add_message(message)
         if self.verbose:
-            logger.debug(f"AI 메시지 추가됨: {content[:50]}...")
+            logger.debug(f"AI message added: {content[:50]}...")
 
     def update_state(self, new_state: Dict[str, Any]) -> None:
         """
-        에이전트 상태를 업데이트합니다.
+        Update the agent's state.
 
         Args:
-            new_state (Dict[str, Any]): 새로운 상태 정보
+            new_state (Dict[str, Any]): New state information
         """
         self.state.update(new_state)
         if self.verbose:
-            logger.debug(f"상태 업데이트됨: {new_state}")
+            logger.debug(f"State updated: {new_state}")
             
     def get_state(self) -> Dict[str, Any]:
         """
-        현재 에이전트 상태를 반환합니다.
+        Get the current agent state.
 
         Returns:
-            Dict[str, Any]: 현재 상태
+            Dict[str, Any]: Current state
         """
         return self.state
 
     @abstractmethod
     def run(self, input_data: Any, config: Optional[RunnableConfig] = None) -> T:
         """
-        에이전트를 실행하고 결과를 반환합니다.
-        모든 하위 클래스는 이 메서드를 구현해야 합니다.
+        Run the agent and return results.
+        All subclasses must implement this method.
 
         Args:
-            input_data (Any): 에이전트에 제공할 입력 데이터
-            config (Optional[RunnableConfig], optional): 실행 구성
+            input_data (Any): Input data to provide to the agent
+            config (Optional[RunnableConfig], optional): Run configuration
 
         Returns:
-            T: 에이전트 출력 타입에 해당하는 결과
+            T: Result corresponding to the agent's output type
         """
         pass
 
     def __str__(self) -> str:
         """
-        에이전트 정보를 문자열로 반환합니다.
+        Return agent information as a string.
 
         Returns:
-            str: 에이전트 정보 문자열
+            str: Agent information string
         """
-        return f"{self.name} (ID: {self.id}): {self.description}" 
+        return f"{self.name} (ID: {self.id}): {self.description}"
