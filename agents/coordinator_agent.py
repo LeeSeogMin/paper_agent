@@ -481,24 +481,46 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                     }
                 }
             
-            # 작성 에이전트 호출
-            writer_result = self.writer_agent.process_writing_task({
-                "task_type": writing_task["task_type"],
-                "task_description": writing_task["task_description"],
-                "materials": research_materials,
-                "additional_context": writing_task["additional_context"]
-            })
+            # 문헌 리뷰인 경우 content 필드 추가
+            if writing_task["task_type"] == "literature_review":
+                # 작성 에이전트에 content 필드 추가 (WritingAgent가 기대하는 형식)
+                content = {
+                    "research_materials": research_materials.get("materials", []),
+                    "topic": requirements["topic"],
+                    "outline": research_materials.get("outline", "")
+                }
+                
+                # process_writing_task 메서드 사용 (새로 추가된 메서드)
+                writer_result = self.process_writing_task("literature_review", content)
+            else:
+                # 기존 방식대로 호출
+                writer_result = self.writer_agent.process_writing_task({
+                    "task_type": writing_task["task_type"],
+                    "task_description": writing_task["task_description"],
+                    "materials": research_materials,
+                    "additional_context": writing_task["additional_context"]
+                })
             
-            # 결과 반환
-            return {
-                "status": "completed",
-                "research_plan": {  # 딕셔너리로 변환
-                    "description": research_plan_text,
-                    "problem_statement": requirements["topic"]
-                },
-                "writing_result": writer_result if isinstance(writer_result, dict) else writer_result.dict(),
-                "requirements": requirements
-            }
+            # 결과 형식 확인 및 조정
+            # app.py에서 필요로 하는 outline과 content 필드 포함
+            if isinstance(writer_result, dict) and "status" in writer_result and writer_result["status"] == "completed":
+                # 이미 적절한 형식인 경우
+                result = {
+                    "status": "completed",
+                    "outline": writer_result.get("outline", research_materials.get("outline", "")),
+                    "content": writer_result.get("content", ""),
+                    "id": "paper_" + requirements["topic"][:10].replace(" ", "_")
+                }
+            else:
+                # 다른 형식인 경우 변환
+                result = {
+                    "status": "completed",
+                    "outline": research_materials.get("outline", ""),
+                    "content": str(writer_result) if writer_result else "",
+                    "id": "paper_" + requirements["topic"][:10].replace(" ", "_")
+                }
+            
+            return result
         except Exception as e:
             logger.error(f"사용자 요구사항 처리 중 오류 발생: {str(e)}")
             return self.handle_error(
@@ -546,3 +568,38 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 "error": str(e),
                 "status": "failed"
             }
+
+    def process_writing_task(self, task_type, content):
+        """
+        작성 태스크 처리
+        """
+        logger.info(f"작성 작업 처리 중: {task_type}")
+        
+        try:
+            task_result = self.writer_agent.process_writing_task({
+                "task_type": task_type,
+                "content": content
+            })
+            
+            # 수정: 태스크 결과가 딕셔너리이면 적절한 필드 추출
+            if isinstance(task_result, dict):
+                # 문헌 리뷰 특별 처리
+                if task_type == "literature_review":
+                    return {
+                        "content": task_result.get("content", ""),
+                        "outline": task_result.get("outline", ""),
+                        "status": "completed"
+                    }
+                else:
+                    return task_result
+            else:
+                # 문자열인 경우 직접 content로 사용
+                return {
+                    "content": task_result,
+                    "outline": content.get("outline", ""),
+                    "status": "completed"
+                }
+            
+        except Exception as e:
+            logger.error(f"작성 작업 처리 중 오류 발생: {str(e)}")
+            raise
