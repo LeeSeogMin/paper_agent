@@ -155,38 +155,27 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         
         logger.info("에이전트 초기화 완료")
 
-    def create_research_plan(self, user_question: str) -> ResearchPlan:
-        """사용자 질문 기반 문제 해결 계획 생성"""
-        logger.info(f"질문 '{user_question}'에 대한 문제 해결 계획 수립 중...")
-        try:
-            format_instructions = self.research_plan_parser.get_format_instructions()
-            result = self.research_plan_chain.invoke({
-                "task": user_question,
-                "constraints": "학술적 정확성, 시간 효율성, 자원 가용성",
-                "resources": "학술 데이터베이스, 연구 자료, AI 분석 도구",
-                "format_instructions": format_instructions
-            })
-            research_plan = self.research_plan_parser.parse(result["text"])
-            logger.info(f"문제 해결 계획 수립 완료: {len(research_plan.implementation_steps)}개 실행 단계")
-            return research_plan
-        except Exception as e:
-            logger.error(f"계획 수립 실패: {str(e)}")
-            # 에러 처리 체인 활용
-            error_analysis = self.error_handling_chain.invoke({
-                "task": "연구 계획 수립",
-                "error": str(e),
-                "context": f"사용자 질문: {user_question}"
-            })
-            logger.info(f"에러 분석: {error_analysis['text']}")
-            
-            # 기본 계획 반환
-            return ResearchPlan(
-                problem_statement=user_question,
-                analysis_approach=["기본 문헌 분석", "관련 데이터 수집"],
-                required_data_sources=["학술 논문", "신뢰할 수 있는 온라인 자료"],
-                implementation_steps=["1. 초기 자료 수집", "2. 핵심 주제 분석", "3. 종합 보고서 작성"],
-                expected_outcomes=["질문에 대한 체계적인 답변", "추가 연구 방향 제시"]
-            )
+    def create_research_plan(self, problem_statement: str, required_data_sources: List[str]) -> ResearchPlan:
+        parser = PydanticOutputParser(pydantic_object=ResearchPlan)
+        prompt = PromptTemplate(
+            template="""다음 문제 해결을 위한 연구 계획을 JSON 형식으로 생성하세요.
+
+문제: {problem_statement}
+필요한 데이터 소스: {required_data_sources}
+
+{format_instructions}
+
+반드시 JSON 형식으로만 응답하세요.""",
+            input_variables=["problem_statement", "required_data_sources"],
+            partial_variables={"format_instructions": parser.get_format_instructions()}
+        )
+
+        chain = prompt | self.llm | parser
+        result = chain.invoke({
+            "problem_statement": problem_statement,
+            "required_data_sources": required_data_sources
+        })
+        return result
 
     def start_workflow(
         self,
@@ -199,7 +188,7 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
     ) -> PaperWorkflowState:
         """사용자 질문 기반 워크플로우 시작"""
         logger.info(f"질문 '{user_question}'에 대한 워크플로우 시작")
-        research_plan = self.create_research_plan(user_question)
+        research_plan = self.create_research_plan(user_question, [])
         
         workflow_state = self.workflow_runner.run_workflow(
             user_question=user_question,
@@ -398,12 +387,12 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             }
         
         # WriterAgent 호출
-        writer_result = self.writer_agent.process_writing_task(
-            task_type=writing_task["task_type"],
-            task_description=writing_task["task_description"],
-            research_materials=research_materials,
-            additional_context=writing_task["additional_context"]
-        )
+        writer_result = self.writer_agent.process_writing_task({
+            "task_type": writing_task["task_type"],
+            "task_description": writing_task["task_description"],
+            "materials": research_materials,
+            "additional_context": writing_task["additional_context"]
+        })
         
         return {
             "research_plan": research_plan.dict(),
@@ -454,7 +443,7 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                     raise ValueError(f"필수 필드 누락: {field}")
             
             # 연구 계획 수립
-            research_plan = self.create_research_plan(requirements["topic"])
+            research_plan = self.create_research_plan(requirements["topic"], [])
             
             # 연구 수행
             research_materials = self.research_agent.run(
@@ -493,12 +482,12 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 }
             
             # 작성 에이전트 호출
-            writer_result = self.writer_agent.process_writing_task(
-                task_type=writing_task["task_type"],
-                task_description=writing_task["task_description"],
-                research_materials=research_materials,
-                additional_context=writing_task["additional_context"]
-            )
+            writer_result = self.writer_agent.process_writing_task({
+                "task_type": writing_task["task_type"],
+                "task_description": writing_task["task_description"],
+                "materials": research_materials,
+                "additional_context": writing_task["additional_context"]
+            })
             
             # 결과 반환
             return {

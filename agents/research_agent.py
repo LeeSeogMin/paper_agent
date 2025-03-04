@@ -188,7 +188,10 @@ class ResearchAgent(BaseAgent):
             source_info = {
                 "title": source.get("title", ""),
                 "abstract": source.get("abstract", "No abstract available"),
-                "authors": ", ".join(source.get("authors", [])),
+                "authors": ", ".join([
+                    author["name"] if isinstance(author, dict) else author
+                    for author in source.get("authors", [])
+                ]),
                 "year": source.get("year", "Unknown"),
                 "venue": source.get("venue", "Unknown"),
                 "citation_count": source.get("citationCount", 0)
