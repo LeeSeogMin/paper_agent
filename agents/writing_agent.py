@@ -647,6 +647,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         try:
             task_type = task.get("task_type", "")
             
+            # 다양한 작업 유형에 따른 처리
             if task_type == "full_paper":
                 # 전체 논문 작성
                 topic = task.get("topic", "")
@@ -657,6 +658,40 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
                     raise ValueError("논문 주제가 제공되지 않았습니다.")
                 
                 return self.run(topic, materials, template_name)
+                
+            elif task_type == "literature_review":
+                # 문헌 검토만 작성
+                content = task.get("content", {})
+                return self.write_literature_review(content)
+                
+            elif task_type == "methodology":
+                # 방법론 섹션만 작성
+                topic = task.get("topic", "")
+                context = task.get("additional_context", {})
+                return self.write_methodology_section(topic, context)
+                
+            elif task_type == "results_analysis":
+                # 결과 분석 섹션만 작성
+                data = task.get("data", {})
+                context = task.get("additional_context", {})
+                return self.write_results_analysis(data, context)
+                
+            elif task_type == "conclusion":
+                # 결론만 작성
+                content = task.get("content", "")
+                return self.write_conclusion(content)
+                
+            elif task_type == "abstract":
+                # 초록만 작성
+                topic = task.get("topic", "")
+                summary = task.get("summary", "")
+                return self.write_abstract(topic, summary)
+                
+            elif task_type == "custom":
+                # 사용자 정의 작성 작업
+                prompt = task.get("prompt", "")
+                context = task.get("context", {})
+                return self.custom_writing_task(prompt, context)
                 
             elif task_type == "section":
                 # 특정 섹션 작성
@@ -674,15 +709,13 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
                     "status": "completed"
                 }
                 
-            elif task_type == "literature_review":
-                # 문헌 리뷰 작성
-                content = task.get("content", {})
-                return self.write_literature_review(content)
+            elif task_type == "revision":
+                # 재작업 요청 처리
+                previous_content = task.get("previous_attempt", "")
+                revision_instructions = task.get("revision_instructions", "")
+                original_task_type = task.get("original_task_type", "unknown")
                 
-            elif task_type == "conclusion":
-                # 결론 작성
-                content = task.get("content", "")
-                return self.write_conclusion(content)
+                return self.revise_content(previous_content, revision_instructions, original_task_type)
                 
             else:
                 raise ValueError(f"지원되지 않는 작업 유형: {task_type}")
@@ -698,45 +731,197 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
     def write_literature_review(self, content: Dict[str, Any]) -> Dict[str, Any]:
         """문헌 리뷰 작성"""
         prompt = f"""
-        다음 연구 자료를 바탕으로 포괄적인 문헌 리뷰를 작성하세요:
+        Write a comprehensive literature review based on the following research materials:
         
         {content.get('research_materials', '')}
         
-        주제: {content.get('topic', '지정된 주제 없음')}
-        개요: {content.get('outline', '개요 없음')}
+        Topic: {content.get('topic', 'No specific topic provided')}
+        Outline: {content.get('outline', 'No outline provided')}
         
-        다음 사항을 포함하세요:
-        1. 주요 연구 동향 및 발전 과정
-        2. 핵심 개념과 모델 설명
-        3. 중요한 연구 결과 및 발견
-        4. 현재 연구의 한계점 및 향후 연구 방향
+        Please include the following elements:
+        1. Major research trends and development history
+        2. Explanation of key concepts and models
+        3. Important research findings and discoveries
+        4. Limitations of current research and future research directions
         
-        학술적이고 객관적인 스타일로 작성하세요.
+        Write in an academic and objective style.
+        
+        {self._get_citation_guidelines()}
         """
         
         response = self.llm.invoke(prompt)
         review_content = response.content
         
-        # 적절한 형식의 응답 반환
+        # Return response in appropriate format
         return {
             "task_type": "literature_review",
             "content": review_content,
-            "outline": content.get('outline', ''),  # 원래 개요를 포함
+            "outline": content.get('outline', ''),  # Include original outline
             "status": "completed"
         }
 
+    def _get_citation_guidelines(self, style="APA") -> str:
+        """인용 가이드라인을 반환합니다.
+        
+        Args:
+            style: 인용 스타일 (기본값: APA)
+            
+        Returns:
+            str: 인용 가이드라인 텍스트
+        """
+        if style.upper() == "APA":
+            return """Citation Guidelines (APA Style):
+1. Parenthetical citation: Include both the author(s) and year in parentheses at the end of the sentence.
+   Example: "Research has shown that artificial intelligence significantly impacts workplace dynamics (Kim & Park, 2023)."
+
+2. Narrative citation: Include the author(s) in the narrative with the year in parentheses.
+   Example: "Kim and Park (2023) found that artificial intelligence transforms traditional workplace hierarchies."
+
+3. For three or more authors, use the first author's name followed by 'et al.' and the year.
+   Example: "Machine learning applications continue to evolve rapidly (Smith et al., 2022)."
+"""
+        else:
+            # 다른 인용 스타일에 대한 가이드라인 추가 가능
+            return "Please use appropriate academic citations."
+
     def write_conclusion(self, content: str) -> Dict[str, Any]:
         """결론 작성"""
+        
         prompt = f"""
-        다음 연구 결과를 바탕으로 결론을 작성하세요:
+        Write a conclusion based on the following research results:
         
         {content}
         
-        학술적이고 객관적인 스타일로 작성하세요.
+        Please write in an academic and objective style in English.
+        
+        {self._get_citation_guidelines()}
+        
+        Please use appropriate citations throughout the conclusion to support your statements.
         """
         
         response = self.llm.invoke(prompt)
         return response.content
+
+    def write_methodology_section(self, topic: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """방법론 섹션 작성"""
+        # 연구 질문 또는 가설 추출
+        research_question = context.get("research_question", topic)
+        expected_outcomes = context.get("expected_outcomes", [])
+        
+        prompt = f"""
+        Write a methodology section for the following research topic:
+        
+        Research Topic: {topic}
+        
+        Research Question: {research_question}
+        
+        Expected outcomes: {', '.join(expected_outcomes) if isinstance(expected_outcomes, list) else expected_outcomes}
+        
+        Please describe:
+        1. The research approach and design
+        2. Data collection methods
+        3. Analysis techniques
+        4. Any limitations of the methodology
+        
+        Write in an academic and objective style.
+        """
+        
+        response = self.llm.invoke(prompt)
+        
+        return {
+            "task_type": "methodology",
+            "content": response.content,
+            "status": "completed"
+        }
+
+    def write_results_analysis(self, data: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """결과 분석 섹션 작성"""
+        topic = context.get("topic", "")
+        
+        prompt = f"""
+        Write a results and analysis section based on the following data:
+        
+        Topic: {topic}
+        
+        Data summary: {json.dumps(data, ensure_ascii=False)}
+        
+        Please include:
+        1. Clear presentation of the key findings
+        2. Analysis of patterns or trends in the data
+        3. Interpretation of the results in relation to the research question
+        4. Visual representations of data (described in text)
+        
+        Write in an academic and objective style.
+        """
+        
+        response = self.llm.invoke(prompt)
+        
+        return {
+            "task_type": "results_analysis",
+            "content": response.content,
+            "status": "completed"
+        }
+
+    def write_abstract(self, topic: str, summary: str) -> Dict[str, Any]:
+        """논문 초록 작성"""
+        prompt = f"""
+        Write an abstract for a research paper on the following topic:
+        
+        Topic: {topic}
+        
+        Research Summary: {summary}
+        
+        The abstract should:
+        1. Be approximately 200-250 words
+        2. Clearly state the purpose of the research
+        3. Briefly describe the methodology
+        4. Summarize key findings
+        5. State the main conclusion and implications
+        
+        Write in an academic and objective style.
+        """
+        
+        response = self.llm.invoke(prompt)
+        
+        return {
+            "task_type": "abstract",
+            "content": response.content,
+            "status": "completed"
+        }
+
+    def custom_writing_task(self, prompt: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        """사용자 정의 작성 작업"""
+        # 컨텍스트에서 관련 정보 추출
+        topic = context.get("topic", "")
+        materials = context.get("materials", [])
+        additional_info = context.get("additional_info", "")
+        
+        # 기본 프롬프트 확장
+        enhanced_prompt = f"""
+        {prompt}
+        
+        Topic: {topic}
+        
+        Additional Information: {additional_info}
+        
+        Please write in an academic and objective style.
+        """
+        
+        # 참고 자료가 있으면 추가
+        if materials:
+            material_text = "\n\n".join([
+                f"Material {i+1}:\nTitle: {m.get('title', '')}\nContent: {m.get('content', '')}"
+                for i, m in enumerate(materials[:3])  # 처음 3개만 사용
+            ])
+            enhanced_prompt += f"\n\nReference Materials:\n{material_text}"
+        
+        response = self.llm.invoke(enhanced_prompt)
+        
+        return {
+            "task_type": "custom",
+            "content": response.content,
+            "status": "completed"
+        }
 
     def generate_academic_paper(self, topic, research_data, outline, references, **kwargs):
         """
@@ -809,85 +994,87 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
     def generate_section(self, section_type, topic, research_data, section_info, ref_id_map, citation_style, **kwargs):
         """
-        논문 섹션 생성
+        Generate a paper section
         
         Args:
-            section_type: 섹션 유형 (title_abstract, introduction, body_section, conclusion)
-            topic: 논문 주제
-            research_data: 연구 데이터
-            section_info: 섹션 정보
-            ref_id_map: 참고문헌 ID 매핑
-            citation_style: 인용 스타일
+            section_type: Section type (title_abstract, introduction, body_section, conclusion)
+            topic: Paper topic
+            research_data: Research data
+            section_info: Section information
+            ref_id_map: Reference ID mapping
+            citation_style: Citation style
         
         Returns:
-            str: 생성된 섹션 내용
+            str: Generated section content
         """
         try:
-            # 섹션별 프롬프트 구성
+            # Configure prompt based on section type
             if section_type == "title_abstract":
                 prompt = f"""
-                    당신은 학술 논문 작성 전문가입니다. 아래 연구 주제와 자료를 바탕으로 논문의 제목과 초록을 작성해주세요.
+                    You are an expert in academic paper writing. Please write a title and abstract for a research paper based on the following topic and materials.
                     
-                    논문 주제: {topic}
+                    Research Topic: {topic}
                     
-                    연구 개요:
+                    Research Outline:
                     {json.dumps(section_info, indent=2, ensure_ascii=False)}
                     
-                    제목과 초록 작성 지침:
-                    1. 제목은 논문의 핵심을 명확하게 전달해야 합니다.
-                    2. 초록은 연구 목적, 방법, 결과, 결론을 간략히 포함해야 합니다.
-                    3. 초록은 200-300단어로 작성해주세요.
-                    4. 초록에는 참고문헌 인용을 포함하지 마세요.
+                    Guidelines for Title and Abstract:
+                    1. The title should clearly convey the core of the paper.
+                    2. The abstract should briefly include research purpose, methods, results, and conclusions.
+                    3. The abstract should be 200-300 words.
+                    4. Do not include citations in the abstract.
                     
-                    출력 형식:
-                    # [논문 제목]
+                    Output Format:
+                    # [Paper Title]
                     
-                    ## 초록
-                    [초록 내용]
+                    ## Abstract
+                    [Abstract Content]
                 """
             elif section_type == "introduction":
-                # 인용 지침 추가
+                # Get references from kwargs or use an empty list as default
+                references = kwargs.get('references', [])
+                
+                # Add citation guidelines
                 prompt = f"""
-                    당신은 학술 논문 작성 전문가입니다. 아래 연구 주제와 자료를 바탕으로 논문의 서론을 작성해주세요.
+                    You are an expert in academic paper writing. Please write an introduction for the paper based on the following research topic and materials.
                     
-                    논문 주제: {topic}
+                    Research Topic: {topic}
                     
-                    연구 자료:
+                    Research Materials:
                     {json.dumps(research_data[:3], indent=2, ensure_ascii=False)}
                     
-                    연구 개요:
+                    Research Outline:
                     {json.dumps(section_info, indent=2, ensure_ascii=False)}
                     
-                    서론 작성 지침:
-                    1. 연구 배경, 문제 제기, 연구 목적을 명확히 설명해야 합니다.
-                    2. 관련 선행 연구를 소개하고 본 연구의 차별점을 언급해야 합니다.
-                    3. 연구의 구성을 간략히 안내해야 합니다.
-                    4. 적절한 참고문헌을 인용해주세요.
+                    Introduction Writing Guidelines:
+                    1. Clearly explain the research background, problem statement, and research purpose.
+                    2. Introduce relevant previous research and mention the differentiation of this study.
+                    3. Briefly guide the structure of the research.
+                    4. Use appropriate citations.
                     
-                    인용 지침 ({citation_style} 스타일):
-                    - APA 형식: 인용할 내용 뒤에 (저자, 연도) 형태로 표기합니다. 예: (Smith, 2020)
-                    - 직접 인용은 "인용문" (저자, 연도, 페이지) 형태로 표기합니다.
+                    Citation Guidelines ({citation_style} style):
+                    {self._get_citation_guidelines(citation_style)}
                     
-                    사용 가능한 참고문헌:
-                    {self._format_ref_list_for_prompt(references[:10], ref_id_map)}
+                    Available References:
+                    {self._format_ref_list_for_prompt(references[:10] if references else [], ref_id_map)}
                     
-                    출력 형식:
-                    ## 서론
-                    [서론 내용]
+                    Output Format:
+                    ## Introduction
+                    [Introduction Content]
                 """
-            # 다른 섹션 타입들에 대한 프롬프트 추가...
+            # Add prompts for other section types...
             
-            # LLM으로 섹션 생성
+            # Generate section with LLM
             response = self.llm.invoke(prompt)
             
             return response.content
             
         except Exception as e:
-            logger.error(f"섹션 생성 중 오류: {str(e)}", exc_info=True)
-            return f"## {kwargs.get('section_title', section_type.capitalize())}\n\n섹션 생성 중 오류가 발생했습니다."
+            logger.error(f"Error generating section: {str(e)}", exc_info=True)
+            return f"## {kwargs.get('section_title', section_type.capitalize())}\n\nAn error occurred while generating this section."
 
     def _format_ref_list_for_prompt(self, references, ref_id_map):
-        """프롬프트용 참고문헌 목록 형식화"""
+        """Format reference list for prompt"""
         ref_list = []
         for ref in references:
             ref_id = ref.get("id")
@@ -902,19 +1089,19 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
 
     def format_references(self, references, citation_style="APA"):
         """
-        참고문헌 목록 형식화
+        Format references section
         
         Args:
-            references: 참고문헌 목록
-            citation_style: 인용 스타일
+            references: List of references
+            citation_style: Citation style
         
         Returns:
-            str: 형식화된 참고문헌 섹션
+            str: Formatted references section
         """
-        # 참고문헌을 저자 이름 기준으로 정렬
+        # Sort references by first author's last name
         sorted_refs = sorted(references, key=lambda x: x.get("authors", "Unknown").split(",")[0].lower())
         
-        # 참고문헌 스타일에 따른 형식화
+        # Format references according to style
         formatted_refs = []
         
         if citation_style.upper() == "APA":
@@ -933,10 +1120,77 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
                 
                 formatted_refs.append(formatted_ref)
         
-        # 최종 참고문헌 섹션 생성
-        references_section = "## 참고문헌\n\n"
+        # Create final references section
+        references_section = "## References\n\n"
         
         for i, ref in enumerate(formatted_refs):
             references_section += f"{i+1}. {ref}\n\n"
         
         return references_section
+
+    def revise_content(self, previous_content: str, revision_instructions: str, 
+                     original_task_type: str) -> Dict[str, Any]:
+        """
+        이전 콘텐츠를 수정 지시사항에 따라 재작성
+        
+        Args:
+            previous_content: 이전에 생성된 콘텐츠
+            revision_instructions: 수정 지시사항
+            original_task_type: 원래 작업 유형
+            
+        Returns:
+            Dict: 수정된 콘텐츠
+        """
+        prompt = f"""
+        You are tasked with revising the following content according to specific instructions.
+        
+        ORIGINAL CONTENT:
+        {previous_content}
+        
+        REVISION INSTRUCTIONS:
+        {revision_instructions}
+        
+        Please revise the content to address the instructions. Maintain academic style and format.
+        Focus specifically on addressing the issues mentioned in the revision instructions.
+        
+        Output the revised content only, without explaining your changes.
+        """
+        
+        response = self.llm.invoke(prompt)
+        
+        return {
+            "task_type": "revision",
+            "original_task_type": original_task_type,
+            "content": response.content,
+            "status": "completed"
+        }
+
+    def update_template_config(self, config: Dict[str, Any]) -> None:
+        """
+        템플릿 설정을 업데이트합니다.
+        
+        Args:
+            config: 새 설정 값
+        """
+        logger.info("작성 에이전트 템플릿 설정 업데이트")
+        
+        # 섹션 설정
+        if "sections" in config:
+            self.section_templates = config["sections"]
+            logger.info(f"섹션 템플릿 업데이트: {len(self.section_templates)} 섹션")
+        
+        # 인용 스타일
+        if "citation_style" in config:
+            self.citation_style = config["citation_style"]
+            logger.info(f"인용 스타일 설정: {self.citation_style}")
+        
+        # 포맷팅 가이드라인
+        if "formatting" in config:
+            self.formatting_guidelines = config["formatting"]
+            logger.info("포맷팅 가이드라인 업데이트 완료")
+        
+        # 기타 설정들
+        for key, value in config.items():
+            if key not in ["sections", "citation_style", "formatting"]:
+                setattr(self, f"_{key}", value)
+                logger.info(f"추가 설정 업데이트: {key}")

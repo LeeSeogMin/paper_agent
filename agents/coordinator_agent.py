@@ -474,105 +474,51 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 if field not in requirements or not requirements[field]:
                     raise ValueError(f"필수 필드 누락: {field}")
             
-            # 주제와 관련된 학술 자료 검색 (요구사항에 topic이 있다고 가정)
-            if "topic" in requirements:
-                try:
-                    logger.info(f"주제에 대한 학술 검색 수행: {requirements['topic']}")
-                    research_summary = self.rag_enhancer.get_research_summary(
-                        topic=requirements['topic'],
-                        limit=5  # 적절한 수로 조정
-                    )
-                    
-                    # 검색 결과를 요구사항에 추가
-                    requirements["research_context"] = research_summary
-                    logger.info("학술 검색 결과가 요구사항에 추가되었습니다")
-                except Exception as e:
-                    logger.warning(f"학술 검색 중 오류 발생: {e}")
+            # 요구사항 분석 및 작업 유형 결정
+            task_type = self._determine_task_type(requirements)
+            logger.info(f"결정된 작업 유형: {task_type}")
             
-            # 연구 계획 수립 (이제 문자열 반환)
-            research_plan_text = self.create_research_plan(requirements["topic"], "literature_review")
+            # 로컬 PDF 파일 수 확인
+            local_pdf_count = self._count_local_pdf_files()
+            logger.info(f"로컬 PDF 파일 수: {local_pdf_count}")
             
-            # 연구 수행 - 직접 topic 전달
-            research_materials = self.research_agent.run(
-                topic=requirements["topic"]  # 원래 topic 사용
-            )
+            # 연구 계획 수립
+            research_plan_text = self.create_research_plan(requirements["topic"], task_type)
             
-            # 간단한 더미 연구 계획 생성 (이전 코드와의 호환성 유지)
-            dummy_research_plan = {
-                "problem_statement": requirements["topic"],
-                "analysis_approach": ["문헌 조사", "데이터 분석"],
-                "expected_outcomes": ["연구 결과 종합", "향후 연구 방향 제시"]
-            }
-            
-            # 논문 유형에 따른 작업 설정
-            paper_type = requirements.get("paper_type", "general")
-            
-            if paper_type == "literature_review":
-                writing_task = {
-                    "task_type": "literature_review",
-                    "task_description": "Create a comprehensive literature review",
-                    "additional_context": {
-                        "focus_areas": dummy_research_plan["analysis_approach"],
-                        "key_themes": dummy_research_plan["expected_outcomes"]
-                    }
-                }
-            elif paper_type == "experimental_research":
-                writing_task = {
-                    "task_type": "methodology",
-                    "task_description": "Design an experimental methodology",
-                    "additional_context": {
-                        "research_questions": requirements["topic"],
-                        "expected_outcomes": dummy_research_plan["expected_outcomes"]
-                    }
-                }
+            # 로컬 PDF 파일이 30개 이상인 경우 조사 단계 건너뛰기
+            if local_pdf_count >= 30:
+                logger.info("충분한 로컬 PDF 파일이 있어 추가 조사를 건너뜁니다.")
+                # 기존 로컬 자료만 활용하여 연구 수행
+                research_materials = self._process_existing_materials(requirements["topic"])
             else:
-                writing_task = {
-                    "task_type": "custom",
-                    "task_description": requirements.get("research_question", requirements["topic"]),
-                    "additional_context": {
-                        "additional_instructions": requirements.get("additional_instructions", ""),
-                        "expected_outcome": dummy_research_plan["expected_outcomes"][0] if dummy_research_plan["expected_outcomes"] else ""
-                    }
-                }
-            
-            # 문헌 리뷰인 경우 content 필드 추가
-            if writing_task["task_type"] == "literature_review":
-                # 작성 에이전트에 content 필드 추가 (WritingAgent가 기대하는 형식)
-                content = {
-                    "research_materials": research_materials.get("materials", []),
-                    "topic": requirements["topic"],
-                    "outline": research_materials.get("outline", "")
-                }
+                # 주제와 관련된 학술 자료 검색
+                if "topic" in requirements:
+                    try:
+                        logger.info(f"주제에 대한 학술 검색 수행: {requirements['topic']}")
+                        research_summary = self.rag_enhancer.get_research_summary(
+                            topic=requirements['topic'],
+                            limit=5
+                        )
+                        
+                        # 검색 결과를 요구사항에 추가
+                        requirements["research_context"] = research_summary
+                        logger.info("학술 검색 결과가 요구사항에 추가되었습니다")
+                    except Exception as e:
+                        logger.warning(f"학술 검색 중 오류 발생: {e}")
                 
-                # process_writing_task 메서드 사용 (새로 추가된 메서드)
-                writer_result = self.process_writing_task("literature_review", content)
-            else:
-                # 기존 방식대로 호출
-                writer_result = self.writer_agent.process_writing_task({
-                    "task_type": writing_task["task_type"],
-                    "task_description": writing_task["task_description"],
-                    "materials": research_materials,
-                    "additional_context": writing_task["additional_context"]
-                })
+                # 조사 에이전트를 통한 연구 수행
+                research_materials = self.research_agent.run(
+                    topic=requirements["topic"]
+                )
+            
+            # 작업 유형에 맞는 작성 작업 구성
+            writing_task = self._create_writing_task(task_type, requirements, research_plan_text, research_materials)
+            
+            # 작성 작업 실행
+            writer_result = self.process_writing_task(task_type, writing_task)
             
             # 결과 형식 확인 및 조정
-            # app.py에서 필요로 하는 outline과 content 필드 포함
-            if isinstance(writer_result, dict) and "status" in writer_result and writer_result["status"] == "completed":
-                # 이미 적절한 형식인 경우
-                result = {
-                    "status": "completed",
-                    "outline": writer_result.get("outline", research_materials.get("outline", "")),
-                    "content": writer_result.get("content", ""),
-                    "id": "paper_" + requirements["topic"][:10].replace(" ", "_")
-                }
-            else:
-                # 다른 형식인 경우 변환
-                result = {
-                    "status": "completed",
-                    "outline": research_materials.get("outline", ""),
-                    "content": str(writer_result) if writer_result else "",
-                    "id": "paper_" + requirements["topic"][:10].replace(" ", "_")
-                }
+            result = self._format_final_result(writer_result, requirements, research_materials)
             
             return result
         except Exception as e:
@@ -583,77 +529,670 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
                 context={"requirements": requirements}
             )
 
-    def handle_writing_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """작성 작업 처리"""
-        logger.info(f"작성 작업 처리 중: {task.get('task_type', 'unknown')}")
+    def _count_local_pdf_files(self) -> int:
+        """
+        로컬 PDF 파일 수를 계산합니다.
+        
+        Returns:
+            int: 로컬 PDF 파일 수
+        """
+        import os
+        from pathlib import Path
+        
+        # 확인할 디렉토리 목록
+        directories = [
+            "data/local",  # 로컬 폴더
+            "data/pdfs"    # 이전에 다운받은 PDF 폴더
+        ]
+        
+        total_pdf_count = 0
+        
+        for directory in directories:
+            if os.path.exists(directory):
+                # 디렉토리 내 PDF 파일 수 계산
+                pdf_files = list(Path(directory).glob("**/*.pdf"))
+                total_pdf_count += len(pdf_files)
+                logger.info(f"{directory} 디렉토리에서 {len(pdf_files)}개의 PDF 파일을 찾았습니다.")
+        
+        return total_pdf_count
+
+    def _process_existing_materials(self, topic: str) -> Dict[str, Any]:
+        """
+        기존 로컬 PDF 파일을 처리하여 연구 자료로 변환합니다.
+        
+        Args:
+            topic: 연구 주제
+            
+        Returns:
+            Dict[str, Any]: 처리된 연구 자료
+        """
+        logger.info(f"기존 로컬 PDF 파일을 '{topic}' 주제에 맞게 처리합니다.")
         
         try:
-            # 작성 에이전트 초기화
-            if not hasattr(self, 'writer_agent') or self.writer_agent is None:
-                from agents import WriterAgent
-                self.writer_agent = WriterAgent(verbose=self.verbose)
+            # 연구 에이전트 초기화 (필요한 경우)
+            if not hasattr(self, 'research_agent') or self.research_agent is None:
+                from agents.research_agent import ResearchAgent
+                self.research_agent = ResearchAgent(verbose=self.verbose)
             
-            # 작업 처리
-            result = self.writer_agent.process_writing_task(task)
-            
-            # 결과 타입 확인 및 처리
-            if isinstance(result, Paper):
-                # Paper 객체인 경우
-                return {
-                    "task_type": task.get("task_type", "unknown"),
-                    "paper": result.dict(),
-                    "status": "completed"
+            # 로컬 자료만 사용하도록 설정된 연구 계획 생성
+            local_research_plan = {
+                "search_strategy": {
+                    "search_scope": "local_only",  # 로컬 자료만 사용
+                    "min_papers": 30,
+                    "queries": [topic]
                 }
-            elif isinstance(result, dict):
-                # 딕셔너리인 경우
-                return result
-            else:
-                # 예상치 못한 타입인 경우
-                return {
-                    "task_type": task.get("task_type", "unknown"),
-                    "error": f"예상치 못한 결과 타입: {type(result)}",
-                    "status": "failed"
-                }
+            }
             
-        except Exception as e:
-            logger.error(f"작성 작업 처리 중 오류 발생: {str(e)}")
+            # 연구 에이전트에게 로컬 자료만 수집하도록 지시
+            research_materials = self.research_agent.collect_research_materials(
+                topic=topic,
+                research_plan=local_research_plan,
+                max_queries=1,
+                results_per_source=30,
+                final_result_count=30
+            )
+            
+            # 수집된 자료 보강
+            enriched_materials = self.research_agent.enrich_research_materials(research_materials)
+            
+            logger.info(f"기존 로컬 PDF 파일에서 {len(enriched_materials)}개의 연구 자료를 처리했습니다.")
+            
+            # 연구 자료를 적절한 형식으로 변환
             return {
-                "task_type": task.get("task_type", "unknown"),
-                "error": str(e),
-                "status": "failed"
+                "materials": enriched_materials,
+                "outline": self._generate_outline_from_materials(topic, enriched_materials),
+                "source": "local_only"
+            }
+        except Exception as e:
+            logger.error(f"기존 자료 처리 중 오류 발생: {str(e)}", exc_info=True)
+            # 오류 발생 시 빈 결과 반환
+            return {
+                "materials": [],
+                "outline": {"title": topic, "sections": []},
+                "source": "local_only",
+                "error": str(e)
             }
 
-    def process_writing_task(self, task_type, content):
+    def _generate_outline_from_materials(self, topic: str, materials: List[Any]) -> Dict[str, Any]:
         """
-        작성 태스크 처리
+        연구 자료를 바탕으로 논문 개요를 생성합니다.
+        
+        Args:
+            topic: 연구 주제
+            materials: 연구 자료 목록
+            
+        Returns:
+            Dict[str, Any]: 생성된 개요
         """
-        logger.info(f"작성 작업 처리 중: {task_type}")
+        logger.info(f"'{topic}' 주제에 대한 개요 생성 중...")
         
         try:
-            task_result = self.writer_agent.process_writing_task({
-                "task_type": task_type,
-                "content": content
-            })
+            # 자료 요약 추출
+            summaries = []
+            for material in materials[:10]:  # 상위 10개 자료만 사용
+                if hasattr(material, 'summary') and material.summary:
+                    summaries.append(material.summary)
+                elif hasattr(material, 'abstract') and material.abstract:
+                    summaries.append(material.abstract[:500])  # 초록 일부만 사용
             
-            # 수정: 태스크 결과가 딕셔너리이면 적절한 필드 추출
-            if isinstance(task_result, dict):
-                # 문헌 리뷰 특별 처리
-                if task_type == "literature_review":
-                    return {
-                        "content": task_result.get("content", ""),
-                        "outline": task_result.get("outline", ""),
-                        "status": "completed"
-                    }
-                else:
-                    return task_result
+            # LLM을 사용하여 개요 생성
+            prompt = f"""
+            다음 연구 자료를 바탕으로 '{topic}' 주제에 대한 학술 논문 개요를 생성해주세요.
+            
+            연구 자료 요약:
+            {' '.join(summaries[:5])}
+            
+            개요는 다음 형식으로 JSON 형태로 반환해주세요:
+            {{
+                "title": "논문 제목",
+                "sections": [
+                    {{"title": "섹션 제목", "content": "섹션 내용 요약"}},
+                    ...
+                ]
+            }}
+            
+            학술 논문의 표준 구조(서론, 방법론, 결과, 논의, 결론 등)를 따라주세요.
+            """
+            
+            response = self.llm.invoke(prompt)
+            
+            # 응답에서 JSON 추출
+            import re
+            import json
+            
+            # JSON 블록 찾기
+            json_match = re.search(r"\{[\s\S]*\}", response.content)
+            if json_match:
+                try:
+                    outline = json.loads(json_match.group(0))
+                    logger.info(f"개요 생성 완료: {outline.get('title', '제목 없음')}")
+                    return outline
+                except json.JSONDecodeError:
+                    logger.warning("JSON 파싱 실패, 기본 개요 사용")
+            
+            # 파싱 실패 시 기본 개요 반환
+            return {
+                "title": f"Research on {topic}",
+                "sections": [
+                    {"title": "Introduction", "content": "Introduction to the topic."},
+                    {"title": "Literature Review", "content": "Review of existing literature."},
+                    {"title": "Methodology", "content": "Research methodology."},
+                    {"title": "Results", "content": "Research findings."},
+                    {"title": "Discussion", "content": "Discussion of results."},
+                    {"title": "Conclusion", "content": "Conclusion and future work."}
+                ]
+            }
+        except Exception as e:
+            logger.error(f"개요 생성 중 오류 발생: {str(e)}", exc_info=True)
+            # 오류 발생 시 기본 개요 반환
+            return {
+                "title": f"Research on {topic}",
+                "sections": [
+                    {"title": "Introduction", "content": ""},
+                    {"title": "Literature Review", "content": ""},
+                    {"title": "Methodology", "content": ""},
+                    {"title": "Results", "content": ""},
+                    {"title": "Discussion", "content": ""},
+                    {"title": "Conclusion", "content": ""}
+                ]
+            }
+
+    def _determine_task_type(self, requirements: Dict[str, Any]) -> str:
+        """
+        사용자 요구사항을 분석하여 작업 유형 결정
+        """
+        # 명시적으로 paper_type이 지정된 경우
+        paper_type = requirements.get("paper_type", "").lower()
+        if paper_type:
+            if "literature" in paper_type or "review" in paper_type:
+                return "literature_review"
+            elif "method" in paper_type or "experimental" in paper_type:
+                return "methodology"
+            elif "case" in paper_type:
+                return "case_study"
+            elif "theoretical" in paper_type or "analysis" in paper_type:
+                return "theoretical_analysis"
+        
+        # 작업 내용에서 키워드 탐색
+        topic = requirements.get("topic", "").lower()
+        additional_instructions = requirements.get("additional_instructions", "").lower()
+        combined_text = f"{topic} {additional_instructions}"
+        
+        # 키워드 기반 작업 유형 추론
+        if any(kw in combined_text for kw in ["review", "literature", "previous work", "existing research"]):
+            return "literature_review"
+        elif any(kw in combined_text for kw in ["method", "methodology", "approach", "experiment"]):
+            return "methodology"
+        elif any(kw in combined_text for kw in ["result", "analysis", "finding", "data"]):
+            return "results_analysis"
+        elif any(kw in combined_text for kw in ["conclusion", "summary", "implication"]):
+            return "conclusion"
+        elif any(kw in combined_text for kw in ["abstract", "overview"]):
+            return "abstract"
+        
+        # 기본값은 전체 논문 작성
+        return "full_paper"
+
+    def _create_writing_task(self, task_type: str, requirements: Dict[str, Any], 
+                            research_plan: str, research_materials: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        작업 유형에 따른 작성 작업 구성
+        """
+        topic = requirements.get("topic", "")
+        additional_instructions = requirements.get("additional_instructions", "")
+        
+        # 기본 작업 템플릿
+        writing_task = {
+            "task_type": task_type,
+            "topic": topic,
+            "materials": research_materials.get("materials", []),
+            "additional_context": {
+                "research_plan": research_plan,
+                "additional_instructions": additional_instructions
+            }
+        }
+        
+        # 작업 유형에 따른 추가 필드
+        if task_type == "literature_review":
+            writing_task["content"] = {
+                "research_materials": research_materials.get("materials", []),
+                "topic": topic,
+                "outline": research_materials.get("outline", "")
+            }
+        elif task_type == "methodology":
+            writing_task["additional_context"]["research_question"] = requirements.get("research_question", topic)
+        elif task_type == "results_analysis":
+            # 분석할 데이터 추가
+            writing_task["data"] = research_materials.get("analysis_data", {})
+        elif task_type == "custom":
+            # 사용자 정의 프롬프트 구성
+            writing_task["prompt"] = additional_instructions or f"Write about {topic}"
+            writing_task["context"] = {
+                "topic": topic,
+                "materials": research_materials.get("materials", []),
+                "additional_info": requirements.get("research_context", "")
+            }
+        
+        return writing_task
+
+    def process_writing_task(self, task_type: str, writing_task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        작성 작업 처리 및 결과 검토
+        """
+        logger.info(f"작성 작업 처리: {task_type}")
+        
+        # WriterAgent가 없으면 초기화
+        if not hasattr(self, 'writer_agent') or self.writer_agent is None:
+            from agents import WriterAgent
+            self.writer_agent = WriterAgent(verbose=self.verbose)
+        
+        # 작업 처리
+        writer_result = self.writer_agent.process_writing_task(writing_task)
+        
+        # 결과 검토
+        review_result = self._review_writing_result(task_type, writing_task, writer_result)
+        
+        # 재작업 필요 여부 확인
+        if review_result["needs_revision"]:
+            logger.info(f"작성 결과 재작업 필요: {review_result['revision_reason']}")
+            
+            # 수정 지시사항 추가
+            revised_task = writing_task.copy()
+            revised_task["revision_instructions"] = review_result["revision_instructions"]
+            revised_task["previous_attempt"] = writer_result.get("content", "")
+            
+            # 재작업 요청
+            return self._request_revision(revised_task)
+        
+        return writer_result
+
+    def _review_writing_result(self, task_type: str, original_task: Dict[str, Any], 
+                             writing_result: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        작성 결과 검토
+        
+        Args:
+            task_type: 작업 유형
+            original_task: 원래 작업 지시사항
+            writing_result: 작성 결과
+            
+        Returns:
+            Dict: 검토 결과 (needs_revision, revision_reason, revision_instructions)
+        """
+        # 기본 검토 결과
+        review = {
+            "needs_revision": False,
+            "revision_reason": "",
+            "revision_instructions": ""
+        }
+        
+        # 결과가 딕셔너리가 아니거나 콘텐츠가 없는 경우
+        if not isinstance(writing_result, dict) or not writing_result.get("content"):
+            review["needs_revision"] = True
+            review["revision_reason"] = "결과물 형식 오류 또는 내용 부재"
+            review["revision_instructions"] = "작업 유형에 맞는 적절한 내용을 생성해주세요."
+            return review
+        
+        content = writing_result.get("content", "")
+        
+        # 작업 유형별 검토
+        if task_type == "literature_review":
+            # 문헌 검토 검토 로직
+            if len(content.split()) < 300:  # 너무 짧은 경우
+                review["needs_revision"] = True
+                review["revision_reason"] = "문헌 검토가 너무 짧습니다."
+                review["revision_instructions"] = "더 포괄적인 문헌 검토를 작성해주세요. 최소 500단어 이상 필요합니다."
+            
+            # 참고 문헌 인용 여부 확인
+            if "[" not in content and "(" not in content:
+                review["needs_revision"] = True
+                review["revision_reason"] = "참고 문헌 인용이 없습니다."
+                review["revision_instructions"] = "문헌 검토에 적절한 인용을 포함해주세요."
+        
+        elif task_type == "methodology":
+            # 방법론 검토 로직
+            if "data collection" not in content.lower() and "method" not in content.lower():
+                review["needs_revision"] = True
+                review["revision_reason"] = "방법론 설명이 부족합니다."
+                review["revision_instructions"] = "데이터 수집 방법과 분석 방법을 더 자세히 설명해주세요."
+        
+        elif task_type == "results_analysis":
+            # 결과 분석 검토 로직
+            if "finding" not in content.lower() and "result" not in content.lower():
+                review["needs_revision"] = True
+                review["revision_reason"] = "결과 및 분석이 명확하지 않습니다."
+                review["revision_instructions"] = "주요 연구 결과를 명확히 제시하고 분석을 강화해주세요."
+        
+        elif task_type == "full_paper":
+            # 전체 논문 검토 로직
+            required_sections = ["abstract", "introduction", "conclusion", "reference"]
+            missing_sections = [s for s in required_sections if s.lower() not in content.lower()]
+            
+            if missing_sections:
+                review["needs_revision"] = True
+                review["revision_reason"] = f"논문에 필수 섹션이 누락되었습니다: {', '.join(missing_sections)}"
+                review["revision_instructions"] = f"누락된 섹션을 추가해주세요: {', '.join(missing_sections)}"
+        
+        # 일반적인 품질 검토
+        if len(content) > 0 and len(content.split()) < 100:
+            review["needs_revision"] = True
+            review["revision_reason"] = "콘텐츠가 너무 짧습니다."
+            review["revision_instructions"] = "더 자세한 내용을 작성해주세요. 현재 내용이 충분하지 않습니다."
+        
+        return review
+
+    def _request_revision(self, revised_task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        작성 에이전트에게 재작업 요청
+        
+        Args:
+            revised_task: 수정 지시사항이 포함된 작업
+            
+        Returns:
+            Dict: 재작업 결과
+        """
+        logger.info("작성 에이전트에 재작업 요청")
+        
+        # 재작업 요청을 위한 특수 작업 유형 설정
+        revised_task["task_type"] = "revision"
+        
+        # WriterAgent가 "revision" 작업 유형을 처리할 수 있도록 하기 위한 코드 추가 필요
+        # (WriterAgent의 process_writing_task 메서드 수정 필요)
+        
+        # 재작업 요청
+        revised_result = self.writer_agent.process_writing_task(revised_task)
+        
+        # 결과 확인
+        if isinstance(revised_result, dict) and revised_result.get("status") == "completed":
+            logger.info("재작업 완료")
+            return revised_result
+        else:
+            # 재작업이 실패한 경우 원래 결과 반환하고 경고 로그
+            logger.warning("재작업 실패, 원래 결과 사용")
+            return {
+                "task_type": revised_task.get("task_type", "unknown"),
+                "content": revised_task.get("previous_attempt", ""),
+                "status": "completed",
+                "revision_failed": True
+            }
+
+    def _format_final_result(self, writer_result: Dict[str, Any], 
+                            requirements: Dict[str, Any], 
+                            research_materials: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        최종 결과 포맷팅
+        """
+        # 기본 결과 템플릿
+        result = {
+            "status": "completed",
+            "id": "paper_" + requirements["topic"][:10].replace(" ", "_").lower()
+        }
+        
+        # 작성 결과 통합
+        if isinstance(writer_result, dict):
+            if "content" in writer_result:
+                result["content"] = writer_result["content"]
+            elif "section_content" in writer_result:
+                result["content"] = writer_result["section_content"]
+            elif isinstance(writer_result.get("paper"), dict):
+                result["content"] = writer_result["paper"].get("content", "")
             else:
-                # 문자열인 경우 직접 content로 사용
-                return {
-                    "content": task_result,
-                    "outline": content.get("outline", ""),
-                    "status": "completed"
+                # 다른 필드 탐색
+                for key, value in writer_result.items():
+                    if isinstance(value, str) and len(value) > 100:
+                        result["content"] = value
+                        break
+        elif isinstance(writer_result, str):
+            result["content"] = writer_result
+        
+        # 개요 추가
+        result["outline"] = research_materials.get("outline", "")
+        
+        # 결과 확인
+        if not result.get("content"):
+            logger.warning("생성된 콘텐츠가 없습니다")
+            result["content"] = f"# {requirements['topic']}\n\n내용을 생성하는 중 오류가 발생했습니다."
+            result["status"] = "partial"
+        
+        return result
+
+    def create_study_plan(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        연구 계획을 수립합니다. (사용자 요구사항 기반)
+        
+        Args:
+            requirements: 사용자 요구사항
+            
+        Returns:
+            Dict: 연구 계획 (에이전트에게 전달될 형식)
+        """
+        topic = requirements.get("topic", "")
+        paper_type = requirements.get("paper_type", "")
+        additional_instructions = requirements.get("additional_instructions", "")
+        
+        logger.info(f"'{topic}'에 대한 연구 계획 수립 중...")
+        
+        try:
+            # LLM을 활용한 연구 계획 생성
+            prompt = f"""
+            Create a detailed study plan for the following research topic:
+            
+            Topic: {topic}
+            Paper Type: {paper_type}
+            Additional Instructions: {additional_instructions}
+            
+            Your study plan should include:
+            1. Main research questions to be addressed
+            2. Key hypotheses or arguments to explore
+            3. Theoretical framework or perspective to be used
+            4. Potential challenges and limitations
+            5. Expected outcomes or contributions
+            
+            Format the plan as a structured JSON object with these sections.
+            """
+            
+            # 연구 계획 생성
+            response = self.llm.invoke(prompt)
+            
+            # 응답에서 JSON 추출 시도
+            study_plan = self._extract_json_from_response(response.content)
+            
+            # JSON 파싱 실패 시 텍스트 형식으로 처리
+            if not study_plan:
+                study_plan = {
+                    "research_questions": ["What are the key aspects of " + topic + "?"],
+                    "hypotheses": ["The research will reveal important insights about " + topic],
+                    "framework": "Standard academic analysis",
+                    "challenges": ["Limited existing research"],
+                    "expected_outcomes": ["Better understanding of " + topic]
                 }
             
+            # 연구 계획에 원본 주제 추가
+            study_plan["topic"] = topic
+            study_plan["paper_type"] = paper_type
+            
+            logger.info(f"연구 계획 수립 완료: {', '.join(study_plan.get('research_questions', [])[:1])}...")
+            return study_plan
+            
         except Exception as e:
-            logger.error(f"작성 작업 처리 중 오류 발생: {str(e)}")
-            raise
+            logger.error(f"연구 계획 수립 중 오류: {str(e)}")
+            # 기본 연구 계획 반환
+            return {
+                "topic": topic,
+                "research_questions": ["What are the key aspects of " + topic + "?"],
+                "expected_outcomes": ["Better understanding of " + topic]
+            }
+
+    def create_report_format(self, requirements: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        보고서 형식을 결정합니다.
+        
+        Args:
+            requirements: 사용자 요구사항
+            
+        Returns:
+            Dict: 보고서 형식 지침
+        """
+        topic = requirements.get("topic", "")
+        paper_type = requirements.get("paper_type", "")
+        task_type = self._determine_task_type(requirements)
+        
+        # 기본 보고서 형식
+        report_format = {
+            "topic": topic,
+            "task_type": task_type,
+            "sections": [],
+            "citation_style": "APA",
+            "formatting_guidelines": {
+                "headings": "## for main sections, ### for subsections",
+                "citations": "Use parenthetical citations (Author, Year)",
+                "figures": "Include descriptive captions",
+                "tables": "Number and title all tables",
+                "emphasis": "Use **bold** for emphasis sparingly"
+            }
+        }
+        
+        # 작업 유형에 따른 섹션 구성
+        if task_type == "literature_review":
+            report_format["sections"] = [
+                "Introduction",
+                "Methodology of Literature Review",
+                "Key Findings from Literature",
+                "Gaps in Current Research",
+                "Discussion",
+                "Conclusion",
+                "References"
+            ]
+        elif task_type == "methodology":
+            report_format["sections"] = [
+                "Introduction",
+                "Research Design",
+                "Data Collection Methods",
+                "Analysis Approach",
+                "Ethical Considerations",
+                "Limitations",
+                "References"
+            ]
+        elif task_type == "results_analysis":
+            report_format["sections"] = [
+                "Introduction",
+                "Results Overview",
+                "Detailed Findings",
+                "Statistical Analysis",
+                "Discussion",
+                "Conclusion",
+                "References"
+            ]
+        elif task_type == "full_paper":
+            report_format["sections"] = [
+                "Abstract",
+                "Introduction",
+                "Literature Review",
+                "Methodology",
+                "Results",
+                "Discussion",
+                "Conclusion",
+                "References"
+            ]
+        
+        logger.info(f"보고서 형식 결정 완료: {task_type} 유형, {len(report_format['sections'])} 섹션")
+        return report_format
+
+    def delegate_to_research_agent(self, research_plan: Dict[str, Any]) -> bool:
+        """
+        조사 에이전트에게 조사 계획을 전달합니다.
+        
+        Args:
+            research_plan: 조사 계획
+            
+        Returns:
+            bool: 성공 여부
+        """
+        if not hasattr(self, 'research_agent') or self.research_agent is None:
+            try:
+                from agents.research_agent import ResearchAgent
+                self.research_agent = ResearchAgent(verbose=self.verbose)
+            except Exception as e:
+                logger.error(f"조사 에이전트 초기화 실패: {str(e)}")
+                return False
+        
+        logger.info("조사 에이전트에게 조사 계획 전달")
+        try:
+            # 조사 에이전트의 설정 업데이트
+            self.research_agent.update_config({
+                "search_depth": research_plan.get("search_depth", 3),
+                "max_sources": research_plan.get("max_sources", 10),
+                "focus_keywords": research_plan.get("focus_keywords", []),
+                "research_questions": research_plan.get("research_questions", [])
+            })
+            
+            logger.info("조사 에이전트 설정 업데이트 완료")
+            return True
+        except Exception as e:
+            logger.error(f"조사 에이전트에게 계획 전달 중 오류: {str(e)}")
+            return False
+
+    def delegate_to_writing_agent(self, report_format: Dict[str, Any]) -> bool:
+        """
+        작성 에이전트에게 보고서 형식을 전달합니다.
+        
+        Args:
+            report_format: 보고서 형식
+            
+        Returns:
+            bool: 성공 여부
+        """
+        if not hasattr(self, 'writer_agent') or self.writer_agent is None:
+            try:
+                from agents.writing_agent import WriterAgent
+                self.writer_agent = WriterAgent(verbose=self.verbose)
+            except Exception as e:
+                logger.error(f"작성 에이전트 초기화 실패: {str(e)}")
+                return False
+        
+        logger.info("작성 에이전트에게 보고서 형식 전달")
+        try:
+            # 작성 에이전트의 설정 업데이트
+            self.writer_agent.update_template_config({
+                "sections": report_format.get("sections", []),
+                "citation_style": report_format.get("citation_style", "APA"),
+                "formatting": report_format.get("formatting_guidelines", {})
+            })
+            
+            logger.info("작성 에이전트 설정 업데이트 완료")
+            return True
+        except Exception as e:
+            logger.error(f"작성 에이전트에게 형식 전달 중 오류: {str(e)}")
+            return False
+
+    def _extract_json_from_response(self, response_text: str) -> Dict[str, Any]:
+        """
+        LLM 응답에서 JSON 형식의 데이터를 추출합니다.
+        
+        Args:
+            response_text: LLM 응답 텍스트
+            
+        Returns:
+            Dict: 추출된 JSON 데이터
+        """
+        import re
+        import json
+        
+        # JSON 블록 찾기 (```json과 ``` 사이)
+        json_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", response_text)
+        if json_match:
+            json_str = json_match.group(1)
+        else:
+            # 중괄호로 둘러싸인 블록 찾기
+            json_match = re.search(r"\{[\s\S]*\}", response_text)
+            if json_match:
+                json_str = json_match.group(0)
+            else:
+                return {}
+        
+        # JSON 파싱 시도
+        try:
+            return json.loads(json_str)
+        except Exception:
+            # 파싱 실패시 빈 딕셔너리 반환
+            return {}

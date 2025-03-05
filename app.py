@@ -99,7 +99,7 @@ def main():
     if not api_keys_available:
         logger.error(f"Cannot start application. Missing required API keys: {', '.join(missing_keys)}")
         logger.error("Please set the required API keys in your environment or .env file.")
-        return
+        return 1
     
     # 필요한 디렉토리 생성
     ensure_directories_exist()
@@ -120,11 +120,31 @@ def main():
     # 사용자 요구사항 처리
     logger.info("총괄 에이전트에 사용자 요구사항 전달")
     try:
+        # 총괄 에이전트가 사용자 요구사항을 분석하여 작업 계획 수립
+        logger.info("총괄 에이전트가 사용자 요구사항 분석 중...")
+        
+        # 1. 연구 계획 수립
+        study_plan = coordinator.create_study_plan(user_requirements)
+        logger.info("연구 계획 수립 완료")
+        
+        # 2. 보고서 양식 결정
+        report_format = coordinator.create_report_format(user_requirements)
+        logger.info("보고서 양식 결정 완료")
+        
+        # 3. 각 에이전트에게 계획 전달
+        logger.info("조사 에이전트에게 연구 계획 전달 중...")
+        coordinator.delegate_to_research_agent(study_plan)
+        
+        logger.info("작성 에이전트에게 보고서 양식 전달 중...")
+        coordinator.delegate_to_writing_agent(report_format)
+        
+        # 4. 전체 프로세스 실행
+        logger.info("논문 작성 프로세스 시작...")
         result = coordinator.process_user_requirements(user_requirements)
         
-        # 결과 검증 추가
-        if not result.get("outline") or not result.get("content"):
-            logger.error("논문 생성 실패: 필수 결과물이 생성되지 않았습니다")
+        # 결과 검증
+        if not result.get("content"):
+            logger.error("논문 생성 실패: 결과물이 생성되지 않았습니다")
             return 1
             
         # 결과 출력
