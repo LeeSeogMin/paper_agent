@@ -26,7 +26,7 @@ from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db, process_and_vectorize_paper
 from utils.api_clients import search_google_scholar, search_academic_papers
 from utils.pdf_processor import extract_text_from_pdf, process_local_pdfs
-from utils.search_utils import academic_search, fallback_search
+from utils.search_utils import academic_search
 from utils.search import google_search, search_academic_resources, search_crossref, search_arxiv
 from utils.pdf_downloader import get_local_pdf_path
 
@@ -328,7 +328,7 @@ class ResearchAgent(BaseAgent):
                     
                     # 학술 검색 및 웹 검색 실행 (영어만)
                     academic_results = academic_search(query_text, max_results=results_per_source, language='en')
-                    web_results = fallback_search(query_text, max_results=results_per_source, language='en')
+                    web_results = academic_search(query_text, max_results=results_per_source, sources=["google", "arxiv", "crossref"], language='en')
                     
                     # PDF URL이 있는 결과만 유지
                     academic_results = [r for r in academic_results if r.get('pdf_url')]
@@ -509,8 +509,8 @@ class ResearchAgent(BaseAgent):
                 "source": getattr(material, 'source', 'unknown')
             }
             
-            # 벡터 DB에 저장 (PDF 다운로드 및 처리 포함)
-            process_and_vectorize_paper(paper_info, material.pdf_url)
+            # Pass only the pdf_url to process_and_vectorize_paper()
+            process_and_vectorize_paper(paper_info["pdf_url"])
             
             # PDF가 있는 경우 내용 추출
             if material.pdf_url and not material.content:
@@ -864,7 +864,7 @@ class ResearchAgent(BaseAgent):
             if not results:
                 logger.warning(f"학술 검색 결과 없음: {query}")
                 # 폴백 검색 시도
-                results = fallback_search(query, num_results=max_results)
+                results = academic_search(query, num_results=max_results)
             
             return results
         except Exception as e:

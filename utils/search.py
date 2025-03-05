@@ -9,43 +9,24 @@ def google_search(query, num_results=10, language='en'):
     """
     구글 검색을 수행하고 결과를 반환 (academic_search.py로 기능 이전됨)
     """
-    logger.info("google_search 함수는 AcademicSearchManager로 이전되었습니다.")
+    logger.info(f"search.py의 google_search 함수 호출: query={query}, num_results={num_results}, language={language}")
+    
+    # 호출 스택 추적을 위한 로깅
+    import traceback
+    call_stack = traceback.format_stack()
+    logger.debug(f"search.py google_search 호출 스택:\n{''.join(call_stack)}")
     
     try:
-        # AcademicSearchManager를 직접 사용하지 않고 API 호출만 수행
-        import os
-        import requests
-        
-        # SerpAPI 키 가져오기
-        serpapi_key = os.getenv("SerpApi_key")
-        if not serpapi_key:
-            logger.error("SerpApi_key가 설정되지 않았습니다.")
-            return []
-            
-        # SerpAPI 직접 호출
-        params = {
-            "engine": "google_scholar",
-            "q": query,
-            "api_key": serpapi_key,
-            "num": num_results
-        }
-        
-        if language:
-            params["hl"] = language
-            
-        response = requests.get("https://serpapi.com/search.json", params=params)
-        response.raise_for_status()
-        data = response.json()
-        
-        # 결과 추출
-        results = []
-        if "organic_results" in data:
-            for item in data["organic_results"]:
-                results.append(item)
-                
+        # AcademicSearchManager 사용
+        from utils.academic_search import AcademicSearchManager
+        search_manager = AcademicSearchManager()
+        logger.info("AcademicSearchManager 인스턴스 생성 완료, google_search_compat 호출 예정")
+        results = search_manager.google_search_compat(query, num_results, language)
+        logger.info(f"google_search_compat 호출 완료, 결과 개수: {len(results)}")
         return results
     except Exception as e:
-        logger.error(f"Google 검색 중 오류: {str(e)}")
+        logger.error(f"search.py Google 검색 중 오류: {str(e)}")
+        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
         return []
 
 def test_academic_search(query):

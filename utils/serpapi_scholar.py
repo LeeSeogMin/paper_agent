@@ -10,7 +10,7 @@ class ScholarSearchTool:
     def __init__(self):
         self.api_key = os.getenv("SerpApi_key")
         if not self.api_key:
-            raise ValueError("SerpApi_key가 환경변수에 설정되지 않았습니다.")
+            print("경고: SerpApi_key가 환경변수에 설정되지 않았습니다. Google Scholar 검색이 작동하지 않을 수 있습니다.")
         self.base_url = "https://serpapi.com/search.json"
     
     def search_scholar(self, 
@@ -30,6 +30,10 @@ class ScholarSearchTool:
         Returns:
             검색 결과 목록 (제목, 링크, 요약, 저자 등 포함)
         """
+        if not self.api_key:
+            print("SerpApi_key가 설정되지 않아 Google Scholar 검색을 수행할 수 없습니다.")
+            return []
+        
         params = {
             "engine": "google_scholar",
             "q": query,

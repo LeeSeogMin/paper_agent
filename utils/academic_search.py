@@ -6,6 +6,8 @@ import re
 import arxiv
 from bs4 import BeautifulSoup
 import hashlib
+import time
+import traceback
 
 from .serpapi_scholar import ScholarSearchTool
 from .openalex_api import OpenAlexTool
@@ -67,174 +69,287 @@ class AcademicSearchManager:
               year_start: Optional[int] = None,
               year_end: Optional[int] = None) -> Dict[str, Any]:
         """
-        여러 학술 검색 소스에서 동시에 검색을 수행
+        통합 학술 검색 수행
         
         Args:
             query: 검색 쿼리
             source: 검색 소스 ('scholar', 'openalex', 'google', 'arxiv', 'crossref', 'all')
-            limit: 각 소스당 검색 결과 수
-            year_start: 시작 연도 (선택 사항)
-            year_end: 종료 연도 (선택 사항)
+            limit: 반환할 최대 결과 수
+            year_start: 검색 시작 연도 (선택 사항)
+            year_end: 검색 종료 연도 (선택 사항)
             
         Returns:
-            통합된 검색 결과
+            검색 결과 (소스별로 구분)
         """
+        logger.info(f"search 메서드 호출: query={query}, source={source}, limit={limit}")
+        
+        # 호출 스택 추적을 위한 로깅
+        import traceback
+        call_stack = traceback.format_stack()
+        logger.debug(f"search 메서드 호출 스택:\n{''.join(call_stack)}")
+        
+        # 쿼리 최적화 (특히 OpenAlex 검색용)
+        optimized_query = self._optimize_query(query)
+        
+        # 결과 초기화
         results = {
             "query": query,
             "sources_used": [],
             "results": []
         }
         
-        # Google Scholar 검색 (SerpApi)
-        if source.lower() in ["scholar", "all"]:
-            try:
-                scholar_results = self.scholar_tool.search_scholar(
-                    query=query,
-                    num_results=limit,
-                    year_start=year_start,
-                    year_end=year_end
-                )
-                
-                if scholar_results:
-                    results["sources_used"].append("google_scholar")
-                    
-                    # 형식 통일
-                    for item in scholar_results:
-                        results["results"].append({
-                            "source": "google_scholar",
-                            "title": item.get("title", ""),
-                            "link": item.get("link", ""),
-                            "abstract": item.get("snippet", ""),
-                            "authors": item.get("publication_info", {}).get("authors", []),
-                            "year": item.get("publication_info", {}).get("year", ""),
-                            "raw_data": item  # 원본 데이터 보존
-                        })
-            except Exception as e:
-                logger.error(f"Google Scholar 검색 중 오류: {e}")
+        # 검색할 소스 결정
+        sources_to_search = []
+        if source.lower() == "all":
+            sources_to_search = ["scholar", "openalex", "google", "arxiv", "crossref"]
+        else:
+            sources_to_search = [source.lower()]
         
-        # OpenAlex 검색
-        if source.lower() in ["openalex", "all"]:
+        # 각 소스별로 독립적으로 검색 실행
+        for search_source in sources_to_search:
             try:
-                filter_options = {}
-                if year_start and year_end:
-                    filter_options["from_publication_date"] = f"{year_start}-01-01"
-                    filter_options["to_publication_date"] = f"{year_end}-12-31"
-                
-                openalex_data = self.openalex_tool.search_works(
-                    query=query,
-                    limit=limit,
-                    filter_options=filter_options
-                )
-                
-                if openalex_data and "results" in openalex_data and openalex_data["results"]:
-                    results["sources_used"].append("openalex")
-                    
-                    # 형식 통일
-                    for item in openalex_data["results"]:
-                        # 저자 정보 추출
-                        authors = []
-                        if "authorships" in item:
-                            for authorship in item["authorships"]:
-                                if "author" in authorship and "display_name" in authorship["author"]:
-                                    authors.append(authorship["author"]["display_name"])
+                if search_source == "scholar":
+                    # Google Scholar 검색 (SerpApi)
+                    try:
+                        scholar_results = self.scholar_tool.search_scholar(
+                            query=optimized_query,
+                            num_results=limit,
+                            year_start=year_start,
+                            year_end=year_end
+                        )
                         
-                        # 결과 추가
-                        results["results"].append({
-                            "source": "openalex",
-                            "title": item.get("title", ""),
-                            "link": item.get("doi", ""),
-                            "abstract": self._extract_abstract_from_openalex(item),
-                            "authors": authors,
-                            "year": item.get("publication_year", ""),
-                            "journal": item.get("primary_location", {}).get("source", {}).get("display_name", ""),
-                            "raw_data": item  # 원본 데이터 보존
-                        })
-            except Exception as e:
-                logger.error(f"OpenAlex 검색 중 오류: {e}")
-        
-        # 구글 검색 (일반)
-        if source.lower() in ["google", "all"]:
-            try:
-                google_results = self.google_search(
-                    query=query,
-                    num_results=limit
-                )
+                        # 결과 유효성 검사
+                        if scholar_results and isinstance(scholar_results, list):
+                            results["sources_used"].append("google_scholar")
+                            
+                            # 형식 통일
+                            for item in scholar_results:
+                                if not isinstance(item, dict):
+                                    logger.warning(f"Google Scholar 검색 결과 항목이 딕셔너리가 아님: {type(item)}")
+                                    continue
+                                        
+                                results["results"].append({
+                                    "source": "google_scholar",
+                                    "title": item.get("title", ""),
+                                    "link": item.get("link", ""),
+                                    "abstract": item.get("snippet", ""),
+                                    "authors": item.get("publication_info", {}).get("authors", []) if isinstance(item.get("publication_info"), dict) else [],
+                                    "year": item.get("publication_info", {}).get("year", "") if isinstance(item.get("publication_info"), dict) else "",
+                                    "raw_data": item  # 원본 데이터 보존
+                                })
+                        elif scholar_results:
+                            logger.warning(f"Google Scholar 검색 결과가 리스트가 아님: {type(scholar_results)}")
+                    except Exception as e:
+                        logger.error(f"Google Scholar 검색 중 오류: {e}")
+                        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                        # 오류가 발생해도 계속 진행
                 
-                if google_results:
-                    results["sources_used"].append("google")
-                    
-                    for item in google_results:
-                        results["results"].append({
-                            "source": "google",
-                            "title": item.get("title", ""),
-                            "link": item.get("link", ""),
-                            "abstract": item.get("snippet", ""),
-                            "authors": [],
-                            "year": "",
-                            "raw_data": item
-                        })
-            except Exception as e:
-                logger.error(f"Google 검색 중 오류: {e}")
-        
-        # arXiv 검색
-        if source.lower() in ["arxiv", "all"]:
-            try:
-                arxiv_results = self.search_arxiv(
-                    query=query,
-                    max_results=limit
-                )
+                elif search_source == "openalex":
+                    # OpenAlex 검색
+                    try:
+                        filter_options = {}
+                        if year_start and year_end:
+                            filter_options["from_publication_date"] = f"{year_start}-01-01"
+                            filter_options["to_publication_date"] = f"{year_end}-12-31"
+                        
+                        openalex_data = self.openalex_tool.search_works(
+                            query=optimized_query,
+                            limit=limit,
+                            filter_options=filter_options
+                        )
+                        
+                        # OpenAlex 응답 검증
+                        if not openalex_data:
+                            logger.warning(f"OpenAlex 검색 결과가 None 또는 빈 값: {query}")
+                            continue
+                        
+                        if isinstance(openalex_data, dict):
+                            # 딕셔너리인 경우, 필요한 데이터가 있는 키 확인
+                            if "results" in openalex_data:
+                                # "results" 키의 값을 리스트로 변환
+                                openalex_data = openalex_data["results"]
+                                logger.info(f"OpenAlex 검색 결과를 딕셔너리에서 리스트로 변환했습니다.")
+                            else:
+                                # 필요한 키가 없으면 빈 리스트로 설정
+                                logger.warning(f"OpenAlex 검색 결과 딕셔너리에 'results' 키가 없습니다.")
+                                openalex_data = []
+                        
+                        # 이제 openalex_data는 리스트 형태로 보장됨
+                        if not isinstance(openalex_data, list):
+                            logger.warning(f"OpenAlex 검색 결과가 리스트가 아님: {type(openalex_data)}")
+                            continue
+                        
+                        results["sources_used"].append("openalex")
+                        
+                        # 결과 처리
+                        for item in openalex_data:
+                            if not isinstance(item, dict):
+                                logger.warning(f"OpenAlex 검색 결과 항목이 딕셔너리가 아님: {type(item)}")
+                                continue
+                            
+                            # 저자 정보 추출
+                            authors = []
+                            authorships = item.get("authorships", [])
+                            if authorships and isinstance(authorships, list):
+                                for authorship in authorships:
+                                    if isinstance(authorship, dict) and "author" in authorship:
+                                        author = authorship.get("author", {})
+                                        display_name = author.get("display_name", "")
+                                        if display_name:
+                                            authors.append(display_name)
+                            
+                            # 결과 추가
+                            primary_location = item.get("primary_location") or {}
+                            source_info = {}
+                            if primary_location and isinstance(primary_location, dict):
+                                source_info = primary_location.get("source") or {}
+                                if not isinstance(source_info, dict):
+                                    source_info = {}
+                            
+                            results["results"].append({
+                                "source": "openalex",
+                                "title": item.get("title", ""),
+                                "link": item.get("doi", ""),
+                                "abstract": self._extract_abstract_from_openalex(item),
+                                "authors": authors,
+                                "year": item.get("publication_year", ""),
+                                "journal": source_info.get("display_name", ""),
+                                "raw_data": item  # 원본 데이터 보존
+                            })
+                    except Exception as e:
+                        logger.error(f"OpenAlex 검색 중 오류: {e}")
+                        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                        # 오류가 발생해도 계속 진행
                 
-                if arxiv_results:
-                    results["sources_used"].append("arxiv")
-                    
-                    for item in arxiv_results:
-                        results["results"].append({
-                            "source": "arxiv",
-                            "title": item.get("title", ""),
-                            "link": item.get("url", ""),
-                            "abstract": item.get("abstract", ""),
-                            "authors": item.get("authors", []),
-                            "year": item.get("published_date", "")[:4] if item.get("published_date") else "",
-                            "pdf_url": item.get("pdf_url", ""),
-                            "raw_data": item
-                        })
-            except Exception as e:
-                logger.error(f"arXiv 검색 중 오류: {e}")
-        
-        # Crossref 검색
-        if source.lower() in ["crossref", "all"]:
-            try:
-                crossref_results = self.search_crossref(
-                    query=query,
-                    max_results=limit
-                )
+                elif search_source == "google":
+                    # 구글 검색 (일반)
+                    try:
+                        google_results = self.google_search(
+                            query=optimized_query,
+                            num_results=limit
+                        )
+                        
+                        if google_results:
+                            results["sources_used"].append("google")
+                            
+                            for item in google_results:
+                                results["results"].append({
+                                    "source": "google",
+                                    "title": item.get("title", ""),
+                                    "link": item.get("link", ""),
+                                    "abstract": item.get("snippet", ""),
+                                    "raw_data": item
+                                })
+                    except Exception as e:
+                        logger.error(f"Google 검색 중 오류: {e}")
+                        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                        # 오류가 발생해도 계속 진행
                 
-                if crossref_results:
-                    results["sources_used"].append("crossref")
-                    
-                    for item in crossref_results:
-                        results["results"].append({
-                            "source": "crossref",
-                            "title": item.get("title", ""),
-                            "link": item.get("url", ""),
-                            "abstract": item.get("abstract", ""),
-                            "authors": item.get("authors", "").split(", ") if isinstance(item.get("authors"), str) else [],
-                            "year": item.get("published_date", "")[:4] if item.get("published_date") else "",
-                            "doi": item.get("doi", ""),
-                            "raw_data": item
-                        })
+                elif search_source == "arxiv":
+                    # arXiv 검색
+                    try:
+                        arxiv_results = self.search_arxiv(
+                            query=optimized_query,
+                            max_results=limit
+                        )
+                        
+                        if arxiv_results:
+                            results["sources_used"].append("arxiv")
+                            
+                            for item in arxiv_results:
+                                results["results"].append({
+                                    "source": "arxiv",
+                                    "title": item.get("title", ""),
+                                    "link": item.get("url", ""),
+                                    "abstract": item.get("abstract", ""),
+                                    "authors": item.get("authors", []),
+                                    "year": item.get("published_date", "")[:4] if item.get("published_date") else "",
+                                    "pdf_url": item.get("pdf_url", ""),
+                                    "raw_data": item
+                                })
+                    except Exception as e:
+                        logger.error(f"arXiv 검색 중 오류: {e}")
+                        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                        # 오류가 발생해도 계속 진행
+                
+                elif search_source == "crossref":
+                    # Crossref 검색
+                    try:
+                        crossref_results = self.search_crossref(
+                            query=optimized_query,
+                            max_results=limit
+                        )
+                        
+                        if crossref_results:
+                            results["sources_used"].append("crossref")
+                            
+                            for item in crossref_results:
+                                results["results"].append({
+                                    "source": "crossref",
+                                    "title": item.get("title", ""),
+                                    "link": item.get("url", "") or item.get("doi", ""),
+                                    "abstract": item.get("abstract", ""),
+                                    "authors": item.get("authors", []),
+                                    "year": item.get("published_date", "")[:4] if item.get("published_date") else "",
+                                    "pdf_url": item.get("pdf_url", ""),
+                                    "doi": item.get("doi", ""),
+                                    "raw_data": item
+                                })
+                    except Exception as e:
+                        logger.error(f"Crossref 검색 중 오류: {e}")
+                        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                        # 오류가 발생해도 계속 진행
+            
             except Exception as e:
-                logger.error(f"Crossref 검색 중 오류: {e}")
+                logger.error(f"{search_source} 검색 중 예상치 못한 오류: {e}")
+                logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                # 오류가 발생해도 계속 진행
         
         return results
     
     def _extract_abstract_from_openalex(self, item):
         """OpenAlex 결과에서 초록 추출"""
-        if "abstract_inverted_index" in item and item["abstract_inverted_index"]:
-            # OpenAlex는 inverted_index 형식으로 초록을 제공
-            # 간단한 변환만 수행
-            return "초록 있음 (추가 처리 필요)"
-        return ""
+        if not item:
+            logger.debug("_extract_abstract_from_openalex: item이 None 또는 빈 값")
+            return ""
+        
+        if not isinstance(item, dict):
+            logger.warning(f"_extract_abstract_from_openalex: item이 딕셔너리가 아님: {type(item)}")
+            return ""
+        
+        abstract_inverted_index = item.get("abstract_inverted_index")
+        if not abstract_inverted_index:
+            return ""
+        
+        if not isinstance(abstract_inverted_index, dict):
+            logger.warning(f"_extract_abstract_from_openalex: abstract_inverted_index가 딕셔너리가 아님: {type(abstract_inverted_index)}")
+            return ""
+        
+        try:
+            # inverted_index에서 단어와 위치 정보 추출
+            words = []
+            positions = {}
+            
+            # 각 단어의 위치 정보 수집
+            for word, indices in abstract_inverted_index.items():
+                if not isinstance(indices, list):
+                    continue
+                    
+                for position in indices:
+                    if not isinstance(position, int):
+                        continue
+                    positions[position] = word
+            
+            # 위치 순서대로 단어 배열
+            for i in sorted(positions.keys()):
+                words.append(positions[i])
+            
+            # 단어들을 공백으로 연결하여 텍스트 생성
+            abstract_text = " ".join(words)
+            return abstract_text
+        except Exception as e:
+            logger.error(f"초록 추출 중 오류: {str(e)}")
+            return "초록 추출 오류"
     
     def format_search_results(self, results: Dict[str, Any]) -> str:
         """
@@ -328,6 +443,13 @@ class AcademicSearchManager:
         """
         Google 검색 API를 사용하여 웹 검색 수행
         """
+        logger.info(f"google_search 메서드 호출: query={query}, num_results={num_results}, language={language}")
+        
+        # 호출 스택 추적을 위한 로깅
+        import traceback
+        call_stack = traceback.format_stack()
+        logger.debug(f"google_search 호출 스택:\n{''.join(call_stack)}")
+        
         if not self.google_api_key or not self.google_cse_id:
             logger.warning("Google API 키 또는 CSE ID가 설정되지 않았습니다.")
             return []
@@ -345,6 +467,7 @@ class AcademicSearchManager:
         }
         
         try:
+            logger.info(f"Google API 호출: {url}, 매개변수: {params}")
             response = requests.get(url, params=params)
             response.raise_for_status()
             
@@ -363,10 +486,12 @@ class AcademicSearchManager:
                     "source": "google"
                 })
             
+            logger.info(f"Google 검색 결과: {len(formatted_results)}개 항목 반환")
             return formatted_results
         
         except Exception as e:
             logger.error(f"Google 검색 오류: {str(e)}")
+            logger.error(f"오류 상세 정보: {traceback.format_exc()}")
             return []
     
     def search_arxiv(self, query: str, max_results: int = 10) -> List[Dict[str, Any]]:
@@ -409,12 +534,20 @@ class AcademicSearchManager:
     def search_crossref(self, query: str, max_results: int = 10, filter: str = None) -> List[Dict[str, Any]]:
         """
         Crossref API를 사용하여 학술 논문 검색
+        
+        Args:
+            query: 검색 쿼리
+            max_results: 반환할 최대 결과 수
+            filter: 추가 필터 옵션
+            
+        Returns:
+            검색 결과 목록
         """
         logger.info(f"Crossref 검색: '{query}', 최대 {max_results}개 결과")
         
         try:
-            # Crossref API 검색
-            url = "https://api.crossref.org/works"
+            # Crossref API v1 경로 사용
+            url = "https://api.crossref.org/v1/works"
             params = {
                 "query": query,
                 "rows": max_results,
@@ -436,7 +569,7 @@ class AcademicSearchManager:
             results = []
             if "message" in data and "items" in data["message"]:
                 for item in data["message"]["items"]:
-                    # 데이터 추출 로직
+                    # 데이터 추출 로직 - 기존과 동일
                     title = item.get("title", [""])[0] if "title" in item and len(item["title"]) > 0 else ""
                     
                     # 저자 정보 추출
@@ -477,7 +610,7 @@ class AcademicSearchManager:
                     
                     result = {
                         'title': title,
-                        'authors': ', '.join(authors),
+                        'authors': authors,
                         'abstract': abstract,
                         'url': url,
                         'doi': doi,
@@ -519,9 +652,10 @@ class AcademicSearchManager:
             
             if item.get("authors"):
                 if isinstance(item["authors"], list):
-                    markdown += f"**저자**: {', '.join(item['authors'])}\n\n"
+                    authors_text = ", ".join(item["authors"])
                 else:
-                    markdown += f"**저자**: {item['authors']}\n\n"
+                    authors_text = str(item["authors"])
+                markdown += f"**저자**: {authors_text}\n\n"
             
             if item.get("year"):
                 markdown += f"**출판 연도**: {item['year']}\n\n"
@@ -564,32 +698,176 @@ class AcademicSearchManager:
         return formatted_results
 
     # 기존 메서드 외에 호환성을 위한 메서드 추가
-    def google_search(self, query: str, num_results: int = 10, language: str = 'en') -> list:
+    def google_search_compat(self, query: str, num_results: int = 10, language: str = 'en') -> list:
         """
         구글 검색을 수행 (호환성 유지용)
         """
-        # 내부적으로 search 메서드 사용
-        results = self.search(
-            query=query,
-            source="google",
-            limit=num_results
-        )
+        logger.info(f"google_search_compat 메서드 호출: query={query}, num_results={num_results}, language={language}")
         
-        # 원래 반환 형식에 맞게 조정
-        return results.get("results", [])
+        # 호출 스택 추적을 위한 로깅
+        import traceback
+        call_stack = traceback.format_stack()
+        logger.debug(f"google_search_compat 호출 스택:\n{''.join(call_stack)}")
+        
+        try:
+            # 무한 재귀 방지: search 메서드 대신 직접 google_search 메서드 호출
+            results = self.google_search(
+                query=query,
+                num_results=num_results,
+                language=language
+            )
+            
+            # 원래 반환 형식에 맞게 조정
+            logger.info(f"google_search_compat 결과: {len(results)}개 항목 반환")
+            return results
+        except Exception as e:
+            logger.error(f"google_search_compat 오류: {str(e)}")
+            logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+            return []
 
     def search_with_fallback(self, query: str, limit: int = 10) -> Dict[str, Any]:
         """
-        SerpAPI 실패 시 대체 검색 방법을 사용
+        여러 검색 소스를 독립적으로 시도하고 결과를 합침
+        
+        Args:
+            query: 검색 쿼리
+            limit: 각 소스당 최대 결과 수
+            
+        Returns:
+            Dict: 통합된 검색 결과
         """
-        try:
-            # 먼저 모든 소스로 검색 시도
-            results = self.search(query=query, source="all", limit=limit)
-            if not results.get("results"):
-                # 결과가 없으면 Google Scholar 제외하고 다시 시도
-                logger.info("전체 검색 결과 없음, OpenAlex만 사용하여 재시도")
-                return self.search(query=query, source="openalex", limit=limit)
-            return results
-        except Exception as e:
-            logger.warning(f"통합 검색 중 오류: {e}, OpenAlex만 사용하여 재시도")
-            return self.search(query=query, source="openalex", limit=limit) 
+        logger.info(f"search_with_fallback 메서드 호출: query={query}, limit={limit}")
+        
+        # 결과 초기화
+        combined_results = {
+            "query": query,
+            "sources_used": [],
+            "results": []
+        }
+        
+        # 모든 소스 독립적으로 시도
+        sources_to_try = ["google", "openalex", "arxiv", "crossref"]
+        
+        for source in sources_to_try:
+            try:
+                logger.info(f"{source} 검색 시도 중...")
+                source_results = self.search(query=query, source=source, limit=limit)
+                
+                # 결과가 있으면 통합
+                if source_results.get("results"):
+                    logger.info(f"{source} 검색 결과: {len(source_results['results'])}개 항목")
+                    combined_results["sources_used"].extend(source_results["sources_used"])
+                    combined_results["results"].extend(source_results["results"])
+                else:
+                    logger.info(f"{source} 검색 결과 없음")
+            except Exception as e:
+                logger.error(f"{source} 검색 중 오류: {e}")
+                logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+                # 오류가 발생해도 다음 소스로 계속 진행
+        
+        # 중복 소스 제거
+        combined_results["sources_used"] = list(set(combined_results["sources_used"]))
+        
+        # 결과가 없으면 로그 남김
+        if not combined_results["results"]:
+            logger.warning(f"모든 소스에서 검색 결과 없음: {query}")
+        
+        return combined_results
+
+    def _optimize_query(self, query: str) -> str:
+        """
+        검색 쿼리를 최적화하여 API 호출에 적합하게 변환
+        
+        Args:
+            query: 원본 쿼리
+            
+        Returns:
+            최적화된 쿼리
+        """
+        # 쿼리가 너무 길면 핵심 키워드만 추출
+        if len(query) > 150:
+            logger.info(f"쿼리가 너무 깁니다 ({len(query)}자). 최적화를 수행합니다.")
+            
+            # 1. 불필요한 지시문이나 설명 제거
+            patterns_to_remove = [
+                r"When summarizing as an academic review,.*",
+                r"In particular, organize the discussion.*",
+                r"cite the references used.*",
+                r"include a bibliography.*",
+                r"This search query would.*",
+                r"Please provide.*",
+                r"I need information about.*",
+                r"I'm looking for.*",
+                r"Can you find.*",
+                r"I want to learn about.*"
+            ]
+            
+            optimized = query
+            for pattern in patterns_to_remove:
+                optimized = re.sub(pattern, "", optimized, flags=re.IGNORECASE)
+            
+            # 2. 쿼리에서 중요 키워드 추출 방법 개선
+            important_keywords = []
+            
+            # 2.1 명사구 추출 (2-3단어로 구성된 구문)
+            noun_phrases = re.findall(r'\b[A-Za-z][\w-]*(?:\s+[A-Za-z][\w-]*){1,2}\b', optimized)
+            
+            # 2.2 대문자로 시작하는 단어나 따옴표 안의 구문 (기존 방식)
+            capitalized_words = re.findall(r'\b[A-Z][a-zA-Z]*\b', optimized)
+            quoted_phrases = re.findall(r'"([^"]*)"', optimized)
+            
+            # 2.3 숫자가 포함된 중요 식별자 (버전 번호 등)
+            identifiers = re.findall(r'\b[A-Za-z]+[\d]+[\w]*\b', optimized)
+            
+            # 2.4 하이픈으로 연결된 복합어
+            compound_words = re.findall(r'\b[\w]+-[\w]+\b', optimized)
+            
+            # 모든 추출 결과 합치기
+            important_keywords.extend(noun_phrases)
+            important_keywords.extend(capitalized_words)
+            important_keywords.extend(quoted_phrases)
+            important_keywords.extend(identifiers)
+            important_keywords.extend(compound_words)
+            
+            # 3. 학술 검색에 중요한 특정 키워드 추가
+            academic_terms = [
+                "model", "models", "comparison", "analysis", "review", 
+                "topic modeling", "LLM", "LLMs", "large language model",
+                "algorithm", "method", "approach", "framework",
+                "research", "study", "experiment", "evaluation",
+                "dataset", "data", "results", "findings",
+                "neural", "network", "deep learning", "machine learning",
+                "artificial intelligence", "AI", "NLP", "natural language processing",
+                "transformer", "attention", "embedding", "fine-tuning",
+                "pre-training", "training", "inference", "performance",
+                "accuracy", "precision", "recall", "F1",
+                "benchmark", "state-of-the-art", "SOTA"
+            ]
+            
+            for term in academic_terms:
+                if term.lower() in optimized.lower() and term not in important_keywords:
+                    important_keywords.append(term)
+            
+            # 4. 중복 제거 및 정리
+            # 대소문자 구분 없이 중복 제거
+            unique_keywords = []
+            lowercase_set = set()
+            
+            for keyword in important_keywords:
+                if keyword.lower() not in lowercase_set and len(keyword) > 2:  # 너무 짧은 키워드 제외
+                    unique_keywords.append(keyword)
+                    lowercase_set.add(keyword.lower())
+            
+            # 5. 키워드 우선순위 지정 (더 긴 구문 우선)
+            unique_keywords.sort(key=len, reverse=True)
+            
+            # 6. 최종 쿼리 생성 (너무 많은 키워드는 제한)
+            if unique_keywords:
+                # 최대 10개 키워드로 제한
+                final_keywords = unique_keywords[:10]
+                final_query = " ".join(final_keywords)
+                logger.info(f"최적화된 쿼리: {final_query}")
+                return final_query
+        
+        # 쿼리가 충분히 짧으면 그대로 사용
+        return query 

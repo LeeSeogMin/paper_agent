@@ -30,10 +30,7 @@ def parse_arguments():
 
 def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
     """사용자 요구사항 로드"""
-    requirements = {
-        "constraints": [],  # 기본 제약사항 추가
-        "resources": [],    # 기본 리소스 추가
-    }
+    requirements = {}
     
     if file_path and os.path.exists(file_path):
         logger.info(f"파일에서 사용자 요구사항 로드: {file_path}")
@@ -50,18 +47,18 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
                 
             if line.endswith(':'):
                 # 이전 키-값 쌍 저장
-                if current_key:
+                if current_key and current_key not in ["constraints", "resources"]:  # 제한사항과 참고자료 키 제외
                     requirements[current_key] = '\n'.join(current_value).strip()
                 
                 # 새 키 설정
                 current_key = line[:-1].lower()
                 current_value = []
             else:
-                if current_key:
+                if current_key and current_key not in ["constraints", "resources"]:
                     current_value.append(line)
         
         # 마지막 키-값 쌍 저장
-        if current_key:
+        if current_key and current_key not in ["constraints", "resources"]:
             requirements[current_key] = '\n'.join(current_value).strip()
     else:
         logger.info("대화형으로 사용자 요구사항 입력 받기")
@@ -88,22 +85,6 @@ def load_user_requirements(file_path: str = None) -> Dict[str, Any]:
             requirements["paper_type"] = "theoretical_analysis"
         elif paper_type == "5":
             requirements["paper_type"] = input("논문 유형 직접 입력: ")
-        
-        # 제약사항 입력 추가
-        print("\n제약사항 (선택사항, 완료시 빈 입력):")
-        while True:
-            constraint = input("제약사항: ").strip()
-            if not constraint:
-                break
-            requirements["constraints"].append(constraint)
-            
-        # 참고자료 입력 추가
-        print("\n참고자료 (선택사항, 완료시 빈 입력):")
-        while True:
-            resource = input("참고자료 URL 또는 DOI: ").strip()
-            if not resource:
-                break
-            requirements["resources"].append(resource)
         
         requirements["additional_instructions"] = input("\n추가 지시사항 (없으면 Enter): ")
         

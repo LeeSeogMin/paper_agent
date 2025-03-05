@@ -10,9 +10,23 @@ def google_search(query: str, num_results: int = 10) -> list:
     """
     Google 검색 (academic_search.py로 기능 이전됨)
     """
-    logger.info("search_utils.google_search 함수는 AcademicSearchManager로 이전되었습니다.")
-    search_manager = AcademicSearchManager()
-    return search_manager.google_search(query, num_results)
+    logger.info(f"search_utils.py의 google_search 함수 호출: query={query}, num_results={num_results}")
+    
+    # 호출 스택 추적을 위한 로깅
+    import traceback
+    call_stack = traceback.format_stack()
+    logger.debug(f"search_utils.py google_search 호출 스택:\n{''.join(call_stack)}")
+    
+    try:
+        search_manager = AcademicSearchManager()
+        logger.info("AcademicSearchManager 인스턴스 생성 완료, google_search_compat 호출 예정")
+        results = search_manager.google_search_compat(query, num_results)
+        logger.info(f"google_search_compat 호출 완료, 결과 개수: {len(results)}")
+        return results
+    except Exception as e:
+        logger.error(f"search_utils.py Google 검색 중 오류: {str(e)}")
+        logger.error(f"오류 상세 정보: {traceback.format_exc()}")
+        return []
 
 def search_arxiv(query: str, max_results: int = 10) -> list:
     """
@@ -44,24 +58,38 @@ def academic_search(query: str, max_results: int = 10, sources: list = None, lan
     Returns:
         list: 검색 결과 목록
     """
-    logger.info("academic_search 함수는 AcademicSearchManager로 이전되었습니다.")
+    logger.info(f"academic_search 함수 호출: query={query}, max_results={max_results}, sources={sources}")
     
     # 지역 임포트로 순환 참조 방지
     from utils.academic_search import AcademicSearchManager
     search_manager = AcademicSearchManager()
     
-    # AcademicSearchManager.search 메서드는 다른 형식을 반환할 수 있으므로
-    # 원래 academic_search 함수와 호환되는 형식으로 변환
-    if sources is None:
-        sources = "all"
-    else:
-        # 문자열 목록을 academic_search.py가 기대하는 형식으로 변환
-        sources = ",".join(sources)
+    # 소스 결정
+    source = "all"
+    if sources:
+        if isinstance(sources, list) and len(sources) == 1:
+            source = sources[0]
+        else:
+            # 여러 소스가 지정된 경우 각각 검색하고 결과 합침
+            all_results = []
+            for src in sources:
+                try:
+                    src_results = search_manager.search(
+                        query=query,
+                        source=src,
+                        limit=max_results
+                    )
+                    if src_results.get("results"):
+                        all_results.extend(src_results["results"])
+                except Exception as e:
+                    logger.error(f"{src} 검색 중 오류: {str(e)}")
+            return all_results
     
     try:
-        # language 매개변수는 무시 (필요하다면 search 함수에 추가 가능)
-        results = search_manager.search_with_fallback(
+        # 직접 search 메서드 호출
+        results = search_manager.search(
             query=query,
+            source=source,
             limit=max_results
         )
         
@@ -69,37 +97,6 @@ def academic_search(query: str, max_results: int = 10, sources: list = None, lan
         return results.get("results", [])
     except Exception as e:
         logger.error(f"학술 검색 중 오류: {str(e)}")
-        return []
-
-# fallback_search 함수 수정
-def fallback_search(query: str, max_results: int = 5, language: str = None) -> list:
-    """
-    대체 검색 메서드 (academic_search.py로 기능 이전됨)
-    
-    Args:
-        query: 검색 쿼리
-        max_results: 최대 결과 수
-        language: 언어 설정 (기본값: None)
-        
-    Returns:
-        list: 검색 결과 목록
-    """
-    logger.info("fallback_search 함수는 AcademicSearchManager로 이전되었습니다.")
-    
-    # 지역 임포트로 순환 참조 방지
-    from utils.academic_search import AcademicSearchManager
-    
-    try:
-        # language 매개변수는 일단 무시 (필요하다면 추가 가능)
-        search_manager = AcademicSearchManager()
-        results = search_manager.search_with_fallback(
-            query=query,
-            limit=max_results
-        )
-        return results.get("results", [])
-    except Exception as e:
-        logger.error(f"대체 검색 중 오류: {str(e)}")
-        # 오류 발생 시 빈 결과 반환
         return []
 
 # 다른 함수들도 필요에 따라 래퍼 함수로 구현 
