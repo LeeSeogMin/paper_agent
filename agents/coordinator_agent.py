@@ -4,6 +4,8 @@
 """
 
 import os
+from utils.xai_client import XAIClient 
+import datetime
 import re
 import json
 from typing import Dict, Any, List, Optional, Tuple, Union, Callable
@@ -172,6 +174,18 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             last=self.llm
         )
         
+        # 논문 요약 프롬프트 템플릿 초기화
+        self.summary_prompt_template = PromptTemplate(
+            template="다음 논문의 내용을 간결하게 요약해주세요:\n\n제목: {title}\n\n내용:\n{content}\n\n요약:",
+            input_variables=["title", "content"]
+        )
+        
+        # 논문 요약 체인 초기화
+        self.summary_chain = LLMChain(
+            llm=self.llm,
+            prompt=self.summary_prompt_template
+        )
+        
         logger.info("Coordinator agent prompts initialized with paper requirements")
 
     def _init_agents(self):
@@ -227,6 +241,10 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
     def start_workflow(
         self, 
         topic: str,
+        paper_type: Optional[str] = None,
+        paper_format: Optional[str] = "standard",
+        additional_instructions: Optional[str] = None,
+        uploaded_file: Optional[str] = None,
         template_name: Optional[str] = None,
         style_guide: Optional[str] = None,
         citation_style: Optional[str] = None,
@@ -238,6 +256,10 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         
         Args:
             topic: 논문 주제
+            paper_type: 논문 유형 (Literature Review, Research Paper 등)
+            paper_format: 논문 형식 (standard, literature_review 등)
+            additional_instructions: 추가 지시사항
+            uploaded_file: 업로드된 파일 경로
             template_name: 논문 템플릿 이름
             style_guide: 스타일 가이드 이름
             citation_style: 인용 스타일
@@ -247,7 +269,11 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         Returns:
             PaperWorkflowState: 워크플로우 상태
         """
-        logger.info(f"Starting workflow for question: {topic}")
+        logger.info(f"Starting workflow for topic: {topic}, paper_format: {paper_format}")
+        
+        # 논문 유형에 따라 템플릿 이름 설정
+        if paper_type and not template_name:
+            template_name = paper_type.lower().replace(' ', '_')
         
         # 워크플로우 설정 - PaperWritingGraph.run_workflow에서 지원하는 매개변수만 포함
         workflow_config = {
@@ -256,7 +282,9 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             "style_guide": style_guide or "Standard Academic",
             "citation_style": citation_style or "APA",
             "output_format": output_format,
-            "verbose": verbose
+            "paper_format": paper_format,
+            "additional_instructions": additional_instructions,
+            "uploaded_file": uploaded_file
         }
         
         # Run the workflow
@@ -348,6 +376,7 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             content_preview = section.content[:1000] + "..." if len(section.content) > 1000 else section.content
             paper_content += f"{content_preview}\n\n"
         try:
+            # LLMChain을 사용하여 요약 생성
             result = self.summary_chain.invoke({"title": paper.title, "content": paper_content})
             summary = result["text"]
             full_summary = f"## 논문 요약: {paper.title}\n\n{summary}\n\n"

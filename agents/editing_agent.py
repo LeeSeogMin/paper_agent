@@ -33,7 +33,7 @@ class EditingTask(BaseModel):
     citation_style: Optional[str] = Field(default="APA", description="Citation style")
     focus_areas: Optional[List[str]] = Field(default_factory=list, description="Focus areas for editing")
     output_format: Optional[str] = Field(default="markdown", description="Output format")
-    paper_format: Optional[str] = Field(default="standard", description="Paper format (standard, literature_review_only, custom)")
+    paper_format: Optional[str] = Field(default="standard", description="Paper format (standard, literature_review, custom)")
     
     @validator('paper_id')
     def paper_id_must_not_be_empty(cls, v):
@@ -192,7 +192,7 @@ class EditorAgent(BaseAgent[Paper]):
         Returns:
             Edited paper
         """
-        logger.info(f"Editing paper: {paper.metadata.title} with style guide: {style_guide.name}")
+        logger.info(f"Editing paper: {paper.metadata.title} with style guide: {style_guide.name}, format: {paper_format}")
         
         # Prepare the editing prompt with style guide and paper content
         editing_input = {
@@ -200,6 +200,7 @@ class EditorAgent(BaseAgent[Paper]):
             "style_guide": style_guide.name,
             "style_rules": "\n".join([f"- {rule}" for rule in style_guide.rules]),
             "paper_format": paper_format,
+            "editing_type": "Full paper editing",
             "language": "English"  # Explicitly specify English
         }
         

@@ -49,21 +49,30 @@ def research_node(state: PaperWorkflowState, research_agent=None) -> PaperWorkfl
         # 상태 업데이트
         state.research_summary = research_summary
         
-        # research_summary는 딕셔너리이므로 키를 사용하여 접근
-        if "materials" in research_summary:
-            state.research_materials = research_summary["materials"]
-        else:
-            logger.warning("연구 결과에 'materials' 키가 없습니다.")
+        # 검색 상태에 따라 처리
+        if isinstance(research_summary, dict) and research_summary.get("status") == "error":
+            # 에러 처리
+            error_message = research_summary.get("message", "연구 과정에서 오류가 발생했습니다.")
+            logger.warning(f"연구 자료 수집 실패: {error_message}")
             state.research_materials = []
-            
-        state.status = "research_completed"
-        
-        logger.info(f"연구 노드 완료: {len(state.research_materials)}개 자료 수집됨")
+            state.status = "research_completed"  # 오류 발생해도 진행
+        elif isinstance(research_summary, dict) and "materials" in research_summary:
+            # 성공 케이스
+            state.research_materials = research_summary["materials"]
+            state.status = "research_completed"
+            logger.info(f"연구 노드 완료: {len(state.research_materials)}개 자료 수집됨")
+        else:
+            # 예상치 못한 형식
+            logger.warning(f"예상하지 못한 연구 결과 형식: {type(research_summary)}")
+            state.research_materials = []  # 빈 목록으로 초기화
+            state.status = "research_completed"  # 일단 계속 진행
+            logger.info("연구 노드 완료: 0개 자료 수집됨")
     
     except Exception as e:
         logger.error(f"연구 노드 실행 중 오류 발생: {str(e)}", exc_info=True)
         state.error = f"연구 단계 오류: {str(e)}"
         state.status = "research_failed"
+        state.research_materials = []  # 예외 발생 시 빈 목록으로 초기화
     
     return state
 
@@ -242,13 +251,11 @@ def decide_next_step(state: PaperWorkflowState) -> str:
         return "research"
     
     elif status == "research_completed":
-        # 연구가 완료되면 작성 단계로 이동
-        if state.research_materials and len(state.research_materials) > 0:
-            return "writing"
+        if state.research_materials:
+            logger.info(f"연구 자료 {len(state.research_materials)}개 사용")
         else:
-            # 연구 자료가 없으면 완료 처리
-            state.error = "연구 자료를 찾을 수 없습니다."
-            return "END"
+            logger.warning("연구 자료 없이 기본 템플릿으로 진행")
+        return "writing"  # 무조건 작성 단계로 진행
     
     elif status == "writing_completed":
         # 작성이 완료되면 편집 단계로 이동
@@ -371,10 +378,13 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
         style_guide: Optional[str] = None,
         citation_style: Optional[str] = None,
         output_format: Optional[str] = None,
+        paper_format: str = "standard",
+        additional_instructions: Optional[str] = None,
+        uploaded_file: Optional[str] = None,
         verbose: bool = False
     ) -> PaperWorkflowState:
         """
-        초기 상태 생성
+        초기 워크플로우 상태 생성
         
         Args:
             topic: 논문 주제
@@ -382,17 +392,33 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
             style_guide: 스타일 가이드 이름
             citation_style: 인용 스타일
             output_format: 출력 형식
+            paper_format: 논문 형식 (standard, literature_review 등)
+            additional_instructions: 추가 지시사항
+            uploaded_file: 업로드된 파일 경로
             verbose: 상세 로깅 여부
             
         Returns:
             PaperWorkflowState: 초기 워크플로우 상태
         """
+        # 기본값 설정
+        template_name = template_name or "academic"
+        style_guide = style_guide or "Standard Academic"
+        citation_style = citation_style or "APA"
+        output_format = output_format or "markdown"
+        
+        # 에이전트 초기화
+        self.initialize_agents(verbose=verbose)
+        
+        # 초기 상태 생성
         return PaperWorkflowState(
             topic=topic,
             template_name=template_name,
             style_guide=style_guide,
             citation_style=citation_style,
             output_format=output_format,
+            paper_format=paper_format,
+            additional_instructions=additional_instructions,
+            uploaded_file=uploaded_file,
             verbose=verbose,
             status="initialized"
         )
@@ -404,6 +430,9 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
         style_guide: Optional[str] = None,
         citation_style: Optional[str] = None,
         output_format: str = "markdown",
+        paper_format: str = "standard",
+        additional_instructions: Optional[str] = None,
+        uploaded_file: Optional[str] = None,
         verbose: bool = False,
         config: Optional[RunnableConfig] = None,
         save_state_path: Optional[str] = None
@@ -417,6 +446,9 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
             style_guide: 스타일 가이드 이름
             citation_style: 인용 스타일
             output_format: 출력 형식
+            paper_format: 논문 형식 (standard, literature_review 등)
+            additional_instructions: 추가 지시사항
+            uploaded_file: 업로드된 파일 경로
             verbose: 상세 로깅 여부
             config: 실행 설정
             save_state_path: 상태 저장 경로 (None이면 저장하지 않음)
@@ -437,6 +469,9 @@ class PaperWritingGraph(BaseWorkflowGraph[PaperWorkflowState]):
             style_guide=style_guide,
             citation_style=citation_style,
             output_format=output_format,
+            paper_format=paper_format,
+            additional_instructions=additional_instructions,
+            uploaded_file=uploaded_file,
             verbose=verbose
         )
         

@@ -18,7 +18,7 @@ from langchain_openai import OpenAI
 from config.settings import OUTPUT_DIR, MAX_SECTION_TOKENS
 from config.templates import get_template
 from utils.logger import logger
-from models.paper import Paper, PaperSection, Reference
+from models.paper import Paper, PaperSection, Reference, PaperMetadata
 from models.research import ResearchMaterial
 from prompts.paper_prompts import (
     PAPER_OUTLINE_PROMPT,
@@ -33,6 +33,9 @@ from prompts.paper_prompts import (
 )
 from agents.base import BaseAgent
 from utils.rag_integration import RAGEnhancer
+
+# XAI API 클라이언트 임포트로 변경
+from utils.xai_client import XAIClient, XAITextGenerator  # Import XAITextGenerator
 
 
 class OutlineTask(BaseModel):
@@ -95,7 +98,10 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         
         self.rag_enhancer = RAGEnhancer()
         
-        logger.info(f"{self.name} initialized with flexible task support")
+        # XAI 클라이언트 초기화
+        self.xai_client = XAIClient(api_key=os.environ.get("XAI_API_KEY"))
+        
+        logger.info(f"{self.name} initialized with XAI integration")
 
     def _init_prompts(self) -> None:
         """Initialize prompt templates for paper writing tasks"""
@@ -127,20 +133,26 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         self.section_parser = PydanticOutputParser(pydantic_object=SectionTask)
         self.edit_parser = PydanticOutputParser(pydantic_object=EditTask)
         
+        # 싱글톤 XAI 클라이언트 인스턴스 가져오기
+        xai_client = XAIClient.get_instance()
+        
+        # XAITextGenerator 인스턴스 생성
+        xai_text_generator = XAITextGenerator(xai_client)
+        
         # Initialize chains using RunnableSequence
         self.outline_chain = RunnableSequence(
             first=self.outline_prompt_template,
-            last=self.llm
+            last=xai_text_generator  # XAITextGenerator 인스턴스 사용
         )
         
         self.section_chain = RunnableSequence(
             first=self.section_prompt_template,
-            last=self.llm
+            last=xai_text_generator  # XAITextGenerator 인스턴스 사용
         )
         
         self.editing_chain = RunnableSequence(
             first=self.editing_prompt_template,
-            last=self.llm
+            last=xai_text_generator  # XAITextGenerator 인스턴스 사용
         )
         
         # Initialize task chains
@@ -148,7 +160,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         for task_type, template in self.task_templates.items():
             self.task_chains[task_type] = RunnableSequence(
                 first=template,
-                last=self.llm
+                last=xai_text_generator  # XAITextGenerator 인스턴스 사용
             )
         
         logger.info("Writing agent prompts initialized with English language and citation requirements")
@@ -319,6 +331,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # Create PaperSection object
             paper_section = PaperSection(
+                section_id=section_title,
                 title=section_title,
                 content=section_task.section_content,
                 citations=citations
@@ -332,6 +345,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # Return default section on error
             return PaperSection(
+                section_id="error",
                 title=section_title,
                 content=f"This section covers '{section_title}'. An error occurred during writing.",
                 citations=[]
@@ -440,6 +454,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # Create edited section
             edited_section = PaperSection(
+                section_id=section.section_id,
                 title=edited_title,
                 content=edited_content,
                 citations=section.citations
@@ -490,6 +505,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
                         break
                 
                 sections.append(PaperSection(
+                    section_id=section_title,
                     title=section_title,
                     content=section_content,
                     citations=citations
@@ -497,8 +513,12 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # Create edited paper object
             edited_paper = Paper(
-                title=title,
-                topic=original_paper.topic,
+                metadata=PaperMetadata(
+                    title=title,
+                    authors=original_paper.metadata.authors,
+                    abstract=original_paper.metadata.abstract,
+                    keywords=original_paper.metadata.keywords
+                ),
                 sections=sections,
                 references=original_paper.references,
                 template_name=original_paper.template_name,
@@ -607,8 +627,12 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # 3. Create paper object
             paper = Paper(
-                title=outline["title"],
-                topic=topic,
+                metadata=PaperMetadata(
+                    title=outline["title"],
+                    authors=outline.get("authors", ["AI Writer"]),
+                    abstract=outline.get("abstract", f"This paper explores {topic}."),
+                    keywords=outline.get("keywords", [topic])
+                ),
                 sections=sections,
                 references=outline["references"],
                 template_name=template_name,
@@ -638,10 +662,15 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             
             # Return empty paper on error
             empty_paper = Paper(
-                title=f"Research on {topic}",
-                topic=topic,
+                metadata=PaperMetadata(
+                    title=f"Research on {topic}",
+                    authors=["AI Writer"],
+                    abstract=f"An error occurred while generating content about {topic}.",
+                    keywords=[topic]
+                ),
                 sections=[
                     PaperSection(
+                        section_id="error",
                         title="Error",
                         content="An error occurred during paper generation.",
                         citations=[]
@@ -771,8 +800,8 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         {self._get_citation_guidelines()}
         """
         
-        response = self.llm.invoke(prompt)
-        review_content = response.content
+        response = self.xai_client.generate_text(prompt)
+        review_content = response
         
         # Return response in appropriate format
         return {
@@ -821,8 +850,8 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         Please use appropriate citations throughout the conclusion to support your statements.
         """
         
-        response = self.llm.invoke(prompt)
-        return response.content
+        response = self.xai_client.generate_text(prompt)
+        return response
 
     def write_methodology_section(self, topic: str, context: Dict[str, Any]) -> Dict[str, Any]:
         """방법론 섹션 작성"""
@@ -848,11 +877,11 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         Write in an academic and objective style.
         """
         
-        response = self.llm.invoke(prompt)
+        response = self.xai_client.generate_text(prompt)
         
         return {
             "task_type": "methodology",
-            "content": response.content,
+            "content": response,
             "status": "completed"
         }
 
@@ -876,11 +905,11 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         Write in an academic and objective style.
         """
         
-        response = self.llm.invoke(prompt)
+        response = self.xai_client.generate_text(prompt)
         
         return {
             "task_type": "results_analysis",
-            "content": response.content,
+            "content": response,
             "status": "completed"
         }
 
@@ -903,11 +932,11 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         Write in an academic and objective style.
         """
         
-        response = self.llm.invoke(prompt)
+        response = self.xai_client.generate_text(prompt)
         
         return {
             "task_type": "abstract",
-            "content": response.content,
+            "content": response,
             "status": "completed"
         }
 
@@ -937,11 +966,11 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             ])
             enhanced_prompt += f"\n\nReference Materials:\n{material_text}"
         
-        response = self.llm.invoke(enhanced_prompt)
+        response = self.xai_client.generate_text(enhanced_prompt)
         
         return {
             "task_type": "custom",
-            "content": response.content,
+            "content": response,
             "status": "completed"
         }
 
@@ -1164,7 +1193,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         )
         
         # Use the LLM to generate the section content
-        response = self.llm.invoke(rag_prompt)
+        response = self.xai_client.generate_text(rag_prompt)
         
         # Extract the content and citations
         content = response
@@ -1230,12 +1259,12 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         Output the revised content only, without explaining your changes.
         """
         
-        response = self.llm.invoke(prompt)
+        response = self.xai_client.generate_text(prompt)
         
         return {
             "task_type": "revision",
             "original_task_type": original_task_type,
-            "content": response.content,
+            "content": response,
             "status": "completed"
         }
 
@@ -1268,3 +1297,63 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             if key not in ["sections", "citation_style", "formatting"]:
                 setattr(self, f"_{key}", value)
                 logger.info(f"추가 설정 업데이트: {key}")
+
+    def generate_text_safely(self, prompt: str) -> str:
+        """
+        안전하게 텍스트를 생성합니다. 오류 처리 포함.
+        
+        Args:
+            prompt (str): 프롬프트 텍스트
+            
+        Returns:
+            str: 생성된 텍스트
+        """
+        try:
+            response = self._generate_content(prompt)
+            
+            # StringPromptValue 객체 처리
+            if hasattr(response, 'content'):
+                return response.content
+            elif isinstance(response, dict) and 'content' in response:
+                return response['content']
+            elif isinstance(response, str):
+                return response
+            else:
+                logger.warning(f"예상치 못한 응답 형식: {type(response)}")
+                return str(response)
+        except Exception as e:
+            logger.error(f"텍스트 생성 중 오류 발생: {str(e)}")
+            return f"텍스트 생성 중 오류가 발생했습니다. 다시 시도해 주세요."
+
+    def _generate_content(self, prompt, context=None):
+        """내부 콘텐츠 생성 메서드"""
+        try:
+            # XAI 클라이언트 사용
+            if hasattr(self, 'xai_client') and self.xai_client:
+                response = self.xai_client.generate_text(prompt)
+                return response
+            
+            # LLM 직접 호출 (fallback)
+            if hasattr(self, 'llm') and self.llm:
+                if isinstance(prompt, str):
+                    messages = [
+                        SystemMessage(content=self.system_prompt),
+                        HumanMessage(content=prompt)
+                    ]
+                    response = self.llm.invoke(messages)
+                    
+                    # StringPromptValue 객체 처리
+                    if hasattr(response, 'content'):
+                        return response.content
+                    return response
+                else:
+                    response = self.llm.invoke(prompt)
+                    if hasattr(response, 'content'):
+                        return response.content
+                    return response
+            
+            logger.error("텍스트 생성 엔진이 설정되지 않았습니다.")
+            return "텍스트 생성 엔진 오류"
+        except Exception as e:
+            logger.error(f"콘텐츠 생성 중 오류: {str(e)}")
+            raise

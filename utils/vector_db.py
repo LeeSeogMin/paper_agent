@@ -115,42 +115,55 @@ def search_vector_db(
     filter_metadata: Optional[Dict[str, Any]] = None
 ) -> List[Document]:
     """
-    Search a vector database for documents similar to a query.
+    벡터 데이터베이스에서 문서를 검색합니다.
     
     Args:
-        db_name: Name of the database to search
-        query: Search query
-        k: Number of results to return
-        filter_metadata: Optional filter to apply to the metadata
+        db_name: 검색할 데이터베이스 이름
+        query: 검색 쿼리
+        k: 반환할 최대 결과 수
+        filter_metadata: 메타데이터 필터링 조건
         
     Returns:
-        List[Document]: List of retrieved documents
+        List[Document]: 검색된 문서 목록
     """
-    logger.info(f"Searching vector database '{db_name}' with query: {query}")
+    logger.info(f"벡터 DB '{db_name}' 검색 중: {query}")
     
-    # Initialize embeddings
-    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
-    
-    # Load vector store
-    db_path = os.path.join(VECTOR_DB_PATH, db_name)
-    if not os.path.exists(db_path):
-        logger.error(f"Vector database '{db_name}' does not exist")
+    try:
+        # 벡터 DB 디렉토리 확인
+        db_path = os.path.join(VECTOR_DB_PATH, db_name)
+        if not os.path.exists(db_path):
+            logger.error(f"벡터 DB가 존재하지 않음: {db_path}")
+            return []
+            
+        # 임베딩 초기화
+        embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
+        
+        # Chroma DB 로드
+        vectorstore = Chroma(
+            persist_directory=db_path,
+            embedding_function=embeddings,
+            collection_name=db_name
+        )
+        
+        # 검색 수행
+        if filter_metadata:
+            results = vectorstore.similarity_search(
+                query,
+                k=k,
+                filter=filter_metadata
+            )
+        else:
+            results = vectorstore.similarity_search(
+                query,
+                k=k
+            )
+        
+        logger.info(f"검색 완료: {len(results)}개 결과")
+        return results
+        
+    except Exception as e:
+        logger.error(f"벡터 DB 검색 중 오류 발생: {str(e)}")
         return []
-    
-    vector_store = FAISS.load_local(
-        db_path, 
-        embeddings, 
-        allow_dangerous_deserialization=True
-    )
-    
-    # Search
-    if filter_metadata:
-        results = vector_store.similarity_search(query, k=k, filter=filter_metadata)
-    else:
-        results = vector_store.similarity_search(query, k=k)
-    
-    logger.info(f"Found {len(results)} results for query: {query}")
-    return results
 
 
 def delete_vector_db(db_name: str) -> bool:
@@ -194,7 +207,15 @@ def list_vector_dbs() -> List[str]:
         logger.warning("Vector database directory does not exist")
         return []
     
+    # 디렉토리 목록 확인
     dbs = [d.name for d in db_dir.iterdir() if d.is_dir()]
+    
+    # research_papers 디렉토리가 있는지 확인
+    research_papers_dir = db_dir / "research_papers"
+    if research_papers_dir.exists() and research_papers_dir.is_dir():
+        if "research_papers" not in dbs:
+            dbs.append("research_papers")
+    
     logger.info(f"Found {len(dbs)} vector databases")
     return dbs
 
@@ -280,18 +301,42 @@ def process_and_vectorize_paper(pdf_path: str) -> Dict[str, Any]:
         
         # 벡터 DB 저장 경로 생성
         os.makedirs(VECTOR_DB_PATH, exist_ok=True)
-        collection_name = f"paper_{paper_id}"
+        collection_name = "research_papers"  # 모든 논문을 하나의 컬렉션에 저장
+        
+        # research_papers 디렉토리 명시적으로 생성
+        research_papers_dir = os.path.join(VECTOR_DB_PATH, "research_papers")
+        os.makedirs(research_papers_dir, exist_ok=True)
         
         # 임베딩 및 벡터 DB 저장
         embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
-        metadata = [{"source": pdf_path, "paper_id": paper_id, "chunk": i} for i in range(len(chunks))]
-        vectorstore = Chroma.from_texts(
-            texts=chunks,
-            embedding=embeddings,
-            metadatas=metadata,
-            persist_directory=VECTOR_DB_PATH,
-            collection_name=collection_name
-        )
+        metadata = [{"source": pdf_path, "paper_id": paper_id, "chunk": i, "title": title} for i in range(len(chunks))]
+        
+        # 기존 컬렉션이 있는지 확인
+        try:
+            # 컬렉션 이름을 명시적으로 지정
+            persist_directory = research_papers_dir
+            
+            vectorstore = Chroma(
+                persist_directory=persist_directory,
+                embedding_function=embeddings,
+                collection_name=collection_name
+            )
+            # 기존 컬렉션에 새 문서 추가
+            vectorstore.add_texts(
+                texts=chunks,
+                metadatas=metadata
+            )
+        except Exception as e:
+            # 컬렉션이 없으면 새로 생성
+            logger.info(f"Creating new vector collection: {collection_name}")
+            vectorstore = Chroma.from_texts(
+                texts=chunks,
+                embedding=embeddings,
+                metadatas=metadata,
+                persist_directory=persist_directory,
+                collection_name=collection_name
+            )
+        
         vectorstore.persist()
         
         # 논문 메타데이터 반환

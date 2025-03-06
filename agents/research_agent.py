@@ -10,7 +10,8 @@ import re
 import json
 import time
 import uuid
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Union
+from datetime import datetime
 
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.schema import Document
@@ -21,6 +22,7 @@ from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage, SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.chains.summarize import load_summarize_chain
+from langchain.chains import LLMChain
 
 from utils.logger import logger
 from utils.vector_db import create_vector_db, search_vector_db, process_and_vectorize_paper
@@ -38,6 +40,9 @@ from prompts.research_prompts import (
     SOURCE_EVALUATION_PROMPT,
     SEARCH_RESULTS_ANALYSIS_PROMPT
 )
+
+# XAI 클라이언트 import 추가 (기존 import 섹션 아래)
+from utils.xai_client import XAIClient  # utils 폴더에서 가져오기
 
 
 class ResearchAgent(BaseAgent):
@@ -309,14 +314,41 @@ class ResearchAgent(BaseAgent):
                 from utils.pdf_processor import process_local_pdfs
                 local_papers = process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db")
                 
-                # 로컬 PDF 관련성 평가 및 자료 생성
+                # 로컬 PDF는 관련성 점수와 상관없이 모두 포함
                 for paper in local_papers:
                     relevance_score, explanation = self.evaluate_source(paper, topic)
+                    material = self._create_research_material(paper, "local", relevance_score, explanation)
+                    if material:
+                        all_materials.append(material)
+                
+                # 로컬 PDF 처리 후 papers.json 파일 저장
+                if local_papers and len(local_papers) > 0:
+                    # 모든 자료를 papers.json에 저장
+                    materials_to_save = []
+                    for paper in local_papers:
+                        # 연구 자료 생성 (관련성 점수는 기본값 사용)
+                        material = {
+                            "id": paper.get("id", f"local_{uuid.uuid4().hex[:8]}"),
+                            "title": paper.get("title", ""),
+                            "authors": paper.get("authors", []),
+                            "year": paper.get("year", ""),
+                            "abstract": paper.get("abstract", ""),
+                            "content": "",
+                            "url": "",
+                            "pdf_url": "",
+                            "local_path": paper.get("pdf_path", ""),
+                            "relevance_score": 1.0,  # 로컬 파일은 모두 최대 관련성 점수 부여
+                            "evaluation": "로컬 파일",
+                            "query_id": "local",
+                            "citation_count": 0,
+                            "venue": "",
+                            "source": "local"
+                        }
+                        
+                        materials_to_save.append(material)
                     
-                    if relevance_score >= 0.6:  # 관련성 최소 기준
-                        material = self._create_research_material(paper, "local", relevance_score, explanation)
-                        if material:
-                            all_materials.append(material)
+                    self.save_research_materials_to_json(materials_to_save, file_path='data/papers.json')
+                    logger.info(f"{len(local_papers)}개의 로컬 PDF 파일 정보를 data/papers.json에 저장했습니다.")
                 
                 # 2. 로컬 데이터베이스 검색
                 local_results = self.search_local_papers(topic, max_results=results_per_source)
@@ -325,12 +357,12 @@ class ResearchAgent(BaseAgent):
                 for result in local_results:
                     relevance_score, explanation = self.evaluate_source(result, topic)
                     
-                    if relevance_score >= 0.6:
-                        material = self._create_research_material(result, "local_db", relevance_score, explanation)
-                        if material:
-                            all_materials.append(material)
+                    # 모든 로컬 파일 포함 (관련성 점수와 상관없이)
+                    material = self._create_research_material(result, "local_db", relevance_score, explanation)
+                    if material:
+                        all_materials.append(material)
                 
-                # pdfs 폴더의 PDF 파일도 처리
+                # pdfs 폴더의 PDF 파일도 모두 포함
                 if os.path.exists(pdfs_dir):
                     from utils.pdf_processor import PDFProcessor
                     pdf_processor = PDFProcessor(use_llm=True)
@@ -353,12 +385,11 @@ class ResearchAgent(BaseAgent):
                                         "pdf_path": pdf_path
                                     }
                                     
+                                    # pdfs 폴더의 파일도 관련성 점수와 상관없이 포함
                                     relevance_score, explanation = self.evaluate_source(paper_info, topic)
-                                    
-                                    if relevance_score >= 0.6:
-                                        material = self._create_research_material(paper_info, "pdfs", relevance_score, explanation)
-                                        if material:
-                                            all_materials.append(material)
+                                    material = self._create_research_material(paper_info, "pdfs", relevance_score, explanation)
+                                    if material:
+                                        all_materials.append(material)
                             except Exception as e:
                                 logger.error(f"pdfs 폴더 PDF 처리 중 오류: {pdf_file} - {str(e)}")
             
@@ -404,7 +435,7 @@ class ResearchAgent(BaseAgent):
                     
                     # 관련성 기준 이상인 결과만 최종 자료로 변환
                     for result in top_results:
-                        if result.get('relevance_score', 0) >= 0.6:
+                        if result.get('relevance_score', 0) >= 0.3:  # 관련성 최소 기준을 0.3으로 낮춤
                             material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
                             if material:
                                 all_materials.append(material)
@@ -510,31 +541,24 @@ class ResearchAgent(BaseAgent):
             title (str): Material title
             
         Returns:
-            str: Summary text
+            str: Generated summary
         """
-        logger.info(f"Summarizing content for: {title}")
-        
         try:
-            # Handle empty or very short content
-            if not content or len(content) < 100:
-                return "Insufficient content available for summarization."
-            
-            # Split text into chunks for processing
+            # Split content into chunks
             text_chunks = self.text_splitter.split_text(content)
             
-            # Join chunks with newlines for processing
-            combined_text = "\n\n".join(text_chunks)
-            combined_text = combined_text[:8000] + "..." if len(combined_text) > 8000 else combined_text
+            # Convert text chunks to Document objects for the summarize chain
+            documents = [Document(page_content=chunk) for chunk in text_chunks]
             
             # Generate summary
-            result = self.summary_chain.invoke({"content": combined_text})
-            summary = result["text"]
+            result = self.summary_chain.invoke({"input_documents": documents})
+            summary = result["output_text"] if "output_text" in result else result.get("text", "")
             
             return summary
             
         except Exception as e:
             logger.error(f"Error summarizing content: {str(e)}", exc_info=True)
-            return "Error generating summary due to technical issues."
+            return f"Failed to summarize content for '{title}': {str(e)}"
     
     def enrich_research_materials(self, materials: List[ResearchMaterial]) -> List[ResearchMaterial]:
         """
@@ -713,12 +737,119 @@ class ResearchAgent(BaseAgent):
                 "recommendations": []
             }
     
-    def create_paper_outline(
-        self, 
-        topic: str,
-        analysis: Dict[str, Any],
-        materials: List[ResearchMaterial]
-    ) -> Dict[str, Any]:
+    def search_local_papers(self, query, data_path="data/papers.json", max_results=10):
+        """
+        로컬에 저장된 논문 데이터에서 검색
+        
+        Args:
+            query: 검색어
+            data_path: 논문 데이터 파일 경로
+            max_results: 최대 결과 수
+            
+        Returns:
+            List[Dict]: 검색 결과 목록
+        """
+        logger.info(f"로컬 데이터에서 검색: {query}")
+        
+        try:
+            import os
+            import json
+            
+            # 파일이 없으면 빈 결과 반환 (파일 생성 시도 안 함)
+            if not os.path.exists(data_path):
+                logger.info(f"로컬 데이터 파일이 없음: {data_path}, 빈 결과 반환")
+                return []
+            
+            # 파일 크기 확인
+            file_size = os.path.getsize(data_path)
+            if file_size == 0:
+                logger.warning(f"로컬 데이터 파일이 비어 있음: {data_path}")
+                return []
+            
+            try:
+                with open(data_path, 'r', encoding='utf-8') as f:
+                    papers = json.load(f)
+                
+                # 빈 배열인 경우 처리
+                if not papers or len(papers) == 0:
+                    logger.warning(f"로컬 데이터 파일에 논문 정보가 없음: {data_path}")
+                    return []
+                
+                logger.info(f"로컬 데이터베이스에서 {len(papers)} 논문 로드됨")
+                
+                # 모든 논문을 결과로 반환 (필터링 없이)
+                for paper in papers:
+                    paper['relevance'] = 1.0  # 모든 논문에 최대 관련성 점수 부여
+                
+                logger.info(f"로컬 데이터에서 {len(papers)}개 논문 찾음")
+                return papers
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"로컬 데이터 파일 JSON 파싱 오류: {str(e)}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"로컬 논문 검색 중 오류: {str(e)}", exc_info=True)
+            return []
+    
+    def _extract_semantic_keywords(self, query):
+        """
+        LLM을 사용하여 검색 쿼리에서 의미 기반 키워드 추출
+        
+        Args:
+            query: 검색 쿼리
+            
+        Returns:
+            Dict[str, float]: 키워드와 가중치 딕셔너리
+        """
+        try:
+            # LLM에게 키워드 추출 요청
+            messages = [
+                SystemMessage(content="You are a research assistant tasked with extracting and expanding search keywords."),
+                HumanMessage(content=f"""
+                    Extract and expand the most important keywords from this search query for academic paper search.
+                    The search query is: "{query}"
+                    
+                    Consider synonyms, related concepts, and specific terminology in the field.
+                    Return a JSON dictionary with keywords as keys and relevance weights (0.0-1.0) as values.
+                    Format: {{"keyword1": weight1, "keyword2": weight2, ...}}
+                    
+                    For example, if the query is "machine learning", you might return:
+                    {{"machine learning": 1.0, "deep learning": 0.8, "neural networks": 0.7, "ai": 0.6, "artificial intelligence": 0.6, "ml": 0.9}}
+                """)
+            ]
+            
+            response = self.llm.invoke(messages)
+            
+            # 응답에서 JSON 추출
+            import re
+            import json
+            
+            # JSON 형식 추출 (중괄호 사이의 내용)
+            json_match = re.search(r'\{.*\}', response.content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                try:
+                    keywords = json.loads(json_str)
+                    return keywords
+                except json.JSONDecodeError:
+                    logger.warning(f"키워드 JSON 파싱 실패: {json_str}")
+            
+            # JSON 파싱 실패 시 기본 키워드 반환
+            logger.warning(f"LLM 응답에서 키워드 추출 실패, 기본 키워드 사용")
+            default_keywords = {query.lower(): 1.0}
+            query_words = query.lower().split()
+            for word in query_words:
+                if word != query.lower():
+                    default_keywords[word] = 0.8
+            return default_keywords
+            
+        except Exception as e:
+            logger.error(f"의미 기반 키워드 추출 중 오류: {str(e)}")
+            # 오류 발생 시 기본 키워드 반환
+            return {query.lower(): 1.0}
+
+    def create_paper_outline(self, topic, analysis, materials):
         """
         Create a paper outline based on research analysis.
         
@@ -866,7 +997,7 @@ class ResearchAgent(BaseAgent):
             
             # 명시적으로 검색 결과가 없는지 확인
             if not materials or len(materials) == 0:
-                logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
+                logger.warning("검색 결과가 없습니다.")
                 return {
                     "status": "error",
                     "message": "검색 결과가 없어 연구를 진행할 수 없습니다. 다른 주제나 검색어를 시도해보세요."
@@ -1019,59 +1150,6 @@ class ResearchAgent(BaseAgent):
             logger.error(f"학술 논문 검색 중 오류 발생: {str(e)}", exc_info=True)
             return []
 
-    def search_local_papers(self, query: str, data_path: str = 'data/papers.json', max_results: int = 10) -> List[Dict]:
-        """
-        로컬에 저장된 논문 데이터셋에서 검색
-        
-        Args:
-            query: 검색 쿼리
-            data_path: 논문 메타데이터 JSON 파일 경로
-            max_results: 반환할 최대 결과 수
-            
-        Returns:
-            List[Dict]: 검색된 논문 목록
-        """
-        logger.info(f"로컬 데이터에서 검색: {query}")
-        
-        try:
-            # 데이터 파일이 존재하는지 확인
-            if not os.path.exists(data_path):
-                logger.warning(f"로컬 데이터 파일이 없음: {data_path}")
-                return []
-            
-            # JSON 파일 로드
-            with open(data_path, 'r', encoding='utf-8') as f:
-                papers = json.load(f)
-            
-            logger.info(f"로컬 데이터베이스에서 {len(papers)} 논문 로드됨")
-            
-            # 간단한 키워드 매칭으로 검색 (실제 구현에서는 더 고급 검색 알고리즘 사용 가능)
-            keywords = query.lower().split()
-            results = []
-            
-            for paper in papers:
-                # 제목과 초록에서 키워드 검색
-                title = paper.get('title', '').lower()
-                abstract = paper.get('abstract', '').lower()
-                
-                # 간단한 관련성 점수 계산 (키워드 일치 수)
-                relevance = sum(1 for kw in keywords if kw in title or kw in abstract)
-                
-                if relevance > 0:
-                    paper['relevance'] = relevance  # 관련성 점수 추가
-                    results.append(paper)
-            
-            # 관련성 점수로 정렬하고 상위 결과만 반환
-            results.sort(key=lambda x: x.get('relevance', 0), reverse=True)
-            limited_results = results[:max_results]
-            
-            logger.info(f"로컬 데이터에서 {len(limited_results)}개 논문 찾음")
-            return limited_results
-            
-        except Exception as e:
-            logger.error(f"로컬 논문 검색 중 오류: {str(e)}", exc_info=True)
-            return []
-
     def extract_keywords(self, topic, analysis):
         """
         주제와 분석 결과에서 중요 키워드 추출
@@ -1172,53 +1250,68 @@ class ResearchAgent(BaseAgent):
         logger.info(f"{len(references)}개 참고문헌 추출됨")
         return references
 
-    def save_research_materials_to_json(self, materials: List[ResearchMaterial], file_path: str = 'data/papers.json') -> None:
+    def save_research_materials_to_json(self, materials: List[Union[ResearchMaterial, Dict]], file_path: str = 'data/papers.json') -> None:
         """
-        Save research materials to a JSON file.
+        연구 자료를 JSON 파일로 저장
         
         Args:
-            materials (List[ResearchMaterial]): List of research materials to save
-            file_path (str): Path to the JSON file
+            materials: 저장할 연구 자료 목록 (ResearchMaterial 객체 또는 딕셔너리)
+            file_path: 저장할 파일 경로
         """
-        import json
-        from pathlib import Path
-        
-        # Materials list validation
-        if not materials:
-            logger.warning("No research materials to save to JSON.")
-            return
-        
         try:
-            # Ensure directory exists
-            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            # 디렉토리 생성
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
             
-            # Convert materials to a list of dictionaries with safe handling
+            # 직렬화 가능한 형태로 변환
             materials_data = []
             for material in materials:
                 try:
-                    # Handle both ResearchMaterial objects and dictionaries
                     if hasattr(material, 'dict'):
+                        # ResearchMaterial 객체인 경우
                         material_dict = material.dict()
                     elif isinstance(material, dict):
+                        # 이미 딕셔너리인 경우
                         material_dict = material
                     else:
-                        logger.warning(f"Unexpected type for material: {type(material)}")
+                        logger.warning(f"Unsupported material type: {type(material)}")
                         continue
-                    
-                    # Include essential fields even if not present
-                    if 'id' not in material_dict:
-                        material_dict['id'] = str(uuid.uuid4())
-                    if 'title' not in material_dict or not material_dict['title']:
-                        material_dict['title'] = "Untitled Document"
                     
                     materials_data.append(material_dict)
                 except Exception as e:
                     logger.warning(f"Error processing material for JSON: {str(e)}")
                     continue
             
+            # datetime 객체를 문자열로 변환하는 함수 정의
+            def json_serial(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                raise TypeError(f"Type {type(obj)} not serializable")
+            
             # Save to JSON file
             with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump(materials_data, f, ensure_ascii=False, indent=2)
+                json.dump(materials_data, f, ensure_ascii=False, indent=2, default=json_serial)
             logger.info(f"Research materials saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to save research materials to JSON: {str(e)}")
+
+    # XAI 클라이언트 사용 부분 (정확한 위치는 파일 내용에 따라 다를 수 있음)
+    def _analyze_research_topic(self, topic, context=None):
+        """XAI API를 사용하여 연구 주제 분석"""
+        
+        # 싱글톤 인스턴스 가져오기
+        xai_client = XAIClient.get_instance()
+        
+        messages = [
+            {"role": "system", "content": "You are a helpful research assistant."},
+            {"role": "user", "content": f"Analyze this research topic: {topic}"}
+        ]
+        
+        if context:
+            messages[1]["content"] += f"\n\nAdditional context: {context}"
+        
+        try:
+            response = xai_client.chat_completion(messages=messages)
+            return response.get("choices", [{}])[0].get("message", {}).get("content", "")
+        except Exception as e:
+            self.logger.error(f"XAI API 호출 오류: {str(e)}")
+            return f"주제 분석 중 오류 발생: {str(e)}"

@@ -33,15 +33,6 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 if USE_ANTHROPIC_API and not ANTHROPIC_API_KEY:
     logger.warning("Anthropic API key not found but Anthropic API is enabled. Using Anthropic API will not be possible.")
 
-# Semantic Scholar API key
-# If API key is not provided, we'll use the API as an unauthorized user
-# This will have lower rate limits but still function
-SEMANTIC_SCHOLAR_API_KEY = os.environ.get("SEMANTIC_SCHOLAR_API_KEY", "")
-# Automatically use unauthorized access if no API key is provided
-SEMANTIC_SCHOLAR_USE_AUTH = bool(SEMANTIC_SCHOLAR_API_KEY)
-if not SEMANTIC_SCHOLAR_API_KEY:
-    logger.warning("Semantic Scholar API key not found. Using unauthorized access with lower rate limits.")
-
 # Google Scholar API key
 # Google Scholar API는 GOOGLE_API_KEY와 GOOGLE_CSE_ID를 사용할 수 있음
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "")

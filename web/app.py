@@ -6,11 +6,17 @@ Flask application for the AI Paper Writing System
 import os
 import sys
 from pathlib import Path
+import datetime
+
+# Add the utils directory to the Python path
+sys.path.append(str(Path(__file__).resolve().parent.parent / "utils"))
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash, session
 import json
 import uuid
 from werkzeug.utils import secure_filename
 import traceback
+import requests  # HTTP 요청을 위한 라이브러리 추가
 
 # Add project root to Python path
 project_root = Path(__file__).resolve().parent.parent
@@ -19,6 +25,25 @@ sys.path.insert(0, str(project_root))
 # Import project modules
 from utils.logger import logger, configure_logging
 from config.settings import OUTPUT_DIR
+from utils.xai_client import XAIClient  # utils 폴더에서 가져오기
+
+# XAI API 키 설정
+XAI_API_KEY = os.environ.get('XAI_API_KEY')
+if not XAI_API_KEY:
+    raise ValueError("XAI_API_KEY 환경 변수가 설정되지 않았습니다. 설정 후 재시작 해주세요.")
+
+# API 키가 'xai-' 접두사로 시작하는지 확인
+if not XAI_API_KEY.startswith('xai-'):
+    logger.warning("XAI_API_KEY가 'xai-' 접두사로 시작하지 않습니다. API 키 형식을 확인하세요.")
+
+# 글로벌 XAI 클라이언트 초기화 - 모든 에이전트가 사용할 수 있도록 싱글톤 패턴 활용
+try:
+    # 싱글톤 인스턴스 초기화
+    xai_client = XAIClient.get_instance()
+    logger.info("XAI Client initialized successfully")
+except Exception as e:
+    logger.error(f"XAI Client 초기화 오류: {str(e)}")
+    logger.error(traceback.format_exc())
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -37,7 +62,12 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 coordinator_agent = None
 try:
     from agents.coordinator_agent import CoordinatorAgent
-    coordinator_agent = CoordinatorAgent(verbose=False)
+    
+    # CoordinatorAgent의 실제 지원하는 파라미터만 사용하여 초기화
+    coordinator_agent = CoordinatorAgent(
+        verbose=False
+    )
+    
     logger.info("CoordinatorAgent initialized successfully")
 except Exception as e:
     error_msg = f"Error initializing CoordinatorAgent: {str(e)}"
@@ -68,6 +98,7 @@ def generate_paper():
     # Get form data
     research_topic = request.form.get('research_topic', '')
     paper_type = request.form.get('paper_type', 'Literature Review')
+    paper_format = request.form.get('paper_format', 'standard')
     additional_instructions = request.form.get('additional_instructions', '')
     
     # Check if a file was uploaded
@@ -90,11 +121,15 @@ def generate_paper():
     
     # Create a task for the coordinator agent
     task = {
-        'id': request_id,
         'topic': research_topic,
         'paper_type': paper_type,
+        'paper_format': paper_format,
         'additional_instructions': additional_instructions,
-        'uploaded_file': uploaded_file
+        'status': 'pending',
+        'progress': 0,
+        'result': None,
+        'error': None,
+        'timestamp': datetime.datetime.now().isoformat()
     }
     
     # Store task in session
@@ -104,11 +139,10 @@ def generate_paper():
         # Start the paper generation workflow
         workflow_state = coordinator_agent.start_workflow(
             topic=research_topic,
-            template_name=paper_type.lower().replace(' ', '_'),
-            style_guide="Standard Academic",
-            citation_style="APA",
-            output_format="markdown",
-            verbose=False
+            paper_type=paper_type,
+            paper_format=paper_format,
+            additional_instructions=additional_instructions,
+            uploaded_file=uploaded_file
         )
         
         # Store workflow state ID in session

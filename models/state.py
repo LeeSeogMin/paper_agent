@@ -226,6 +226,9 @@ class WorkflowState(StateTransitionModel['WorkflowState']):
     style_guide: str
     citation_style: str
     output_format: str
+    paper_format: str = "standard"
+    additional_instructions: Optional[str] = None
+    uploaded_file: Optional[str] = None
     verbose: bool = False
     research_state: Optional[ResearchState] = None
     writing_state: Optional[WritingState] = None
@@ -237,6 +240,7 @@ class WorkflowState(StateTransitionModel['WorkflowState']):
     end_time: Optional[datetime] = None
     current_stage: str = "initialized"
     research_summary: Optional[Any] = None
+    research_materials: Optional[List[Any]] = None
     
     # Stage constants
     STAGE_INITIALIZED: ClassVar[str] = "initialized"

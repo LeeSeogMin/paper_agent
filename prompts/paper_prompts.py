@@ -181,6 +181,7 @@ PAPER_EDITING_PROMPT = PromptTemplate(
 
 Task type: {editing_type}
 Style guide: {style_guide}
+Paper format: {paper_format}
 
 Paper content:
 {paper_content}
@@ -193,11 +194,15 @@ Editing and improvement guidelines:
 5. Use appropriate academic expressions and terminology
 6. Check citation and reference format
 
+Special instructions for paper format:
+- If paper_format is "standard": Format as a complete academic paper with all standard sections.
+- If paper_format is "literature_review": Format as a literature review that summarizes and synthesizes existing research. Focus on organizing content by themes or findings rather than creating a full research paper. Ensure all information is properly cited with references at the end.
+
 Improve the expression while maintaining the original meaning.
 
 Edited content:
 """,
-    input_variables=["editing_type", "style_guide", "paper_content"],
+    input_variables=["editing_type", "style_guide", "paper_content", "paper_format"],
 )
 
 

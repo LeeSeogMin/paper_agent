@@ -23,6 +23,7 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from utils.vector_db import process_and_vectorize_paper
+from utils.xai_client import XAIClient  # XAI 클라이언트 추가
 
 
 def extract_text_from_pdf(pdf_path_or_url: str) -> str:
@@ -37,19 +38,35 @@ def extract_text_from_pdf(pdf_path_or_url: str) -> str:
     """
     logger.info(f"Extracting text from PDF: {pdf_path_or_url}")
     
-    # This is a mock implementation since PyPDF2 is not installed
-    # In a real implementation, this would use PyPDF2 to extract text
-    logger.warning("PDF extraction is mocked (PyPDF2 not installed)")
-    
-    # Return mock text
-    return f"This is mock text extracted from {pdf_path_or_url}.\n\n" + \
-           "Abstract\n\nThis paper discusses important research findings...\n\n" + \
-           "Introduction\n\nThe field of research has seen significant advancements...\n\n" + \
-           "Methodology\n\nWe applied various techniques to analyze the data...\n\n" + \
-           "Results\n\nOur findings indicate significant improvements...\n\n" + \
-           "Conclusion\n\nThis research contributes to the field by providing...\n\n" + \
-           "References\n\n1. Smith, J. (2020). Recent Advances in Research.\n" + \
-           "2. Johnson, K. (2019). Analytical Methods for Academic Research."
+    try:
+        # Handle URL or local path
+        if pdf_path_or_url.startswith(('http://', 'https://')):
+            # Download PDF from URL to a temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+            temp_file.close()
+            download_pdf(pdf_path_or_url, temp_file.name)
+            pdf_path = temp_file.name
+        else:
+            pdf_path = pdf_path_or_url
+        
+        # Use PyMuPDF (fitz) to extract text
+        doc = fitz.open(pdf_path)
+        text = ""
+        
+        # Extract text from all pages
+        for page in doc:
+            text += page.get_text()
+        
+        doc.close()
+        
+        # Clean up temporary file if created
+        if pdf_path_or_url.startswith(('http://', 'https://')):
+            os.unlink(pdf_path)
+            
+        return text
+    except Exception as e:
+        logger.error(f"Error extracting text from PDF: {str(e)}")
+        return f"Error extracting text from {pdf_path_or_url}: {str(e)}"
 
 
 def clean_pdf_text(text: str) -> str:
@@ -193,6 +210,14 @@ class PDFProcessor:
         """
         self.use_llm = use_llm
         self.llm = llm if llm else OpenAI(temperature=0)
+        
+        # XAI 클라이언트 초기화
+        try:
+            self.xai_client = XAIClient.get_instance()
+            self.use_xai = True
+        except Exception as e:
+            logger.warning(f"XAI 클라이언트 초기화 실패: {str(e)}")
+            self.use_xai = False
         
         # 메타데이터 추출 체인 초기화
         self.metadata_chain = LLMChain(
@@ -354,11 +379,39 @@ class PDFProcessor:
                 text_for_llm = first_page_text[:2000]
                 
                 try:
-                    llm_result = self.metadata_chain.invoke({"text": text_for_llm})
-                    llm_metadata = json.loads(llm_result["text"])
+                    # XAI 클라이언트 사용 시도
+                    if self.use_xai:
+                        logger.info("XAI 클라이언트를 사용하여 메타데이터 추출 시도")
+                        prompt = f"""다음은 학술 논문의 텍스트입니다. 제목, 저자, 소속, 발행 연도, 주제어, 초록 등의 
+                        메타데이터를 추출해 JSON 형식으로 반환해주세요:
+                        
+                        {text_for_llm}
+                        
+                        출력 형식:
+                        {{
+                          "title": "논문 제목",
+                          "authors": ["저자1", "저자2"],
+                          "affiliations": ["소속1", "소속2"],
+                          "year": "출판 연도",
+                          "keywords": ["키워드1", "키워드2"],
+                          "abstract": "초록 내용"
+                        }}
+                        """
+                        
+                        result = self.xai_client.generate_text(prompt)
+                        # JSON 형식 추출
+                        json_match = re.search(r'({.*})', result, re.DOTALL)
+                        if json_match:
+                            llm_metadata = json.loads(json_match.group(1))
+                        else:
+                            raise ValueError("XAI 응답에서 JSON 형식을 찾을 수 없습니다")
+                    else:
+                        # 기존 LLM 체인 사용
+                        llm_result = self.metadata_chain.invoke({"text": text_for_llm})
+                        llm_metadata = json.loads(llm_result["text"])
                     
                     # Log the LLM result for debugging
-                    logger.debug(f"LLM result: {llm_result}")
+                    logger.debug(f"LLM result: {llm_metadata}")
                     
                     # LLM 결과로 빈 필드 채우기
                     if not metadata["title"] and llm_metadata.get("title"):
@@ -532,8 +585,17 @@ def process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db"):
     # PDF 프로세서 초기화 (하이브리드 방식 사용)
     pdf_processor = PDFProcessor(use_llm=True)
     
+    # 메타데이터 추출 실패 기록을 위한 딕셔너리
+    extraction_failures = {}
+    
     for pdf_file in pdf_files:
         pdf_path = os.path.join(local_dir, pdf_file)
+        
+        # 이전 실패 횟수 확인
+        if pdf_file in extraction_failures and extraction_failures[pdf_file] >= 2:
+            logger.warning(f"PDF 메타데이터 추출 2회 이상 실패, 건너뜀: {pdf_file}")
+            continue
+        
         try:
             # 하이브리드 방식으로 PDF 처리
             pdf_result = pdf_processor.process_pdf(pdf_path)
@@ -541,8 +603,24 @@ def process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db"):
             if pdf_result["success"]:
                 metadata = pdf_result["metadata"]
                 
+                # 메타데이터 유효성 검사
+                if not metadata.get("title") or not metadata.get("authors"):
+                    # 실패 횟수 증가
+                    extraction_failures[pdf_file] = extraction_failures.get(pdf_file, 0) + 1
+                    logger.warning(f"PDF 메타데이터 불완전, 실패 횟수: {extraction_failures[pdf_file]}: {pdf_file}")
+                    
+                    # 2회 이상 실패하면 건너뜀
+                    if extraction_failures[pdf_file] >= 2:
+                        logger.warning(f"PDF 메타데이터 추출 2회 이상 실패, 건너뜀: {pdf_file}")
+                        continue
+                
                 # 텍스트 추출 및 벡터화
-                # ...벡터화 코드...
+                text = pdf_processor.extract_text_from_pdf(pdf_path)
+                if text:
+                    # 벡터 DB에 저장
+                    vector_result = process_and_vectorize_paper(
+                        pdf_path=pdf_path
+                    )
                 
                 paper_info = {
                     "id": f"local_{os.path.splitext(pdf_file)[0]}",
@@ -550,17 +628,41 @@ def process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db"):
                     "authors": metadata.get("authors", []),
                     "abstract": metadata.get("abstract", ""),
                     "year": metadata.get("year", ""),
-                    # ...기타 필드...
+                    "pdf_path": pdf_path,
+                    "local_path": pdf_path,
+                    "vectorized": True if text else False
                 }
                 
                 processed_papers.append(paper_info)
                 logger.info(f"로컬 PDF 처리 완료: {pdf_file}")
             else:
+                # 실패 횟수 증가
+                extraction_failures[pdf_file] = extraction_failures.get(pdf_file, 0) + 1
+                logger.warning(f"PDF 처리 실패, 실패 횟수: {extraction_failures[pdf_file]}: {pdf_file}")
+                
+                # 2회 이상 실패하면 건너뜀
+                if extraction_failures[pdf_file] >= 2:
+                    logger.warning(f"PDF 처리 2회 이상 실패, 건너뜀: {pdf_file}")
+                    continue
+                
                 # 하이브리드 방식 실패시 기존 방식 시도
                 paper_info = process_and_vectorize_paper(pdf_path=pdf_path)
                 # ...기존 처리 코드...
         except Exception as e:
-            logger.error(f"로컬 PDF 처리 중 오류: {pdf_file} - {str(e)}")
+            # 실패 횟수 증가
+            extraction_failures[pdf_file] = extraction_failures.get(pdf_file, 0) + 1
+            logger.error(f"로컬 PDF 처리 중 오류, 실패 횟수: {extraction_failures[pdf_file]}: {pdf_file} - {str(e)}")
+            
+            # 2회 이상 실패하면 건너뜀
+            if extraction_failures[pdf_file] >= 2:
+                logger.warning(f"PDF 처리 2회 이상 실패, 건너뜀: {pdf_file}")
+                continue
     
     logger.info(f"{len(processed_papers)}개의 로컬 PDF 파일 처리 완료")
+    
+    # 실패 통계 로깅
+    total_failures = sum(1 for count in extraction_failures.values() if count >= 2)
+    if total_failures > 0:
+        logger.warning(f"{total_failures}개의 PDF 파일이 메타데이터 추출 실패로 건너뜀")
+    
     return processed_papers
