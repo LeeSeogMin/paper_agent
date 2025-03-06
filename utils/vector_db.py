@@ -12,6 +12,7 @@ from pathlib import Path
 
 import numpy as np
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -36,7 +37,7 @@ def create_vector_db(documents: List[Union[Document, Dict[str, Any]]], db_name: 
     logger.info(f"Creating vector database '{db_name}' with {len(documents)} documents")
     
     # Initialize embeddings
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
     
     # Convert dictionaries to Document objects if needed
     docs = []
@@ -77,7 +78,7 @@ def update_vector_db(db_name: str, new_documents: List[Union[Document, Dict[str,
     logger.info(f"Updating vector database '{db_name}' with {len(new_documents)} new documents")
     
     # Initialize embeddings
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
     
     # Load existing vector store
     db_path = os.path.join(VECTOR_DB_PATH, db_name)
@@ -128,7 +129,7 @@ def search_vector_db(
     logger.info(f"Searching vector database '{db_name}' with query: {query}")
     
     # Initialize embeddings
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
+    embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
     
     # Load vector store
     db_path = os.path.join(VECTOR_DB_PATH, db_name)
@@ -282,7 +283,7 @@ def process_and_vectorize_paper(pdf_path: str) -> Dict[str, Any]:
         collection_name = f"paper_{paper_id}"
         
         # 임베딩 및 벡터 DB 저장
-        embeddings = OpenAIEmbeddings()
+        embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
         metadata = [{"source": pdf_path, "paper_id": paper_id, "chunk": i} for i in range(len(chunks))]
         vectorstore = Chroma.from_texts(
             texts=chunks,

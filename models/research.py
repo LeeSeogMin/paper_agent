@@ -5,6 +5,7 @@ This module contains data models for representing research information,
 including search queries, research materials, and analysis results.
 """
 
+import re
 from typing import List, Dict, Any, Optional, Union
 from datetime import datetime
 from pydantic import Field, validator
@@ -63,6 +64,10 @@ class ResearchMaterial(I18nModel):
         default=None,
         description="URL to the PDF version of the paper"
     )
+    pdf_path: Optional[str] = Field(
+        default=None,
+        description="Local path to the PDF file"
+    )
     relevance_score: float = Field(
         default=0.0,
         description="Relevance score (0.0-1.0) for the research topic"
@@ -94,6 +99,10 @@ class ResearchMaterial(I18nModel):
     source: str = Field(
         default="unknown",
         description="Source of the material (e.g., 'Semantic Scholar', 'Google Scholar')"
+    )
+    related_documents: Optional[List[Dict[str, Any]]] = Field(
+        default_factory=list,
+        description="Related documents from vector database"
     )
     
     @validator('authors', pre=True)

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}AI Paper Writing System - Home{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        {% if coordinator_agent is none %}
+        <div class="alert alert-info mb-4">
+            <h5><i class="bi bi-info-circle"></i> 시스템 점검 중</h5>
+            <p>AI Paper Writing System이 현재 점검 중입니다. 나중에 다시 시도해 주세요.</p>
+        </div>
+        {% endif %}
+        
+        <form id="paper-form" action="{{ url_for('generate_paper') }}" method="post" enctype="multipart/form-data">
+            <!-- Upload Requirements Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Upload Requirements (Optional)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="file" class="form-control" id="file" name="file">
+                        <div class="form-text">Supported formats: .txt, .md, .json</div>
+                        <div id="file-preview" class="mt-2" style="display: none;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Research Topic Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Research Topic</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="research_topic" name="research_topic" required placeholder="Enter your research topic or question">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Paper Type Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Paper Type</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <select class="form-select" id="paper_type" name="paper_type">
+                            <option value="Literature Review" selected>Literature Review</option>
+                            <option value="Research Paper">Research Paper</option>
+                            <option value="Technical Report">Technical Report</option>
+                            <option value="Case Study">Case Study</option>
+                            <option value="Systematic Review">Systematic Review</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Instructions Section -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5>Additional Instructions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <textarea class="form-control" id="additional_instructions" name="additional_instructions" rows="5" placeholder="Enter specific areas to focus on, time period to cover, or any other requirements for your literature review"></textarea>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Submit Button -->
+            <div class="text-center">
+                <button type="submit" class="btn btn-primary btn-lg">Generate Paper</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+{% endblock %} 

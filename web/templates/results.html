@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}AI Paper Writing System - Results{% endblock %}
+
+{% block extra_css %}
+<style>
+    .status-card {
+        margin-bottom: 20px;
+    }
+    .progress {
+        height: 25px;
+    }
+    .progress-bar {
+        font-size: 14px;
+        line-height: 25px;
+    }
+    .step-item {
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    .step-completed {
+        background-color: #d1e7dd;
+    }
+    .step-current {
+        background-color: #cfe2ff;
+        font-weight: bold;
+    }
+    .step-pending {
+        background-color: #f8f9fa;
+        color: #6c757d;
+    }
+    .paper-summary {
+        margin-top: 30px;
+        padding: 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card status-card">
+            <div class="card-header">
+                <h5>Paper Generation Status</h5>
+            </div>
+            <div class="card-body">
+                <h6>Request ID: {{ request_id }}</h6>
+                
+                <!-- Progress Bar -->
+                {% set progress = status.progress_percentage if status is mapping else status.progress_percentage %}
+                <div id="status-progress" class="progress mb-4" data-request-id="{{ request_id }}" data-complete="{{ 'true' if progress == 100 else 'false' }}">
+                    <div class="progress-bar" role="progressbar" style="width: {{ progress }}%;" 
+                         aria-valuenow="{{ progress }}" aria-valuemin="0" aria-valuemax="100">
+                        {{ progress }}%
+                    </div>
+                </div>
+                
+                <!-- Status Information -->
+                <div class="status-info mb-4">
+                    {% set status_text = status.status if status is mapping else status.status %}
+                    <p><strong>Current Status:</strong> <span id="status-text">{{ status_text }}</span></p>
+                    
+                    <!-- Completed Steps -->
+                    <h6>Completed Steps:</h6>
+                    <div class="steps-list">
+                        {% set completed_steps = status.completed_steps if status is mapping else status.completed_steps %}
+                        {% for step in completed_steps %}
+                            <div class="step-item step-completed">
+                                <i class="bi bi-check-circle-fill"></i> {{ step }}
+                            </div>
+                        {% else %}
+                            <div class="step-item">No steps completed yet</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Current Step -->
+                    {% set current_step = status.current_step if status is mapping else status.current_step %}
+                    {% if current_step %}
+                        <h6 class="mt-3">Current Step:</h6>
+                        <div class="step-item step-current">
+                            <i class="bi bi-arrow-right-circle-fill"></i> {{ current_step }}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Next Steps -->
+                    {% set next_steps = status.next_steps if status is mapping else status.next_steps %}
+                    {% if next_steps %}
+                        <h6 class="mt-3">Next Steps:</h6>
+                        <div class="steps-list">
+                            {% for step in next_steps %}
+                                <div class="step-item step-pending">
+                                    <i class="bi bi-circle"></i> {{ step }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Issues -->
+                    {% set issues = status.issues if status is mapping else status.issues %}
+                    {% if issues %}
+                        <h6 class="mt-3">Issues:</h6>
+                        <div class="alert alert-warning">
+                            <ul>
+                                {% for issue in issues %}
+                                    <li>{{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-between">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Home</a>
+                    
+                    {% if progress == 100 %}
+                        <a href="{{ url_for('download_paper', request_id=request_id) }}" class="btn btn-success">
+                            <i class="bi bi-download"></i> Download Paper
+                        </a>
+                    {% else %}
+                        <button class="btn btn-primary" id="refresh-status">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Paper Summary (if available) -->
+        {% if paper_summary %}
+            <div class="paper-summary">
+                <h5>Paper Summary</h5>
+                <div class="summary-content">
+                    {{ paper_summary|safe }}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+{% endblock %} 

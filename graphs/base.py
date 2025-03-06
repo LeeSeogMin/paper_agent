@@ -10,9 +10,105 @@ import json
 import time
 from pathlib import Path
 
-from langchain.graphs import StateGraph
-from langchain.schema.prompt_template import PromptTemplate
-from langchain.chat_models import ChatOpenAI
+# Custom StateGraph implementation
+class SimpleStateGraph:
+    """Simple implementation of a state graph without external dependencies"""
+    
+    def __init__(self, name: str):
+        self.name = name
+        self.nodes = {}
+        self.edges = []
+        self.entry_point = None
+        self._compiled = False
+    
+    def add_node(self, name: str, action: Callable):
+        """Add a node to the graph"""
+        self.nodes[name] = action
+    
+    def set_entry_point(self, node_name: str):
+        """Set the entry point for the graph"""
+        if node_name not in self.nodes:
+            raise ValueError(f"Node {node_name} not found in graph")
+        self.entry_point = node_name
+    
+    def add_edge(self, start: str, end: str):
+        """Add an edge between nodes"""
+        if start not in self.nodes:
+            raise ValueError(f"Start node {start} not found in graph")
+        if end not in self.nodes:
+            raise ValueError(f"End node {end} not found in graph")
+        self.edges.append((start, end))
+    
+    def add_conditional_edges(self, start: str, condition: Callable, possible_ends: Dict[str, str]):
+        """Add conditional edges from a node"""
+        if start not in self.nodes:
+            raise ValueError(f"Start node {start} not found in graph")
+        for end in possible_ends.values():
+            if end not in self.nodes and end != "END":
+                raise ValueError(f"End node {end} not found in graph")
+        self.edges.append((start, condition, possible_ends))
+    
+    def compile(self):
+        """Compile the graph"""
+        if not self.entry_point:
+            raise ValueError("Entry point not set")
+        self._compiled = True
+    
+    def invoke(self, inputs: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """Run the graph with the given inputs"""
+        if not self._compiled:
+            raise ValueError("Graph not compiled")
+        
+        state = inputs.get("state")
+        current_node = self.entry_point
+        
+        while current_node != "END" and current_node is not None:
+            # Execute the current node
+            action = self.nodes.get(current_node)
+            if action:
+                state = action(state)
+            
+            # Find the next node
+            next_node = None
+            for edge in self.edges:
+                if len(edge) == 2:  # Simple edge
+                    start, end = edge
+                    if start == current_node:
+                        next_node = end
+                        break
+                elif len(edge) == 3:  # Conditional edge
+                    start, condition, possible_ends = edge
+                    if start == current_node:
+                        result = condition(state)
+                        next_node = possible_ends.get(result)
+                        break
+            
+            current_node = next_node
+        
+        return {"state": state}
+
+# 최신 LangChain 버전에 맞게 임포트 경로 수정
+try:
+    # 최신 버전에서는 langchain_core.prompts에서 가져옴
+    from langchain_core.prompts import PromptTemplate
+except ImportError:
+    try:
+        # 이전 버전 호환성을 위해 시도
+        from langchain.prompts import PromptTemplate
+    except ImportError:
+        raise ImportError("PromptTemplate를 찾을 수 없습니다. 'pip install langchain-core'를 실행하여 필요한 패키지를 설치하세요.")
+
+# ChatOpenAI 임포트 경로 수정
+try:
+    # 최신 버전에서는 langchain_openai에서 가져옴
+    from langchain_openai import ChatOpenAI
+except ImportError:
+    try:
+        # 이전 버전 호환성을 위해 시도
+        from langchain.chat_models import ChatOpenAI
+    except ImportError:
+        raise ImportError("ChatOpenAI를 찾을 수 없습니다. 'pip install langchain-openai'를 실행하여 필요한 패키지를 설치하세요.")
+
 from langchain_core.runnables import RunnableConfig
 
 from utils.logger import logger
@@ -40,7 +136,7 @@ class BaseWorkflowGraph(Generic[T]):
         self.name = name
         self.description = description
         self.state_class = state_class
-        self.graph = StateGraph(name=name)
+        self.graph = SimpleStateGraph(name=name)
         
         logger.info(f"Initialized BaseWorkflowGraph: {name}")
     

@@ -15,8 +15,8 @@ from typing import List, Dict, Any, Optional, Tuple
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain.schema import Document
 from langchain.tools import tool
-from langchain.chains import LLMChain
-from langchain.prompts import PromptTemplate
+from langchain_core.runnables import RunnableSequence
+from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from langchain.schema.messages import HumanMessage, SystemMessage
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -48,32 +48,34 @@ class ResearchAgent(BaseAgent):
     findings for use in the paper writing phase.
     """
     
-    def __init__(self, model_name: str = "gpt-4", temperature: float = 0.2):
+    def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.2, verbose: bool = False):
         """
         Initialize the research agent.
         
         Args:
             model_name (str): Name of the large language model to use
             temperature (float): Temperature parameter for LLM
+            verbose (bool): Enable verbose logging
         """
         super().__init__(model_name, temperature)
         
         self.llm = ChatOpenAI(model_name=model_name, temperature=temperature)
+        self.verbose = verbose
         
-        # Initialize chains
-        self.query_chain = LLMChain(
-            llm=self.llm,
-            prompt=QUERY_GENERATION_PROMPT
+        # Initialize chains using RunnableSequence
+        self.query_chain = RunnableSequence(
+            first=QUERY_GENERATION_PROMPT,
+            last=self.llm
         )
         
-        self.evaluation_chain = LLMChain(
-            llm=self.llm,
-            prompt=SOURCE_EVALUATION_PROMPT
+        self.evaluation_chain = RunnableSequence(
+            first=SOURCE_EVALUATION_PROMPT,
+            last=self.llm
         )
         
-        self.analysis_chain = LLMChain(
-            llm=self.llm,
-            prompt=SEARCH_RESULTS_ANALYSIS_PROMPT
+        self.analysis_chain = RunnableSequence(
+            first=SEARCH_RESULTS_ANALYSIS_PROMPT,
+            last=self.llm
         )
         
         # Initialize text splitter for handling large documents
@@ -283,6 +285,25 @@ class ResearchAgent(BaseAgent):
                     predefined_queries = research_plan["search_strategy"]["queries"]
                     max_queries = min(max_queries, len(predefined_queries))
             
+            # 로컬 폴더와 pdfs 폴더의 PDF 파일 수 확인
+            from utils.pdf_downloader import PDF_STORAGE_PATH
+            
+            local_dir = "data/local"
+            pdfs_dir = PDF_STORAGE_PATH
+            
+            # 각 디렉토리의 PDF 파일 수 계산
+            local_pdf_count = len([f for f in os.listdir(local_dir) if f.lower().endswith('.pdf')]) if os.path.exists(local_dir) else 0
+            pdfs_pdf_count = len([f for f in os.listdir(pdfs_dir) if f.lower().endswith('.pdf')]) if os.path.exists(pdfs_dir) else 0
+            
+            total_pdf_count = local_pdf_count + pdfs_pdf_count
+            logger.info(f"PDF 파일 수: 로컬 폴더 {local_pdf_count}개, pdfs 폴더 {pdfs_pdf_count}개, 총 {total_pdf_count}개")
+            
+            # PDF 파일이 30개 이상인 경우 외부 검색 건너뛰기
+            skip_external_search = total_pdf_count >= 30
+            if skip_external_search:
+                logger.info(f"PDF 파일이 30개 이상 ({total_pdf_count}개) 존재하여 외부 검색을 건너뜁니다.")
+                search_scope = "local_only"
+            
             # 1. 로컬 PDF 파일 처리 및 벡터화 (로컬 검색 허용 시)
             if search_scope in ["local_only", "all"]:
                 from utils.pdf_processor import process_local_pdfs
@@ -308,9 +329,41 @@ class ResearchAgent(BaseAgent):
                         material = self._create_research_material(result, "local_db", relevance_score, explanation)
                         if material:
                             all_materials.append(material)
+                
+                # pdfs 폴더의 PDF 파일도 처리
+                if os.path.exists(pdfs_dir):
+                    from utils.pdf_processor import PDFProcessor
+                    pdf_processor = PDFProcessor(use_llm=True)
+                    
+                    for pdf_file in os.listdir(pdfs_dir):
+                        if pdf_file.lower().endswith('.pdf'):
+                            pdf_path = os.path.join(pdfs_dir, pdf_file)
+                            try:
+                                pdf_result = pdf_processor.process_pdf(pdf_path)
+                                
+                                if pdf_result["success"]:
+                                    metadata = pdf_result["metadata"]
+                                    
+                                    paper_info = {
+                                        "id": f"pdfs_{os.path.splitext(pdf_file)[0]}",
+                                        "title": metadata.get("title", ""),
+                                        "authors": metadata.get("authors", []),
+                                        "abstract": metadata.get("abstract", ""),
+                                        "year": metadata.get("year", ""),
+                                        "pdf_path": pdf_path
+                                    }
+                                    
+                                    relevance_score, explanation = self.evaluate_source(paper_info, topic)
+                                    
+                                    if relevance_score >= 0.6:
+                                        material = self._create_research_material(paper_info, "pdfs", relevance_score, explanation)
+                                        if material:
+                                            all_materials.append(material)
+                            except Exception as e:
+                                logger.error(f"pdfs 폴더 PDF 처리 중 오류: {pdf_file} - {str(e)}")
             
             # 외부 검색이 허용된 경우에만 실행
-            if search_scope in ["web_only", "all"]:
+            if search_scope in ["web_only", "all"] and not skip_external_search:
                 # 3. 검색 쿼리 생성 또는 계획에서 가져오기
                 search_queries = []
                 if research_plan and "search_strategy" in research_plan and "queries" in research_plan["search_strategy"]:
@@ -387,9 +440,11 @@ class ResearchAgent(BaseAgent):
     
     def _create_research_material(self, result, query_id, relevance_score, evaluation):
         """자료로부터 ResearchMaterial 객체 생성 (helper 메서드)"""
-        # PDF URL 확인
+        # PDF URL 또는 PDF 경로 확인
         pdf_url = result.get('pdf_url')
-        if not pdf_url:
+        pdf_path = result.get('pdf_path')
+        
+        if not pdf_url and not pdf_path:
             return None
         
         # 저자 처리
@@ -419,6 +474,7 @@ class ResearchAgent(BaseAgent):
             abstract=result.get("abstract", ""),
             url=result.get("url", ""),
             pdf_url=pdf_url,
+            pdf_path=pdf_path,  # PDF 경로 추가
             relevance_score=relevance_score,
             evaluation=evaluation,
             query_id=query_id,
@@ -426,20 +482,20 @@ class ResearchAgent(BaseAgent):
             summary=""
         )
     
-    def extract_content_from_pdf(self, pdf_url: str) -> str:
+    def extract_content_from_pdf(self, pdf_url_or_path: str) -> str:
         """
         Extract text content from a PDF file.
         
         Args:
-            pdf_url (str): URL to PDF file
+            pdf_url_or_path (str): URL or local path to PDF file
             
         Returns:
             str: Extracted text
         """
-        logger.info(f"Extracting content from PDF: {pdf_url}")
+        logger.info(f"Extracting content from PDF: {pdf_url_or_path}")
         
         try:
-            text = extract_text_from_pdf(pdf_url)
+            text = extract_text_from_pdf(pdf_url_or_path)
             return text
         except Exception as e:
             logger.error(f"Error extracting content from PDF: {str(e)}", exc_info=True)
@@ -506,17 +562,26 @@ class ResearchAgent(BaseAgent):
                 "abstract": material.abstract,
                 "url": material.url,
                 "pdf_url": material.pdf_url,
+                "pdf_path": material.pdf_path,
                 "source": getattr(material, 'source', 'unknown')
             }
             
-            # Pass only the pdf_url to process_and_vectorize_paper()
-            process_and_vectorize_paper(paper_info["pdf_url"])
+            # PDF URL이 있는 경우 벡터화
+            if material.pdf_url:
+                # Pass only the pdf_url to process_and_vectorize_paper()
+                process_and_vectorize_paper(paper_info["pdf_url"])
             
-            # PDF가 있는 경우 내용 추출
-            if material.pdf_url and not material.content:
+            # PDF가 있는 경우 내용 추출 (URL 또는 로컬 경로)
+            if not material.content and (material.pdf_url or material.pdf_path):
                 try:
-                    # PDF 다운로드 및 텍스트 추출
-                    pdf_path = get_local_pdf_path(material.id, material.pdf_url)
+                    pdf_path = None
+                    
+                    # 로컬 경로가 있는 경우 직접 사용
+                    if material.pdf_path and os.path.exists(material.pdf_path):
+                        pdf_path = material.pdf_path
+                    # URL이 있는 경우 다운로드
+                    elif material.pdf_url:
+                        pdf_path = get_local_pdf_path(material.id, material.pdf_url)
                     
                     if pdf_path:
                         text = self.extract_content_from_pdf(pdf_path)
@@ -548,16 +613,13 @@ class ResearchAgent(BaseAgent):
                                     'similarity': f"{score:.2f}",
                                     'content': doc.page_content[:200] + '...' if len(doc.page_content) > 200 else doc.page_content
                                 })
-                        
-                        # 관련 정보 추가
-                        if related_info:
-                            material.related_info = related_info
+                                
+                        material.related_documents = related_info
                 except Exception as e:
                     logger.error(f"벡터 DB 검색 중 오류 발생: {str(e)}", exc_info=True)
             
             enriched_materials.append(material)
         
-        logger.info(f"Enriched {len(enriched_materials)} research materials")
         return enriched_materials
     
     def analyze_research_materials(self, materials, topic):
@@ -813,6 +875,9 @@ class ResearchAgent(BaseAgent):
             # 2. 연구 자료 강화 (내용 및 요약 추가 + 벡터 DB 처리)
             enriched_materials = self.enrich_research_materials(materials)
             
+            # 연구 자료 JSON 파일로 저장
+            self.save_research_materials_to_json(enriched_materials)
+
             # 3. 연구 자료 분석
             analysis = self.analyze_research_materials(enriched_materials, topic)
             
@@ -1106,3 +1171,54 @@ class ResearchAgent(BaseAgent):
         
         logger.info(f"{len(references)}개 참고문헌 추출됨")
         return references
+
+    def save_research_materials_to_json(self, materials: List[ResearchMaterial], file_path: str = 'data/papers.json') -> None:
+        """
+        Save research materials to a JSON file.
+        
+        Args:
+            materials (List[ResearchMaterial]): List of research materials to save
+            file_path (str): Path to the JSON file
+        """
+        import json
+        from pathlib import Path
+        
+        # Materials list validation
+        if not materials:
+            logger.warning("No research materials to save to JSON.")
+            return
+        
+        try:
+            # Ensure directory exists
+            Path(file_path).parent.mkdir(parents=True, exist_ok=True)
+            
+            # Convert materials to a list of dictionaries with safe handling
+            materials_data = []
+            for material in materials:
+                try:
+                    # Handle both ResearchMaterial objects and dictionaries
+                    if hasattr(material, 'dict'):
+                        material_dict = material.dict()
+                    elif isinstance(material, dict):
+                        material_dict = material
+                    else:
+                        logger.warning(f"Unexpected type for material: {type(material)}")
+                        continue
+                    
+                    # Include essential fields even if not present
+                    if 'id' not in material_dict:
+                        material_dict['id'] = str(uuid.uuid4())
+                    if 'title' not in material_dict or not material_dict['title']:
+                        material_dict['title'] = "Untitled Document"
+                    
+                    materials_data.append(material_dict)
+                except Exception as e:
+                    logger.warning(f"Error processing material for JSON: {str(e)}")
+                    continue
+            
+            # Save to JSON file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(materials_data, f, ensure_ascii=False, indent=2)
+            logger.info(f"Research materials saved to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save research materials to JSON: {str(e)}")

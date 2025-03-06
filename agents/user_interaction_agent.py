@@ -72,7 +72,7 @@ class UserInteractionAgent(BaseAgent):
     - Guided workflow assistance
     """
     
-    def __init__(self, model_name: str = "gpt-4", temperature: float = 0.3):
+    def __init__(self, model_name: str = "gpt-4o-mini", temperature: float = 0.3):
         super().__init__(
             name="User Interaction Agent",
             description="Manages user interactions and conversation flow",

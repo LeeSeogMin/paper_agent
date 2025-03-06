@@ -7,6 +7,7 @@ This module defines the state objects used to track the progress and state of th
 from typing import Dict, List, Optional, Any, Union, ClassVar, TypeVar, Generic
 from datetime import datetime
 from pydantic import BaseModel, Field, validator
+import uuid
 
 from models.base import StateTransitionModel
 from models.paper import Paper, PaperOutline
@@ -219,11 +220,13 @@ class ReviewState(StateTransitionModel['ReviewState']):
 
 class WorkflowState(StateTransitionModel['WorkflowState']):
     """Model representing the overall workflow state"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     topic: str
     template_name: str
     style_guide: str
     citation_style: str
     output_format: str
+    verbose: bool = False
     research_state: Optional[ResearchState] = None
     writing_state: Optional[WritingState] = None
     editing_state: Optional[EditingState] = None
@@ -233,6 +236,7 @@ class WorkflowState(StateTransitionModel['WorkflowState']):
     start_time: datetime = Field(default_factory=datetime.now)
     end_time: Optional[datetime] = None
     current_stage: str = "initialized"
+    research_summary: Optional[Any] = None
     
     # Stage constants
     STAGE_INITIALIZED: ClassVar[str] = "initialized"

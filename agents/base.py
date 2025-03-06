@@ -11,8 +11,13 @@ from langchain.schema import BaseMessage, HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 
-from config.settings import TEMPERATURE, OPENAI_MODEL
+from config.settings import (
+    TEMPERATURE, OPENAI_MODEL, XAI_MODEL, ANTHROPIC_MODEL,
+    USE_OPENAI_API, USE_XAI_API, USE_ANTHROPIC_API
+)
 from utils.logger import logger
+from utils.xai_client import ChatXAI
+from utils.anthropic_client import ChatAnthropic
 
 
 # Define agent output type
@@ -46,12 +51,35 @@ class BaseAgent(Generic[T], ABC):
         self.memory: List[BaseMessage] = []
         self.state: Dict[str, Any] = {}
         
-        # Initialize LLM with OpenAI
-        self.llm = ChatOpenAI(
-            model=OPENAI_MODEL,
-            temperature=TEMPERATURE,
-            verbose=self.verbose
-        )
+        # Initialize LLM based on selected API
+        if USE_OPENAI_API:
+            logger.info(f"Using OpenAI API with model: {OPENAI_MODEL}")
+            self.llm = ChatOpenAI(
+                model=OPENAI_MODEL,
+                temperature=TEMPERATURE,
+                verbose=self.verbose
+            )
+        elif USE_XAI_API:
+            logger.info(f"Using xAI API with model: {XAI_MODEL}")
+            self.llm = ChatXAI(
+                model=XAI_MODEL,
+                temperature=TEMPERATURE,
+                verbose=self.verbose
+            )
+        elif USE_ANTHROPIC_API:
+            logger.info(f"Using Anthropic API with model: {ANTHROPIC_MODEL}")
+            self.llm = ChatAnthropic(
+                model=ANTHROPIC_MODEL,
+                temperature=TEMPERATURE,
+                verbose=self.verbose
+            )
+        else:
+            logger.warning("No API selected. Using Anthropic API as default.")
+            self.llm = ChatAnthropic(
+                model=ANTHROPIC_MODEL,
+                temperature=TEMPERATURE,
+                verbose=self.verbose
+            )
         
         logger.info(f"Agent initialized: {self.name} (ID: {self.id})")
 

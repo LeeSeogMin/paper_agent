@@ -10,14 +10,43 @@ from pathlib import Path
 # Base directory
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# API Selection
+USE_OPENAI_API = os.environ.get("USE_OPENAI_API", "false").lower() == "true"
+USE_XAI_API = os.environ.get("USE_XAI_API", "false").lower() == "true"
+USE_ANTHROPIC_API = os.environ.get("USE_ANTHROPIC_API", "true").lower() == "true"
+
 # OpenAI API settings
-OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4")
+OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 OPENAI_TEMPERATURE = float(os.environ.get("OPENAI_TEMPERATURE", "0.7"))
 TEMPERATURE = OPENAI_TEMPERATURE  # Add alias for backward compatibility
 
 # XAI API settings
-# XAI_MODEL = os.environ.get("XAI_MODEL", "grok-2-1212")
+XAI_MODEL = os.environ.get("XAI_MODEL", "grok-2")
+XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
+XAI_TEMPERATURE = float(os.environ.get("XAI_TEMPERATURE", "0.7"))
+
+# Anthropic API settings
+ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-3-7-sonnet-20240229")
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+ANTHROPIC_TEMPERATURE = float(os.environ.get("ANTHROPIC_TEMPERATURE", "0.7"))
+
+# Default model settings (will be set based on selected API)
+if USE_OPENAI_API:
+    DEFAULT_MODEL = OPENAI_MODEL
+    DEFAULT_TEMPERATURE = OPENAI_TEMPERATURE
+elif USE_XAI_API:
+    DEFAULT_MODEL = XAI_MODEL
+    DEFAULT_TEMPERATURE = XAI_TEMPERATURE
+elif USE_ANTHROPIC_API:
+    DEFAULT_MODEL = ANTHROPIC_MODEL
+    DEFAULT_TEMPERATURE = ANTHROPIC_TEMPERATURE
+else:
+    # Fallback to Anthropic if no API is selected
+    DEFAULT_MODEL = ANTHROPIC_MODEL
+    DEFAULT_TEMPERATURE = ANTHROPIC_TEMPERATURE
+
+TEMPERATURE = DEFAULT_TEMPERATURE  # Add alias for backward compatibility
 
 # Paper settings
 DEFAULT_TEMPLATE = "academic"

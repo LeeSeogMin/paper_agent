@@ -9,12 +9,11 @@ import json
 from typing import Dict, Any, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, RunnableSequence
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.output_parsers import PydanticOutputParser
-from langchain_community.llms import OpenAI
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
+from langchain_openai import OpenAI
 
 from config.settings import OUTPUT_DIR, MAX_SECTION_TOKENS
 from config.templates import get_template
@@ -78,13 +77,7 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
         # Create output directory
         os.makedirs(OUTPUT_DIR, exist_ok=True)
         
-        # Initialize prompts
-        self._init_prompts()
-        
-        # Currently working paper
-        self.current_paper = None
-        
-        # 추가: 작업 유형별 템플릿 초기화
+        # Task templates initialization
         self.task_templates = {
             "full_paper": PAPER_SECTION_PROMPT,
             "literature_review": LITERATURE_REVIEW_PROMPT,
@@ -94,42 +87,71 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             "custom": CUSTOM_WRITING_PROMPT
         }
         
+        # Initialize prompts
+        self._init_prompts()
+        
+        # Currently working paper
+        self.current_paper = None
+        
         self.rag_enhancer = RAGEnhancer()
         
         logger.info(f"{self.name} initialized with flexible task support")
 
     def _init_prompts(self) -> None:
-        """Initialize prompts and chains"""
-        # Initialize outline task parser
+        """Initialize prompt templates for paper writing tasks"""
+        # Add English language requirement to all prompts
+        self.outline_prompt_template = PromptTemplate(
+            template=PAPER_OUTLINE_PROMPT.template + "\n\nIMPORTANT: The outline must be in English.",
+            input_variables=PAPER_OUTLINE_PROMPT.input_variables
+        )
+        
+        self.section_prompt_template = PromptTemplate(
+            template=PAPER_SECTION_PROMPT.template + "\n\nIMPORTANT: The section must be written in English. All content must be based on the provided research materials. Every claim or statement must include proper citations to the research materials.",
+            input_variables=PAPER_SECTION_PROMPT.input_variables
+        )
+        
+        self.editing_prompt_template = PromptTemplate(
+            template=PAPER_EDITING_PROMPT.template + "\n\nIMPORTANT: The edited content must be in English. Ensure all claims are properly cited and all citations are included in the references section.",
+            input_variables=PAPER_EDITING_PROMPT.input_variables
+        )
+        
+        # Update all task templates to require English and proper citations
+        for task_type, template in self.task_templates.items():
+            self.task_templates[task_type] = PromptTemplate(
+                template=template.template + "\n\nIMPORTANT: All content must be written in English. All content must be based on the provided research materials. Every claim or statement must include proper citations to the research materials.",
+                input_variables=template.input_variables
+            )
+        
+        # Initialize parsers
         self.outline_parser = PydanticOutputParser(pydantic_object=OutlineTask)
-        
-        # Initialize section task parser
         self.section_parser = PydanticOutputParser(pydantic_object=SectionTask)
-        
-        # Initialize edit task parser
         self.edit_parser = PydanticOutputParser(pydantic_object=EditTask)
         
-        # Initialize outline writing chain
-        self.outline_chain = LLMChain(
-            llm=self.llm,
-            prompt=PAPER_OUTLINE_PROMPT,
-            verbose=self.verbose
+        # Initialize chains using RunnableSequence
+        self.outline_chain = RunnableSequence(
+            first=self.outline_prompt_template,
+            last=self.llm
         )
         
-        # Initialize section writing chain
-        self.section_chain = LLMChain(
-            llm=self.llm,
-            prompt=PAPER_SECTION_PROMPT
+        self.section_chain = RunnableSequence(
+            first=self.section_prompt_template,
+            last=self.llm
         )
         
-        # Initialize editing chain
-        self.edit_chain = LLMChain(
-            llm=self.llm,
-            prompt=PAPER_EDITING_PROMPT,
-            verbose=self.verbose
+        self.editing_chain = RunnableSequence(
+            first=self.editing_prompt_template,
+            last=self.llm
         )
         
-        logger.debug("Writer agent prompts and chains initialized")
+        # Initialize task chains
+        self.task_chains = {}
+        for task_type, template in self.task_templates.items():
+            self.task_chains[task_type] = RunnableSequence(
+                first=template,
+                last=self.llm
+            )
+        
+        logger.info("Writing agent prompts initialized with English language and citation requirements")
 
     def create_paper_outline(
         self, 
@@ -925,153 +947,246 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
 
     def generate_academic_paper(self, topic, research_data, outline, references, **kwargs):
         """
-        학술 논문 생성
+        Generate a complete academic paper based on research data and outline
         
         Args:
-            topic: 논문 주제
-            research_data: 연구 데이터(자료 분석 결과)
-            outline: 논문 개요
-            references: 참고문헌 목록
-        
+            topic: Paper topic
+            research_data: Research materials to use
+            outline: Paper outline structure
+            references: Reference materials
+            **kwargs: Additional parameters
+            
         Returns:
-            str: 생성된 논문 내용
+            Complete academic paper
         """
-        logger.info(f"논문 생성 시작: {topic}")
+        logger.info(f"Generating academic paper on topic: {topic}")
         
-        try:
-            # 1. 인용 스타일 설정 (기본: APA)
-            citation_style = kwargs.get("citation_style", "APA")
+        # Ensure we have a reference ID mapping for citations
+        ref_id_map = {}
+        for i, ref in enumerate(references):
+            ref_id = ref.get('id', f'ref_{i+1}')
+            ref_id_map[ref_id] = i
+        
+        # Get citation style
+        citation_style = kwargs.get('citation_style', 'APA')
+        
+        # Generate each section based on the outline
+        sections = []
+        for section_info in outline.get('sections', []):
+            section_type = section_info.get('type', 'standard')
             
-            # 2. 참고문헌 ID 매핑 (인용에 사용)
-            ref_id_map = {}
-            for i, ref in enumerate(references):
-                ref_id = ref.get("id", f"ref_{i+1}")
-                ref_id_map[ref_id] = i + 1  # 1부터 시작하는 번호 부여
-            
-            # 3. 논문 구조에 따라 섹션별 생성
-            sections = []
-            
-            # 제목 및 초록
-            title_abstract = self.generate_section(
-                "title_abstract", topic, research_data, outline, ref_id_map, citation_style
+            # Generate the section content
+            section_result = self.generate_section(
+                section_type=section_type,
+                topic=topic,
+                research_data=research_data,
+                section_info=section_info,
+                ref_id_map=ref_id_map,
+                citation_style=citation_style,
+                **kwargs
             )
-            sections.append(title_abstract)
             
-            # 서론
-            introduction = self.generate_section(
-                "introduction", topic, research_data, outline, ref_id_map, citation_style
-            )
-            sections.append(introduction)
+            # Add to sections list
+            sections.append(section_result)
+        
+        # Format references section
+        references_section = {
+            'title': 'References',
+            'content': self.format_references(references, citation_style),
+            'type': 'references'
+        }
+        
+        # Add references section to the paper
+        sections.append(references_section)
+        
+        # Assemble the complete paper
+        paper = {
+            'title': outline.get('title', topic),
+            'sections': sections,
+            'references': references
+        }
+        
+        logger.info(f"Academic paper generated with {len(sections)} sections including references")
+        return paper
+
+    def format_references(self, references, citation_style="APA"):
+        """
+        Format references according to the specified citation style
+        
+        Args:
+            references: List of reference objects
+            citation_style: Citation style to use (APA, MLA, Chicago, etc.)
             
-            # 본문 (각 섹션)
-            for section_idx, section in enumerate(outline.get("sections", [])):
-                section_title = section.get("title", f"Section {section_idx+1}")
-                section_content = self.generate_section(
-                    "body_section", topic, research_data, section, ref_id_map, citation_style,
-                    section_title=section_title
-                )
-                sections.append(section_content)
+        Returns:
+            Formatted references as a string
+        """
+        logger.info(f"Formatting {len(references)} references in {citation_style} style")
+        
+        if not references:
+            return "No references."
+        
+        formatted_refs = []
+        
+        for ref in references:
+            if citation_style.upper() == "APA":
+                # APA style formatting
+                authors = ref.get('authors', [])
+                if not authors:
+                    author_text = "Unknown"
+                elif len(authors) == 1:
+                    author_text = f"{authors[0]}"
+                elif len(authors) == 2:
+                    author_text = f"{authors[0]} & {authors[1]}"
+                else:
+                    author_text = f"{authors[0]} et al."
+                
+                year = ref.get('year', 'n.d.')
+                title = ref.get('title', 'Untitled')
+                venue = ref.get('venue', '')
+                url = ref.get('url', '')
+                doi = ref.get('doi', '')
+                
+                ref_text = f"{author_text} ({year}). {title}."
+                if venue:
+                    ref_text += f" {venue}."
+                if doi:
+                    ref_text += f" DOI: {doi}"
+                elif url:
+                    ref_text += f" Retrieved from {url}"
+                
+                formatted_refs.append(ref_text)
             
-            # 결론
-            conclusion = self.generate_section(
-                "conclusion", topic, research_data, outline, ref_id_map, citation_style
-            )
-            sections.append(conclusion)
+            elif citation_style.upper() == "MLA":
+                # MLA style formatting
+                authors = ref.get('authors', [])
+                if not authors:
+                    author_text = "Unknown"
+                elif len(authors) == 1:
+                    author_text = f"{authors[0]}"
+                elif len(authors) == 2:
+                    author_text = f"{authors[0]} and {authors[1]}"
+                else:
+                    author_text = f"{authors[0]} et al."
+                
+                title = ref.get('title', 'Untitled')
+                venue = ref.get('venue', '')
+                year = ref.get('year', 'n.d.')
+                url = ref.get('url', '')
+                
+                ref_text = f"{author_text}. \"{title}\"."
+                if venue:
+                    ref_text += f" {venue},"
+                ref_text += f" {year}."
+                if url:
+                    ref_text += f" {url}."
+                
+                formatted_refs.append(ref_text)
             
-            # 4. 참고문헌 생성
-            references_section = self.format_references(references, citation_style)
-            sections.append(references_section)
-            
-            # 5. 전체 논문 통합
-            paper = "\n\n".join(sections)
-            
-            logger.info(f"논문 생성 완료: {len(paper)} 자")
-            return paper
-            
-        except Exception as e:
-            logger.error(f"논문 생성 중 오류: {str(e)}", exc_info=True)
-            return f"논문 생성 실패: {str(e)}"
-            
+            else:
+                # Default formatting for other styles
+                authors = ref.get('authors', [])
+                author_text = ", ".join(authors) if authors else "Unknown"
+                title = ref.get('title', 'Untitled')
+                year = ref.get('year', 'n.d.')
+                
+                ref_text = f"{author_text}. {title}. {year}."
+                formatted_refs.append(ref_text)
+        
+        # Join all formatted references with line breaks
+        return "\n\n".join(formatted_refs)
+
     def generate_section(self, section_type, topic, research_data, section_info, ref_id_map, citation_style, **kwargs):
         """
-        Generate a paper section
+        Generate a specific section of an academic paper
         
         Args:
-            section_type: Section type (title_abstract, introduction, body_section, conclusion)
+            section_type: Type of section to generate
             topic: Paper topic
-            research_data: Research data
+            research_data: Research materials
             section_info: Section information
             ref_id_map: Reference ID mapping
-            citation_style: Citation style
-        
+            citation_style: Citation style to use
+            **kwargs: Additional parameters
+            
         Returns:
-            str: Generated section content
+            Generated section content
         """
-        try:
-            # Configure prompt based on section type
-            if section_type == "title_abstract":
-                prompt = f"""
-                    You are an expert in academic paper writing. Please write a title and abstract for a research paper based on the following topic and materials.
-                    
-                    Research Topic: {topic}
-                    
-                    Research Outline:
-                    {json.dumps(section_info, indent=2, ensure_ascii=False)}
-                    
-                    Guidelines for Title and Abstract:
-                    1. The title should clearly convey the core of the paper.
-                    2. The abstract should briefly include research purpose, methods, results, and conclusions.
-                    3. The abstract should be 200-300 words.
-                    4. Do not include citations in the abstract.
-                    
-                    Output Format:
-                    # [Paper Title]
-                    
-                    ## Abstract
-                    [Abstract Content]
-                """
-            elif section_type == "introduction":
-                # Get references from kwargs or use an empty list as default
-                references = kwargs.get('references', [])
-                
-                # Add citation guidelines
-                prompt = f"""
-                    You are an expert in academic paper writing. Please write an introduction for the paper based on the following research topic and materials.
-                    
-                    Research Topic: {topic}
-                    
-                    Research Materials:
-                    {json.dumps(research_data[:3], indent=2, ensure_ascii=False)}
-                    
-                    Research Outline:
-                    {json.dumps(section_info, indent=2, ensure_ascii=False)}
-                    
-                    Introduction Writing Guidelines:
-                    1. Clearly explain the research background, problem statement, and research purpose.
-                    2. Introduce relevant previous research and mention the differentiation of this study.
-                    3. Briefly guide the structure of the research.
-                    4. Use appropriate citations.
-                    
-                    Citation Guidelines ({citation_style} style):
-                    {self._get_citation_guidelines(citation_style)}
-                    
-                    Available References:
-                    {self._format_ref_list_for_prompt(references[:10] if references else [], ref_id_map)}
-                    
-                    Output Format:
-                    ## Introduction
-                    [Introduction Content]
-                """
-            # Add prompts for other section types...
-            
-            # Generate section with LLM
-            response = self.llm.invoke(prompt)
-            
-            return response.content
-            
-        except Exception as e:
-            logger.error(f"Error generating section: {str(e)}", exc_info=True)
-            return f"## {kwargs.get('section_title', section_type.capitalize())}\n\nAn error occurred while generating this section."
+        logger.info(f"Generating {section_type} section: {section_info.get('title', 'Untitled')}")
+        
+        # Prepare research materials for the prompt
+        formatted_research = self._format_ref_list_for_prompt(research_data, ref_id_map)
+        
+        # Get section title and description
+        section_title = section_info.get('title', 'Untitled Section')
+        section_desc = section_info.get('description', '')
+        
+        # Base prompt variables
+        prompt_vars = {
+            'topic': topic,
+            'section_title': section_title,
+            'section_description': section_desc,
+            'research_materials': formatted_research,
+            'citation_style': self._get_citation_guidelines(citation_style)
+        }
+        
+        # Add any additional context from kwargs
+        for key, value in kwargs.items():
+            if key not in prompt_vars:
+                prompt_vars[key] = value
+        
+        # Select the appropriate template based on section type
+        if section_type == 'introduction':
+            template = self.task_templates.get('full_paper')
+            prompt_vars['section_type'] = 'introduction'
+        elif section_type == 'literature_review':
+            template = self.task_templates.get('literature_review')
+        elif section_type == 'methodology':
+            template = self.task_templates.get('methodology')
+        elif section_type == 'results':
+            template = self.task_templates.get('analysis')
+            prompt_vars['section_type'] = 'results'
+        elif section_type == 'discussion':
+            template = self.task_templates.get('analysis')
+            prompt_vars['section_type'] = 'discussion'
+        elif section_type == 'conclusion':
+            template = self.task_templates.get('full_paper')
+            prompt_vars['section_type'] = 'conclusion'
+        else:
+            # Default to standard section template
+            template = self.task_templates.get('full_paper')
+            prompt_vars['section_type'] = 'standard'
+        
+        # Generate the section content using RAG-enhanced prompt
+        rag_prompt = self.rag_enhancer.enhance_prompt_with_research(
+            topic=f"{topic} {section_title}",
+            base_prompt=template.format(**prompt_vars),
+            num_sources=5
+        )
+        
+        # Use the LLM to generate the section content
+        response = self.llm.invoke(rag_prompt)
+        
+        # Extract the content and citations
+        content = response
+        citations = []
+        
+        # Extract citations from the content
+        citation_pattern = r'\(([^)]+)\)'
+        matches = re.findall(citation_pattern, content)
+        for match in matches:
+            if any(ref_id in match for ref_id in ref_id_map.keys()):
+                citations.append(match)
+        
+        # Create the section object
+        section = {
+            'title': section_title,
+            'content': content,
+            'type': section_type,
+            'citations': citations
+        }
+        
+        logger.info(f"Generated {section_type} section with {len(citations)} citations")
+        return section
 
     def _format_ref_list_for_prompt(self, references, ref_id_map):
         """Format reference list for prompt"""
@@ -1086,47 +1201,6 @@ class WriterAgent(BaseAgent[Union[Paper, Dict[str, Any]]]):
             ref_list.append(f"[{num}] {authors} ({year}). {title}")
         
         return "\n".join(ref_list)
-
-    def format_references(self, references, citation_style="APA"):
-        """
-        Format references section
-        
-        Args:
-            references: List of references
-            citation_style: Citation style
-        
-        Returns:
-            str: Formatted references section
-        """
-        # Sort references by first author's last name
-        sorted_refs = sorted(references, key=lambda x: x.get("authors", "Unknown").split(",")[0].lower())
-        
-        # Format references according to style
-        formatted_refs = []
-        
-        if citation_style.upper() == "APA":
-            for ref in sorted_refs:
-                authors = ref.get("authors", "")
-                year = ref.get("year", "")
-                title = ref.get("title", "")
-                source = ref.get("source", "")
-                url = ref.get("url", "")
-                
-                formatted_ref = f"{authors} ({year}). {title}. "
-                if source:
-                    formatted_ref += f"{source}. "
-                if url:
-                    formatted_ref += f"Retrieved from {url}"
-                
-                formatted_refs.append(formatted_ref)
-        
-        # Create final references section
-        references_section = "## References\n\n"
-        
-        for i, ref in enumerate(formatted_refs):
-            references_section += f"{i+1}. {ref}\n\n"
-        
-        return references_section
 
     def revise_content(self, previous_content: str, revision_instructions: str, 
                      original_task_type: str) -> Dict[str, Any]:

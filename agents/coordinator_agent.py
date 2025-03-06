@@ -9,7 +9,7 @@ import json
 from typing import Dict, Any, List, Optional, Tuple, Union, Callable
 from pydantic import BaseModel, Field
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, RunnableSequence
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -39,6 +39,14 @@ if TYPE_CHECKING:
 
 from utils.academic_search import AcademicSearchManager
 from utils.rag_integration import RAGEnhancer
+
+# Add global paper requirements
+PAPER_REQUIREMENTS = {
+    "language": "English",
+    "citation_required": True,
+    "bibliography_required": True,
+    "vector_db_based": True
+}
 
 
 class WorkflowRunner:
@@ -99,46 +107,72 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         self.search_manager = AcademicSearchManager()
         self.rag_enhancer = RAGEnhancer()
         
-        logger.info(f"{self.name} 초기화 완료")
+        # Set global paper requirements
+        self.paper_requirements = PAPER_REQUIREMENTS
+        logger.info(f"Coordinator agent initialized with paper requirements: {self.paper_requirements}")
 
     def _init_prompts(self) -> None:
-        """프롬프트와 체인 초기화"""
-        self.research_plan_parser = PydanticOutputParser(pydantic_object=ResearchPlan)
-        self.status_parser = PydanticOutputParser(pydantic_object=ProjectStatus)
-        
-        # 기존 프롬프트 대신 agent_prompts.py의 프롬프트 활용
-        self.research_plan_chain = LLMChain(
-            llm=self.llm,
-            prompt=AGENT_PLANNING_PROMPT,
-            output_key="text",
-            verbose=self.verbose
+        """Initialize prompt templates with paper requirements"""
+        # Add paper requirements to planning prompt
+        self.planning_prompt_template = PromptTemplate(
+            template=AGENT_PLANNING_PROMPT.template + "\n\nIMPORTANT REQUIREMENTS:\n1. All papers and reports must be written in English.\n2. All content must be based on the vector database content.\n3. Every claim or statement must include proper citations.\n4. All papers and reports must include a complete bibliography/references section at the end.",
+            input_variables=AGENT_PLANNING_PROMPT.input_variables
         )
         
-        self.summary_chain = LLMChain(
-            llm=self.llm,
-            prompt=PromptTemplate(
-                template="""다음 논문을 요약해 주세요:
-                
-                제목: {title}
-                
-                논문 내용:
-                {content}
-                
-                300단어 이내로 핵심 내용, 주요 발견, 그리고 결론을 요약해 주세요.""",
-                input_variables=["title", "content"],
-            ),
-            verbose=self.verbose
+        # Add paper requirements to communication prompt
+        self.communication_prompt_template = PromptTemplate(
+            template=AGENT_COMMUNICATION_PROMPT.template + "\n\nIMPORTANT: Remind all agents that papers and reports must be in English, based on vector database content, with proper citations and a bibliography.",
+            input_variables=AGENT_COMMUNICATION_PROMPT.input_variables
         )
         
-        # 에러 처리 체인 추가
-        self.error_handling_chain = LLMChain(
-            llm=self.llm,
-            prompt=AGENT_ERROR_HANDLING_PROMPT,
-            output_key="text",
-            verbose=self.verbose
+        # Add paper requirements to error handling prompt
+        self.error_handling_prompt_template = PromptTemplate(
+            template=AGENT_ERROR_HANDLING_PROMPT.template + "\n\nWhen handling errors, ensure that paper requirements (English language, vector DB content, citations, bibliography) are still met.",
+            input_variables=AGENT_ERROR_HANDLING_PROMPT.input_variables
         )
         
-        logger.debug("총괄 에이전트 프롬프트 및 체인 초기화 완료")
+        # Add paper requirements to self-evaluation prompt
+        self.self_evaluation_prompt_template = PromptTemplate(
+            template=AGENT_SELF_EVALUATION_PROMPT.template + "\n\nEvaluation criteria must include checking that papers are in English, based on vector database content, with proper citations and a bibliography.",
+            input_variables=AGENT_SELF_EVALUATION_PROMPT.input_variables
+        )
+        
+        # Initialize chains using the new LangChain API with RunnableSequence
+        from langchain_core.runnables import RunnableSequence
+        
+        self.planning_chain = RunnableSequence(
+            first=self.planning_prompt_template,
+            last=self.llm
+        )
+        
+        self.communication_chain = RunnableSequence(
+            first=self.communication_prompt_template,
+            last=self.llm
+        )
+        
+        self.error_handling_chain = RunnableSequence(
+            first=self.error_handling_prompt_template,
+            last=self.llm
+        )
+        
+        self.self_evaluation_chain = RunnableSequence(
+            first=self.self_evaluation_prompt_template,
+            last=self.llm
+        )
+        
+        # 연구 계획 프롬프트 템플릿 초기화
+        self.research_plan_prompt_template = PromptTemplate(
+            template="연구 주제: {topic}\n작업 유형: {task}\n가용 자원: {resources}\n제약 사항: {constraints}\n\n위 정보를 바탕으로 상세한 연구 계획을 작성해주세요.",
+            input_variables=["topic", "task", "resources", "constraints"]
+        )
+        
+        # 연구 계획 체인 초기화
+        self.research_plan_chain = RunnableSequence(
+            first=self.research_plan_prompt_template,
+            last=self.llm
+        )
+        
+        logger.info("Coordinator agent prompts initialized with paper requirements")
 
     def _init_agents(self):
         """Initialize agent instances"""
@@ -167,42 +201,68 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         """
         try:
             # 필요한 모든 입력 키 제공
-            result = self.research_plan_chain.run({
+            inputs = {
                 "topic": topic,
-                "task": task_type,  # 누락된 'task' 키
-                "resources": [],    # 누락된 'resources' 키
-                "constraints": ""   # 누락된 'constraints' 키
-            })
-            return result
+                "task": task_type,
+                "resources": [],
+                "constraints": ""
+            }
+            # 새로운 LangChain API 사용
+            result = self.research_plan_chain.invoke(inputs)
+            # result는 {"output": AIMessage} 형식이므로 content 속성을 추출
+            if isinstance(result, dict) and "output" in result:
+                if hasattr(result["output"], "content"):
+                    return result["output"].content
+                else:
+                    return str(result["output"])
+            elif hasattr(result, "content"):
+                return result.content
+            else:
+                return str(result)
         except Exception as e:
             logger.error(f"연구 계획 생성 중 오류: {str(e)}")
             # 오류 발생 시 기본 템플릿 반환
             return f"# 연구 계획: {topic}\n\n## 목표\n\n{topic}에 대한 연구 수행\n\n## 단계\n\n1. 문헌 조사\n2. 분석\n3. 정리"
 
     def start_workflow(
-        self,
-        user_question: str,
+        self, 
+        topic: str,
         template_name: Optional[str] = None,
         style_guide: Optional[str] = None,
         citation_style: Optional[str] = None,
         output_format: str = "markdown",
         verbose: bool = False
     ) -> PaperWorkflowState:
-        """사용자 질문 기반 워크플로우 시작"""
-        logger.info(f"질문 '{user_question}'에 대한 워크플로우 시작")
-        research_plan = self.create_research_plan(user_question, "literature_review")
+        """
+        논문 작성 워크플로우 시작
         
-        workflow_state = self.workflow_runner.run_workflow(
-            user_question=user_question,
-            template_name=template_name,
-            style_guide=style_guide,
-            citation_style=citation_style,
-            output_format=output_format,
-            verbose=verbose
-        )
-        self.workflow_state = workflow_state
-        logger.info(f"워크플로우 실행 완료: 상태 - {workflow_state.status}")
-        return workflow_state
+        Args:
+            topic: 논문 주제
+            template_name: 논문 템플릿 이름
+            style_guide: 스타일 가이드 이름
+            citation_style: 인용 스타일
+            output_format: 출력 형식
+            verbose: 상세 로깅 여부
+            
+        Returns:
+            PaperWorkflowState: 워크플로우 상태
+        """
+        logger.info(f"Starting workflow for question: {topic}")
+        
+        # 워크플로우 설정 - PaperWritingGraph.run_workflow에서 지원하는 매개변수만 포함
+        workflow_config = {
+            "topic": topic,
+            "template_name": template_name or "academic",
+            "style_guide": style_guide or "Standard Academic",
+            "citation_style": citation_style or "APA",
+            "output_format": output_format,
+            "verbose": verbose
+        }
+        
+        # Run the workflow
+        self.workflow_state = self.workflow_runner.run_workflow(**workflow_config)
+        
+        return self.workflow_state
 
     def get_workflow_status(self) -> ProjectStatus:
         """현재 워크플로우 상태를 가져오기"""
@@ -350,44 +410,217 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             Dict: 생성된 논문 및 메타데이터
         """
         try:
-            logger.info(f"사용자 요구사항 처리 시작")
+            logger.info(f"사용자 요구사항 처리 시작: {topic}")
             
-            # 1. 연구 계획 생성 (중앙집중형 모델의 핵심)
-            research_plan = self.create_research_plan(topic, paper_type, constraints, references)
+            # 1. 사용자 요청 분석
+            logger.info("사용자 요청 분석 중...")
+            request_analysis = self._analyze_user_request(topic, paper_type, constraints, instructions)
             
-            # 추가 지시사항 처리
-            if instructions:
-                self.process_instructions(instructions, research_plan)
+            # 2. 조사 계획 생성 및 조사 에이전트에게 전달
+            logger.info("조사 계획 생성 중...")
+            investigation_plan = self._create_investigation_plan(request_analysis, topic)
             
-            # 2. 연구 자료 수집 (연구 계획 전달)
-            materials = self.research_agent.run(
+            # 조사 에이전트에게 조사 계획 전달
+            logger.info("조사 에이전트에게 조사 계획 전달")
+            investigation_success = self.delegate_to_research_agent(investigation_plan)
+            
+            if not investigation_success:
+                logger.error("조사 계획 전달 실패")
+                return {"error": "조사 계획 전달 실패"}
+            
+            # 3. 조사 에이전트 실행 및 결과 검증
+            logger.info("조사 에이전트 실행 중...")
+            investigation_results = self.research_agent.run(
                 task="collect_materials",
                 topic=topic,
-                research_plan=research_plan,  # 연구 계획 전달
+                research_plan=investigation_plan,
                 max_queries=5,
-                results_per_source=10,
-                constraints=constraints
+                results_per_source=10
             )
             
-            # 자료가 충분한지 확인
-            if not materials or len(materials) < 3:
-                # 계획 수정 - 로컬만 검색했다면 외부 검색 허용
-                if research_plan["search_strategy"].get("search_scope") == "local_only":
-                    logger.info("로컬 자료 부족, 외부 검색으로 확장")
-                    research_plan["search_strategy"]["search_scope"] = "all"
-                    # 다시 자료 수집
-                    materials = self.research_agent.run(
-                        task="collect_materials",
-                        topic=topic,
-                        research_plan=research_plan,
-                        max_queries=5
-                    )
+            # 조사 결과 검증
+            logger.info("조사 결과 검증 중...")
+            investigation_valid, investigation_feedback = self._validate_investigation_results(investigation_results, topic)
             
-            # 3. 논문 작성 (연구 계획 전달)
-            # ... (이하 다른 에이전트에도 연구 계획 전달)
+            # 조사 결과가 타당하지 않으면 다시 조사 지시
+            max_investigation_attempts = 3
+            investigation_attempts = 1
             
-            # 4. 최종 논문 통합 및 반환
-            # ... (기존 코드)
+            while not investigation_valid and investigation_attempts < max_investigation_attempts:
+                logger.info(f"조사 결과 타당하지 않음. 피드백: {investigation_feedback}")
+                logger.info(f"조사 재시도 ({investigation_attempts}/{max_investigation_attempts})...")
+                
+                # 피드백을 반영하여 조사 계획 수정
+                investigation_plan = self._revise_investigation_plan(investigation_plan, investigation_feedback)
+                
+                # 수정된 계획으로 다시 조사
+                self.delegate_to_research_agent(investigation_plan)
+                investigation_results = self.research_agent.run(
+                    task="collect_materials",
+                    topic=topic,
+                    research_plan=investigation_plan,
+                    max_queries=5,
+                    results_per_source=10
+                )
+                
+                # 결과 재검증
+                investigation_valid, investigation_feedback = self._validate_investigation_results(investigation_results, topic)
+                investigation_attempts += 1
+            
+            if not investigation_valid:
+                logger.warning(f"최대 조사 시도 횟수 도달. 최선의 결과로 진행합니다.")
+            
+            # 4. 연구 계획 생성 및 연구 에이전트에게 전달
+            logger.info("연구 계획 생성 중...")
+            research_plan = self._create_research_plan(request_analysis, topic, investigation_results)
+            
+            # 연구 에이전트에게 연구 계획 전달
+            logger.info("연구 에이전트에게 연구 계획 전달")
+            # 연구 에이전트 실행
+            research_materials = self.research_agent.run(
+                task="analyze_materials",
+                topic=topic,
+                research_plan=research_plan,
+                materials=investigation_results
+            )
+            
+            # 연구 결과 검증
+            logger.info("연구 결과 검증 중...")
+            research_valid, research_feedback = self._validate_research_results(research_materials, topic)
+            
+            # 연구 결과가 타당하지 않으면 다시 연구 지시
+            max_research_attempts = 3
+            research_attempts = 1
+            
+            while not research_valid and research_attempts < max_research_attempts:
+                logger.info(f"연구 결과 타당하지 않음. 피드백: {research_feedback}")
+                logger.info(f"연구 재시도 ({research_attempts}/{max_research_attempts})...")
+                
+                # 피드백을 반영하여 연구 계획 수정
+                research_plan = self._revise_research_plan(research_plan, research_feedback)
+                
+                # 수정된 계획으로 다시 연구
+                research_materials = self.research_agent.run(
+                    task="analyze_materials",
+                    topic=topic,
+                    research_plan=research_plan,
+                    materials=investigation_results
+                )
+                
+                # 결과 재검증
+                research_valid, research_feedback = self._validate_research_results(research_materials, topic)
+                research_attempts += 1
+            
+            if not research_valid:
+                logger.warning(f"최대 연구 시도 횟수 도달. 최선의 결과로 진행합니다.")
+            
+            # 5. 보고서 양식 생성 및 편집 에이전트에게 전달
+            logger.info("보고서 양식 생성 중...")
+            report_format = self._create_report_format(request_analysis, topic, paper_type)
+            
+            # 편집 에이전트에게 보고서 양식 전달
+            logger.info("편집 에이전트에게 보고서 양식 전달")
+            format_success = self.delegate_to_writing_agent(report_format)
+            
+            if not format_success:
+                logger.error("보고서 양식 전달 실패")
+                return {"error": "보고서 양식 전달 실패"}
+            
+            # 6. 작성 에이전트 실행
+            logger.info("작성 에이전트 실행 중...")
+            paper_draft = self.writer_agent.run(
+                task="write_paper",
+                topic=topic,
+                paper_type=paper_type,
+                research_materials=research_materials,
+                report_format=report_format
+            )
+            
+            # 작성 결과 검증
+            logger.info("작성 결과 검증 중...")
+            writing_valid, writing_feedback = self._validate_writing_results(paper_draft, topic, report_format)
+            
+            # 작성 결과가 타당하지 않으면 다시 작성 지시
+            max_writing_attempts = 3
+            writing_attempts = 1
+            
+            while not writing_valid and writing_attempts < max_writing_attempts:
+                logger.info(f"작성 결과 타당하지 않음. 피드백: {writing_feedback}")
+                logger.info(f"작성 재시도 ({writing_attempts}/{max_writing_attempts})...")
+                
+                # 피드백을 반영하여 작성 지시 수정
+                revised_report_format = self._revise_report_format(report_format, writing_feedback)
+                
+                # 수정된 양식으로 다시 작성
+                self.delegate_to_writing_agent(revised_report_format)
+                paper_draft = self.writer_agent.run(
+                    task="write_paper",
+                    topic=topic,
+                    paper_type=paper_type,
+                    research_materials=research_materials,
+                    report_format=revised_report_format
+                )
+                
+                # 결과 재검증
+                writing_valid, writing_feedback = self._validate_writing_results(paper_draft, topic, revised_report_format)
+                writing_attempts += 1
+                report_format = revised_report_format
+            
+            if not writing_valid:
+                logger.warning(f"최대 작성 시도 횟수 도달. 최선의 결과로 진행합니다.")
+            
+            # 7. 편집 에이전트 실행
+            logger.info("편집 에이전트 실행 중...")
+            edited_paper = self.editor_agent.run(
+                task="edit_paper",
+                paper_draft=paper_draft,
+                report_format=report_format,
+                citation_style=report_format.get("citation_style", "APA")
+            )
+            
+            # 편집 결과 검증
+            logger.info("편집 결과 검증 중...")
+            editing_valid, editing_feedback = self._validate_editing_results(edited_paper, paper_draft, report_format)
+            
+            # 편집 결과가 타당하지 않으면 다시 편집 지시
+            max_editing_attempts = 3
+            editing_attempts = 1
+            
+            while not editing_valid and editing_attempts < max_editing_attempts:
+                logger.info(f"편집 결과 타당하지 않음. 피드백: {editing_feedback}")
+                logger.info(f"편집 재시도 ({editing_attempts}/{max_editing_attempts})...")
+                
+                # 피드백을 반영하여 편집 지시 수정
+                revised_editing_instructions = self._revise_editing_instructions(report_format, editing_feedback)
+                
+                # 수정된 지시로 다시 편집
+                edited_paper = self.editor_agent.run(
+                    task="edit_paper",
+                    paper_draft=paper_draft,
+                    report_format=revised_editing_instructions,
+                    citation_style=revised_editing_instructions.get("citation_style", "APA")
+                )
+                
+                # 결과 재검증
+                editing_valid, editing_feedback = self._validate_editing_results(edited_paper, paper_draft, revised_editing_instructions)
+                editing_attempts += 1
+            
+            if not editing_valid:
+                logger.warning(f"최대 편집 시도 횟수 도달. 최선의 결과로 진행합니다.")
+            
+            # 8. 최종 결과 반환
+            logger.info("논문 작성 프로세스 완료")
+            return {
+                "paper": edited_paper,
+                "topic": topic,
+                "paper_type": paper_type,
+                "research_materials": research_materials,
+                "metadata": {
+                    "investigation_plan": investigation_plan,
+                    "research_plan": research_plan,
+                    "report_format": report_format
+                }
+            }
             
         except Exception as e:
             logger.error(f"논문 생성 실패: {str(e)}", exc_info=True)
@@ -733,46 +966,133 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         # 기본값은 전체 논문 작성
         return "full_paper"
 
+    def _create_investigation_plan(self, request_analysis, topic):
+        """
+        사용자 요청 분석을 바탕으로 조사 계획을 생성합니다.
+        
+        Args:
+            request_analysis: 사용자 요청 분석 결과
+            topic: 연구 주제
+            
+        Returns:
+            Dict: 조사 계획
+        """
+        logger.info(f"조사 계획 생성: 주제={topic}")
+        
+        try:
+            # 조사 계획 구성
+            investigation_plan = {
+                "topic": topic,
+                "search_strategy": {
+                    "search_scope": "all",  # 기본값은 모든 소스 검색
+                    "min_papers": 10,  # 최소 필요 논문 수
+                    "queries": []  # 검색 쿼리 목록
+                },
+                "focus_keywords": request_analysis.get("keywords", [topic]),
+                "research_questions": request_analysis.get("research_questions", [f"{topic}에 대한 최신 연구는 무엇인가?"]),
+                "required_sources": request_analysis.get("required_sources", ["학술 논문", "연구 보고서"]),
+                "search_depth": 3,  # 기본 검색 깊이
+                "max_sources": 20,  # 최대 소스 수
+                "time_constraints": "최근 5년",  # 시간적 제약
+                "language_preferences": ["한국어", "영어"],  # 언어 선호도
+                "evaluation_criteria": {
+                    "relevance_threshold": 0.6,  # 관련성 임계값
+                    "quality_metrics": ["인용 수", "저널 영향력", "최신성"]
+                }
+            }
+            
+            # 검색 쿼리 생성
+            keywords = request_analysis.get("keywords", [topic])
+            for keyword in keywords:
+                investigation_plan["search_strategy"]["queries"].append(keyword)
+            
+            # 연구 질문을 기반으로 추가 쿼리 생성
+            research_questions = request_analysis.get("research_questions", [])
+            for question in research_questions:
+                # 질문에서 핵심 키워드 추출
+                question_keywords = question.split()
+                if len(question_keywords) > 3:
+                    # 긴 질문에서는 주요 명사만 추출
+                    query = " ".join([word for word in question_keywords if len(word) > 1 and word.lower() not in ["무엇", "어떻게", "왜", "언제", "어디서", "누구", "의", "에", "을", "를", "이", "가"]])
+                    if query and query not in investigation_plan["search_strategy"]["queries"]:
+                        investigation_plan["search_strategy"]["queries"].append(query)
+            
+            # 중복 제거 및 최대 5개 쿼리로 제한
+            investigation_plan["search_strategy"]["queries"] = list(set(investigation_plan["search_strategy"]["queries"]))[:5]
+            
+            logger.info(f"조사 계획 생성 완료: {len(investigation_plan['search_strategy']['queries'])}개 검색 쿼리 생성")
+            return investigation_plan
+            
+        except Exception as e:
+            logger.error(f"조사 계획 생성 중 오류: {str(e)}")
+            # 오류 발생 시 기본 조사 계획 반환
+            return {
+                "topic": topic,
+                "search_strategy": {
+                    "search_scope": "all",
+                    "min_papers": 10,
+                    "queries": [topic]
+                },
+                "focus_keywords": [topic],
+                "research_questions": [f"{topic}에 대한 최신 연구는 무엇인가?"],
+                "required_sources": ["학술 논문", "연구 보고서"],
+                "search_depth": 3,
+                "max_sources": 20
+            }
+
     def _create_writing_task(self, task_type: str, requirements: Dict[str, Any], 
                             research_plan: str, research_materials: Dict[str, Any]) -> Dict[str, Any]:
         """
-        작업 유형에 따른 작성 작업 구성
-        """
-        topic = requirements.get("topic", "")
-        additional_instructions = requirements.get("additional_instructions", "")
+        Create a writing task based on the research plan and materials
         
-        # 기본 작업 템플릿
+        Args:
+            task_type: Type of writing task
+            requirements: User requirements
+            research_plan: Research plan
+            research_materials: Research materials
+            
+        Returns:
+            Writing task configuration
+        """
+        logger.info(f"Creating {task_type} writing task")
+        
+        # Base writing task
         writing_task = {
             "task_type": task_type,
-            "topic": topic,
-            "materials": research_materials.get("materials", []),
-            "additional_context": {
-                "research_plan": research_plan,
-                "additional_instructions": additional_instructions
-            }
+            "topic": requirements.get("topic", ""),
+            "research_plan": research_plan,
+            "research_materials": research_materials,
+            "requirements": requirements,
+            # Add global paper requirements
+            "language": self.paper_requirements["language"],
+            "citation_required": self.paper_requirements["citation_required"],
+            "bibliography_required": self.paper_requirements["bibliography_required"],
+            "vector_db_based": self.paper_requirements["vector_db_based"]
         }
         
-        # 작업 유형에 따른 추가 필드
-        if task_type == "literature_review":
-            writing_task["content"] = {
-                "research_materials": research_materials.get("materials", []),
-                "topic": topic,
-                "outline": research_materials.get("outline", "")
-            }
-        elif task_type == "methodology":
-            writing_task["additional_context"]["research_question"] = requirements.get("research_question", topic)
-        elif task_type == "results_analysis":
-            # 분석할 데이터 추가
-            writing_task["data"] = research_materials.get("analysis_data", {})
-        elif task_type == "custom":
-            # 사용자 정의 프롬프트 구성
-            writing_task["prompt"] = additional_instructions or f"Write about {topic}"
-            writing_task["context"] = {
-                "topic": topic,
-                "materials": research_materials.get("materials", []),
-                "additional_info": requirements.get("research_context", "")
-            }
+        # Add task-specific configurations
+        if task_type == "academic_paper":
+            writing_task.update({
+                "paper_type": requirements.get("paper_type", "research"),
+                "citation_style": requirements.get("citation_style", "APA"),
+                "target_length": requirements.get("target_length", 3000),
+                "template": requirements.get("template", "academic")
+            })
+        elif task_type == "report":
+            writing_task.update({
+                "report_type": requirements.get("report_type", "technical"),
+                "target_audience": requirements.get("target_audience", "professional"),
+                "format": requirements.get("format", "standard"),
+                "include_visuals": requirements.get("include_visuals", True)
+            })
+        elif task_type == "literature_review":
+            writing_task.update({
+                "focus_area": requirements.get("focus_area", "comprehensive"),
+                "chronological": requirements.get("chronological", False),
+                "critical_analysis": requirements.get("critical_analysis", True)
+            })
         
+        logger.info(f"Created {task_type} writing task with paper requirements")
         return writing_task
 
     def process_writing_task(self, task_type: str, writing_task: Dict[str, Any]) -> Dict[str, Any]:
@@ -1196,3 +1516,783 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         except Exception:
             # 파싱 실패시 빈 딕셔너리 반환
             return {}
+
+    def _analyze_user_request(self, topic, paper_type, constraints=None, instructions=None):
+        """
+        사용자 요청을 분석하여 요구사항을 파악합니다.
+        
+        Args:
+            topic: 연구 주제
+            paper_type: 논문 유형
+            constraints: 제약사항
+            instructions: 추가 지시사항
+            
+        Returns:
+            Dict: 분석된 요구사항
+        """
+        logger.info(f"사용자 요청 분석: 주제={topic}, 유형={paper_type}")
+        
+        try:
+            # 프롬프트 생성
+            prompt = f"""
+            다음 연구 주제와 논문 유형에 대한 요구사항을 분석해주세요:
+            
+            주제: {topic}
+            논문 유형: {paper_type}
+            
+            제약사항: {constraints if constraints else '없음'}
+            추가 지시사항: {instructions if instructions else '없음'}
+            
+            다음 항목을 포함하여 JSON 형식으로 응답해주세요:
+            1. 핵심 키워드 (keywords): 연구에 필요한 핵심 키워드 목록
+            2. 연구 질문 (research_questions): 답변해야 할 주요 연구 질문 목록
+            3. 필요한 자료 유형 (required_sources): 필요한 자료 유형 목록 (예: 학술 논문, 통계 자료, 사례 연구 등)
+            4. 연구 범위 (scope): 연구의 범위와 한계
+            5. 방법론 (methodology): 적합한 연구 방법론 제안
+            6. 예상 결과물 (expected_outcomes): 예상되는 결과물 설명
+            7. 보고서 구조 (report_structure): 적합한 보고서 구조 제안
+            """
+            
+            # LLM을 사용하여 요청 분석
+            response = self.llm.invoke(prompt)
+            
+            # JSON 추출
+            analysis = self._extract_json_from_response(response.content)
+            
+            # 기본값 설정
+            if "keywords" not in analysis:
+                analysis["keywords"] = [topic]
+            
+            if "research_questions" not in analysis:
+                analysis["research_questions"] = [f"{topic}에 대한 최신 연구는 무엇인가?"]
+            
+            if "required_sources" not in analysis:
+                analysis["required_sources"] = ["학술 논문", "연구 보고서"]
+            
+            if "scope" not in analysis:
+                analysis["scope"] = f"{topic}에 관한 최근 5년간의 연구"
+            
+            if "methodology" not in analysis:
+                analysis["methodology"] = "문헌 조사 및 분석"
+            
+            if "expected_outcomes" not in analysis:
+                analysis["expected_outcomes"] = [f"{topic}에 대한 종합적인 이해와 분석"]
+            
+            if "report_structure" not in analysis:
+                analysis["report_structure"] = ["서론", "본론", "결론"]
+            
+            logger.info(f"사용자 요청 분석 완료: {len(analysis['keywords'])}개 키워드, {len(analysis['research_questions'])}개 연구 질문 식별")
+            return analysis
+            
+        except Exception as e:
+            logger.error(f"사용자 요청 분석 중 오류: {str(e)}")
+            # 오류 발생 시 기본 분석 결과 반환
+            return {
+                "keywords": [topic],
+                "research_questions": [f"{topic}에 대한 최신 연구는 무엇인가?"],
+                "required_sources": ["학술 논문", "연구 보고서"],
+                "scope": f"{topic}에 관한 최근 5년간의 연구",
+                "methodology": "문헌 조사 및 분석",
+                "expected_outcomes": [f"{topic}에 대한 종합적인 이해와 분석"],
+                "report_structure": ["서론", "본론", "결론"]
+            }
+
+    def _validate_investigation_results(self, investigation_results, topic):
+        """
+        조사 결과의 타당성을 검증합니다.
+        
+        Args:
+            investigation_results: 조사 결과
+            topic: 연구 주제
+            
+        Returns:
+            Tuple[bool, str]: (타당성 여부, 피드백)
+        """
+        logger.info(f"조사 결과 검증: {len(investigation_results) if investigation_results else 0}개 자료")
+        
+        try:
+            # 결과가 없는 경우
+            if not investigation_results or len(investigation_results) == 0:
+                return False, "조사 결과가 없습니다. 검색 범위를 확장하거나 다른 키워드를 사용해 보세요."
+            
+            # 결과가 너무 적은 경우
+            if len(investigation_results) < 3:
+                return False, f"조사 결과가 부족합니다 ({len(investigation_results)}개). 최소 3개 이상의 자료가 필요합니다."
+            
+            # 주제 관련성 검증
+            relevant_count = 0
+            for material in investigation_results:
+                if hasattr(material, 'relevance_score') and material.relevance_score >= 0.6:
+                    relevant_count += 1
+            
+            if relevant_count < len(investigation_results) * 0.5:
+                return False, f"관련성 높은 자료가 부족합니다 ({relevant_count}/{len(investigation_results)}). 더 정확한 키워드로 검색해 보세요."
+            
+            # 자료의 다양성 검증
+            sources = set()
+            years = set()
+            for material in investigation_results:
+                if hasattr(material, 'source'):
+                    sources.add(material.source)
+                if hasattr(material, 'year') and material.year:
+                    years.add(material.year)
+            
+            if len(sources) < 2:
+                return False, "자료 출처가 다양하지 않습니다. 다양한 소스에서 자료를 수집해 보세요."
+            
+            if len(years) < 2:
+                return False, "자료의 출판 연도가 다양하지 않습니다. 다양한 시기의 자료를 수집해 보세요."
+            
+            # 최신 자료 포함 여부 검증
+            current_year = datetime.now().year
+            has_recent = False
+            for material in investigation_results:
+                if hasattr(material, 'year') and material.year and material.year >= current_year - 3:
+                    has_recent = True
+                    break
+            
+            if not has_recent:
+                return False, "최신 자료(최근 3년 이내)가 포함되어 있지 않습니다. 최신 연구 자료를 추가해 보세요."
+            
+            # 모든 검증을 통과한 경우
+            return True, "조사 결과가 타당합니다."
+            
+        except Exception as e:
+            logger.error(f"조사 결과 검증 중 오류: {str(e)}")
+            # 오류 발생 시 기본적으로 통과시킴
+            return True, f"검증 중 오류가 발생했으나 진행합니다: {str(e)}"
+    
+    def _revise_investigation_plan(self, original_plan, feedback):
+        """
+        피드백을 바탕으로 조사 계획을 수정합니다.
+        
+        Args:
+            original_plan: 원래 조사 계획
+            feedback: 피드백
+            
+        Returns:
+            Dict: 수정된 조사 계획
+        """
+        logger.info(f"조사 계획 수정: {feedback}")
+        
+        try:
+            # 원본 계획 복사
+            revised_plan = original_plan.copy()
+            
+            # 피드백에 따른 수정
+            if "검색 범위를 확장" in feedback or "자료가 없습니다" in feedback or "자료가 부족합니다" in feedback:
+                # 검색 범위 확장
+                revised_plan["search_strategy"]["search_scope"] = "all"
+                revised_plan["search_depth"] = min(revised_plan.get("search_depth", 3) + 1, 5)
+                revised_plan["max_sources"] = min(revised_plan.get("max_sources", 20) + 10, 50)
+                
+                # 최소 논문 수 감소
+                revised_plan["search_strategy"]["min_papers"] = max(revised_plan["search_strategy"].get("min_papers", 10) - 2, 3)
+                
+                # 관련성 임계값 낮추기
+                if "evaluation_criteria" in revised_plan:
+                    revised_plan["evaluation_criteria"]["relevance_threshold"] = max(
+                        revised_plan["evaluation_criteria"].get("relevance_threshold", 0.6) - 0.1, 
+                        0.4
+                    )
+            
+            if "더 정확한 키워드" in feedback or "관련성 높은 자료가 부족" in feedback:
+                # 주제에서 추가 키워드 추출
+                topic = revised_plan.get("topic", "")
+                
+                # 프롬프트 생성
+                prompt = f"""
+                다음 주제에 대한 더 구체적인 검색 키워드를 5개 생성해주세요:
+                
+                주제: {topic}
+                
+                피드백: {feedback}
+                
+                JSON 형식으로 응답해주세요:
+                {{
+                    "keywords": ["키워드1", "키워드2", ...]
+                }}
+                """
+                
+                # LLM을 사용하여 키워드 생성
+                response = self.llm.invoke(prompt)
+                
+                # JSON 추출
+                result = self._extract_json_from_response(response.content)
+                
+                if "keywords" in result and result["keywords"]:
+                    # 기존 쿼리와 새 키워드 결합
+                    existing_queries = set(revised_plan["search_strategy"].get("queries", []))
+                    for keyword in result["keywords"]:
+                        if keyword not in existing_queries:
+                            existing_queries.add(keyword)
+                    
+                    # 최대 7개 쿼리로 제한
+                    revised_plan["search_strategy"]["queries"] = list(existing_queries)[:7]
+                    
+                    # 포커스 키워드도 업데이트
+                    revised_plan["focus_keywords"] = list(set(revised_plan.get("focus_keywords", []) + result["keywords"]))
+            
+            if "자료 출처가 다양하지 않습니다" in feedback:
+                # 다양한 소스 추가
+                if "required_sources" not in revised_plan or len(revised_plan["required_sources"]) < 3:
+                    revised_plan["required_sources"] = list(set(revised_plan.get("required_sources", []) + ["학술 논문", "연구 보고서", "학위 논문", "컨퍼런스 자료", "서적"]))
+            
+            if "출판 연도가 다양하지 않습니다" in feedback or "최신 자료" in feedback:
+                # 시간 범위 확장
+                revised_plan["time_constraints"] = "최근 10년"
+                
+                # 최신 자료 강조
+                if "search_strategy" in revised_plan:
+                    current_year = datetime.now().year
+                    revised_plan["search_strategy"]["queries"].append(f"{revised_plan['topic']} {current_year-1}")
+                    revised_plan["search_strategy"]["queries"].append(f"{revised_plan['topic']} {current_year-2}")
+                    
+                    # 중복 제거 및 최대 7개 쿼리로 제한
+                    revised_plan["search_strategy"]["queries"] = list(set(revised_plan["search_strategy"]["queries"]))[:7]
+            
+            logger.info(f"조사 계획 수정 완료: {len(revised_plan['search_strategy']['queries'])}개 검색 쿼리")
+            return revised_plan
+            
+        except Exception as e:
+            logger.error(f"조사 계획 수정 중 오류: {str(e)}")
+            # 오류 발생 시 원본 계획 반환
+            return original_plan
+
+    def _create_research_plan(self, request_analysis, topic, investigation_results):
+        """
+        사용자 요청 분석과 조사 결과를 바탕으로 연구 계획을 생성합니다.
+        
+        Args:
+            request_analysis: 사용자 요청 분석 결과
+            topic: 연구 주제
+            investigation_results: 조사 결과
+            
+        Returns:
+            Dict: 연구 계획
+        """
+        logger.info(f"연구 계획 생성: 주제={topic}, 자료={len(investigation_results) if investigation_results else 0}개")
+        
+        try:
+            # 조사 결과에서 주요 키워드 추출
+            keywords = set(request_analysis.get("keywords", [topic]))
+            for material in investigation_results:
+                if hasattr(material, 'title'):
+                    # 제목에서 키워드 추출
+                    title_words = material.title.split()
+                    for word in title_words:
+                        if len(word) > 1 and word.lower() not in ["the", "and", "or", "of", "in", "on", "at", "by", "for", "with", "about", "to", "from"]:
+                            keywords.add(word)
+            
+            # 연구 계획 구성
+            research_plan = {
+                "topic": topic,
+                "objective": f"{topic}에 대한 종합적인 이해와 분석",
+                "methodology": request_analysis.get("methodology", "문헌 조사 및 분석"),
+                "key_questions": request_analysis.get("research_questions", [f"{topic}에 대한 최신 연구는 무엇인가?"]),
+                "analysis_framework": {
+                    "approach": "주제별 분석",
+                    "dimensions": ["현황", "동향", "이슈", "전망"],
+                    "comparison_criteria": ["방법론", "결과", "한계점"]
+                },
+                "key_materials": [],
+                "expected_outcomes": request_analysis.get("expected_outcomes", [f"{topic}에 대한 종합적인 이해와 분석"]),
+                "timeline": {
+                    "analysis": "1일",
+                    "synthesis": "1일",
+                    "writing": "1일"
+                }
+            }
+            
+            # 주요 자료 선정 (최대 5개)
+            if investigation_results:
+                sorted_materials = sorted(investigation_results, key=lambda x: getattr(x, 'relevance_score', 0), reverse=True)
+                for material in sorted_materials[:5]:
+                    if hasattr(material, 'id') and hasattr(material, 'title'):
+                        research_plan["key_materials"].append({
+                            "id": material.id,
+                            "title": material.title,
+                            "reason": "높은 관련성"
+                        })
+            
+            logger.info(f"연구 계획 생성 완료: {len(research_plan['key_materials'])}개 주요 자료 선정")
+            return research_plan
+            
+        except Exception as e:
+            logger.error(f"연구 계획 생성 중 오류: {str(e)}")
+            # 오류 발생 시 기본 연구 계획 반환
+            return {
+                "topic": topic,
+                "objective": f"{topic}에 대한 종합적인 이해와 분석",
+                "methodology": "문헌 조사 및 분석",
+                "key_questions": [f"{topic}에 대한 최신 연구는 무엇인가?"],
+                "analysis_framework": {
+                    "approach": "주제별 분석",
+                    "dimensions": ["현황", "동향", "이슈", "전망"]
+                },
+                "key_materials": [],
+                "expected_outcomes": [f"{topic}에 대한 종합적인 이해와 분석"]
+            }
+    
+    def _validate_research_results(self, research_materials, topic):
+        """
+        연구 결과의 타당성을 검증합니다.
+        
+        Args:
+            research_materials: 연구 결과
+            topic: 연구 주제
+            
+        Returns:
+            Tuple[bool, str]: (타당성 여부, 피드백)
+        """
+        logger.info(f"연구 결과 검증: {len(research_materials) if research_materials else 0}개 자료")
+        
+        try:
+            # 결과가 없는 경우
+            if not research_materials or len(research_materials) == 0:
+                return False, "연구 결과가 없습니다. 다시 분석을 시도해 보세요."
+            
+            # 내용 및 요약 검증
+            missing_content = 0
+            missing_summary = 0
+            for material in research_materials:
+                if not hasattr(material, 'content') or not material.content:
+                    missing_content += 1
+                if not hasattr(material, 'summary') or not material.summary:
+                    missing_summary += 1
+            
+            if missing_content > len(research_materials) * 0.5:
+                return False, f"많은 자료({missing_content}/{len(research_materials)})에 내용이 없습니다. 내용 추출을 다시 시도해 보세요."
+            
+            if missing_summary > len(research_materials) * 0.5:
+                return False, f"많은 자료({missing_summary}/{len(research_materials)})에 요약이 없습니다. 요약 생성을 다시 시도해 보세요."
+            
+            # 주제 관련성 검증
+            low_relevance = 0
+            for material in research_materials:
+                if hasattr(material, 'relevance_score') and material.relevance_score < 0.6:
+                    low_relevance += 1
+            
+            if low_relevance > len(research_materials) * 0.3:
+                return False, f"관련성이 낮은 자료({low_relevance}/{len(research_materials)})가 많습니다. 더 관련성 높은 자료를 선별해 보세요."
+            
+            # 모든 검증을 통과한 경우
+            return True, "연구 결과가 타당합니다."
+            
+        except Exception as e:
+            logger.error(f"연구 결과 검증 중 오류: {str(e)}")
+            # 오류 발생 시 기본적으로 통과시킴
+            return True, f"검증 중 오류가 발생했으나 진행합니다: {str(e)}"
+    
+    def _revise_research_plan(self, original_plan, feedback):
+        """
+        피드백을 바탕으로 연구 계획을 수정합니다.
+        
+        Args:
+            original_plan: 원래 연구 계획
+            feedback: 피드백
+            
+        Returns:
+            Dict: 수정된 연구 계획
+        """
+        logger.info(f"연구 계획 수정: {feedback}")
+        
+        try:
+            # 원본 계획 복사
+            revised_plan = original_plan.copy()
+            
+            # 피드백에 따른 수정
+            if "내용이 없습니다" in feedback:
+                # 내용 추출 강화
+                revised_plan["content_extraction"] = {
+                    "method": "hybrid",
+                    "fallback_strategy": "title_based",
+                    "retry_count": 3
+                }
+            
+            if "요약이 없습니다" in feedback:
+                # 요약 생성 강화
+                revised_plan["summary_generation"] = {
+                    "method": "extractive_then_abstractive",
+                    "length": "medium",
+                    "focus_on_key_findings": True
+                }
+            
+            if "관련성이 낮은 자료" in feedback:
+                # 관련성 기준 강화
+                revised_plan["relevance_criteria"] = {
+                    "threshold": 0.7,
+                    "prioritize_recent": True,
+                    "keyword_match_weight": 0.8
+                }
+                
+                # 주요 자료 재선정 지시
+                revised_plan["reselect_materials"] = True
+            
+            logger.info(f"연구 계획 수정 완료")
+            return revised_plan
+            
+        except Exception as e:
+            logger.error(f"연구 계획 수정 중 오류: {str(e)}")
+            # 오류 발생 시 원본 계획 반환
+            return original_plan
+
+    def _create_report_format(self, request_analysis, topic, paper_type):
+        """
+        사용자 요청 분석을 바탕으로 보고서 양식을 생성합니다.
+        
+        Args:
+            request_analysis: 사용자 요청 분석 결과
+            topic: 연구 주제
+            paper_type: 논문 유형
+            
+        Returns:
+            Dict: 보고서 양식
+        """
+        logger.info(f"보고서 양식 생성: 주제={topic}, 유형={paper_type}")
+        
+        try:
+            # 보고서 구조 결정
+            structure = request_analysis.get("report_structure", ["서론", "본론", "결론"])
+            
+            # 논문 유형에 따른 기본 섹션 설정
+            if paper_type.lower() in ["academic", "research", "학술", "연구"]:
+                sections = ["초록", "서론", "선행 연구", "연구 방법", "결과", "논의", "결론", "참고문헌"]
+            elif paper_type.lower() in ["review", "survey", "리뷰", "조사"]:
+                sections = ["초록", "서론", "문헌 조사", "주요 발견", "동향 분석", "향후 전망", "결론", "참고문헌"]
+            elif paper_type.lower() in ["report", "보고서"]:
+                sections = ["요약", "서론", "현황 분석", "주요 이슈", "해결 방안", "결론", "참고자료"]
+            else:
+                # 기본 구조
+                sections = ["서론", "본론", "결론", "참고문헌"]
+            
+            # 보고서 양식 구성
+            report_format = {
+                "title": f"{topic}에 관한 {paper_type}",
+                "sections": sections,
+                "citation_style": "APA",  # 기본 인용 스타일
+                "formatting_guidelines": {
+                    "font": "맑은 고딕",
+                    "font_size": "11pt",
+                    "line_spacing": 1.5,
+                    "margins": "2.5cm"
+                },
+                "section_guidelines": {}
+            }
+            
+            # 각 섹션별 가이드라인 추가
+            for section in sections:
+                if section.lower() in ["초록", "abstract", "요약", "summary"]:
+                    report_format["section_guidelines"][section] = "연구의 목적, 방법, 결과, 결론을 간략히 요약 (200-300단어)"
+                elif section.lower() in ["서론", "introduction"]:
+                    report_format["section_guidelines"][section] = "연구 배경, 목적, 연구 질문 제시"
+                elif section.lower() in ["선행 연구", "literature review", "문헌 조사"]:
+                    report_format["section_guidelines"][section] = "관련 선행 연구 검토 및 분석"
+                elif section.lower() in ["연구 방법", "methodology", "methods"]:
+                    report_format["section_guidelines"][section] = "연구 방법, 자료 수집 및 분석 방법 설명"
+                elif section.lower() in ["결과", "results", "findings", "주요 발견"]:
+                    report_format["section_guidelines"][section] = "연구 결과 제시 (표, 그림 활용 가능)"
+                elif section.lower() in ["논의", "discussion", "동향 분석"]:
+                    report_format["section_guidelines"][section] = "연구 결과의 의미와 시사점 논의"
+                elif section.lower() in ["결론", "conclusion"]:
+                    report_format["section_guidelines"][section] = "연구 요약, 한계점, 향후 연구 방향 제시"
+                elif section.lower() in ["참고문헌", "references", "참고자료"]:
+                    report_format["section_guidelines"][section] = "인용된 모든 자료의 출처 (APA 형식)"
+                else:
+                    report_format["section_guidelines"][section] = f"{section} 내용 작성"
+            
+            logger.info(f"보고서 양식 생성 완료: {len(sections)}개 섹션")
+            return report_format
+            
+        except Exception as e:
+            logger.error(f"보고서 양식 생성 중 오류: {str(e)}")
+            # 오류 발생 시 기본 보고서 양식 반환
+            return {
+                "title": f"{topic}에 관한 보고서",
+                "sections": ["서론", "본론", "결론", "참고문헌"],
+                "citation_style": "APA",
+                "formatting_guidelines": {
+                    "font": "맑은 고딕",
+                    "font_size": "11pt",
+                    "line_spacing": 1.5
+                }
+            }
+    
+    def _validate_writing_results(self, paper_draft, topic, report_format):
+        """
+        Validate the writing results against requirements
+        
+        Args:
+            paper_draft: Draft paper
+            topic: Paper topic
+            report_format: Report format
+            
+        Returns:
+            Validation results
+        """
+        logger.info(f"Validating writing results for topic: {topic}")
+        
+        # Create validation criteria
+        validation_criteria = [
+            f"The paper addresses the topic: {topic}",
+            f"The paper follows the specified format: {report_format.get('format', 'standard')}",
+            "The paper is well-structured with clear sections",
+            "The content is coherent and logically organized",
+            "The paper is written in English",
+            "All claims are supported by citations",
+            "The paper includes a complete bibliography/references section",
+            "The content is based on the vector database materials"
+        ]
+        
+        # Prepare validation prompt
+        validation_prompt = f"""
+        Evaluate the following paper draft against these criteria:
+        
+        Paper Topic: {topic}
+        
+        Validation Criteria:
+        {chr(10).join([f"- {criterion}" for criterion in validation_criteria])}
+        
+        Paper Draft:
+        {paper_draft}
+        
+        For each criterion, provide a pass/fail assessment and brief explanation.
+        Also provide an overall assessment and recommendations for improvement.
+        """
+        
+        # Get validation results
+        validation_result = self.llm.invoke(validation_prompt)
+        
+        # Extract validation details
+        validation_details = {
+            "overall_assessment": "Needs revision",  # Default
+            "criteria_results": {},
+            "recommendations": []
+        }
+        
+        # Parse validation result
+        try:
+            # Extract overall assessment
+            overall_pattern = r"Overall\s+Assessment:?\s*(.*?)(?:\n|$)"
+            overall_match = re.search(overall_pattern, validation_result, re.IGNORECASE)
+            if overall_match:
+                validation_details["overall_assessment"] = overall_match.group(1).strip()
+            
+            # Extract criteria results
+            for criterion in validation_criteria:
+                key = criterion.split(":")[0].strip().lower().replace(" ", "_")
+                pattern = f"{re.escape(criterion)}:?\\s*(Pass|Fail)\\s*(.*?)(?:\\n\\n|$)"
+                match = re.search(pattern, validation_result, re.IGNORECASE | re.DOTALL)
+                if match:
+                    validation_details["criteria_results"][key] = {
+                        "status": match.group(1).strip(),
+                        "explanation": match.group(2).strip()
+                    }
+            
+            # Extract recommendations
+            recommendations_pattern = r"Recommendations:?\s*(.*?)(?:\n\n|$)"
+            recommendations_match = re.search(recommendations_pattern, validation_result, re.IGNORECASE | re.DOTALL)
+            if recommendations_match:
+                recommendations_text = recommendations_match.group(1).strip()
+                validation_details["recommendations"] = [r.strip() for r in recommendations_text.split("\n-") if r.strip()]
+        
+        except Exception as e:
+            logger.error(f"Error parsing validation result: {str(e)}")
+            validation_details["error"] = str(e)
+        
+        # Check if paper meets the requirements
+        meets_requirements = (
+            validation_details.get("criteria_results", {}).get("the_paper_is_written_in_english", {}).get("status", "Fail") == "Pass" and
+            validation_details.get("criteria_results", {}).get("all_claims_are_supported_by_citations", {}).get("status", "Fail") == "Pass" and
+            validation_details.get("criteria_results", {}).get("the_paper_includes_a_complete_bibliography/references_section", {}).get("status", "Fail") == "Pass" and
+            validation_details.get("criteria_results", {}).get("the_content_is_based_on_the_vector_database_materials", {}).get("status", "Fail") == "Pass"
+        )
+        
+        validation_details["meets_requirements"] = meets_requirements
+        
+        logger.info(f"Writing validation completed. Meets requirements: {meets_requirements}")
+        return validation_details
+    
+    def _revise_report_format(self, original_format, feedback):
+        """
+        피드백을 바탕으로 보고서 양식을 수정합니다.
+        
+        Args:
+            original_format: 원래 보고서 양식
+            feedback: 피드백
+            
+        Returns:
+            Dict: 수정된 보고서 양식
+        """
+        logger.info(f"보고서 양식 수정: {feedback}")
+        
+        try:
+            # 원본 양식 복사
+            revised_format = original_format.copy()
+            
+            # 피드백에 따른 수정
+            if "작성된 내용이 너무 짧습니다" in feedback:
+                # 각 섹션별 최소 길이 지정
+                revised_format["section_min_length"] = {}
+                for section in revised_format.get("sections", []):
+                    if section.lower() in ["초록", "abstract", "요약", "summary"]:
+                        revised_format["section_min_length"][section] = 200
+                    elif section.lower() in ["서론", "introduction"]:
+                        revised_format["section_min_length"][section] = 500
+                    elif section.lower() in ["본론", "body", "선행 연구", "연구 방법", "결과", "논의"]:
+                        revised_format["section_min_length"][section] = 1000
+                    elif section.lower() in ["결론", "conclusion"]:
+                        revised_format["section_min_length"][section] = 300
+                    else:
+                        revised_format["section_min_length"][section] = 500
+                
+                # 전체 최소 길이 지정
+                revised_format["min_total_length"] = 3000
+            
+            if "섹션이 누락되었습니다" in feedback:
+                # 누락된 섹션 강조
+                missing_sections = re.findall(r'다음 섹션이 누락되었습니다: (.*?)\.', feedback)
+                if missing_sections:
+                    sections = missing_sections[0].split(', ')
+                    revised_format["required_sections"] = sections
+                    
+                    # 각 섹션별 가이드라인 강화
+                    for section in sections:
+                        if section in revised_format.get("section_guidelines", {}):
+                            revised_format["section_guidelines"][section] += " (필수 섹션)"
+            
+            if "주제와의 연관성을 강화" in feedback:
+                # 주제 강조 지시 추가
+                revised_format["emphasis"] = {
+                    "topic": True,
+                    "keywords": True
+                }
+                
+                # 서론 가이드라인 강화
+                if "서론" in revised_format.get("section_guidelines", {}):
+                    revised_format["section_guidelines"]["서론"] += " 주제를 명확히 제시하고 연구의 중요성을 강조해 주세요."
+            
+            if "인용이 포함되어 있지 않습니다" in feedback:
+                # 인용 지침 강화
+                revised_format["citation_requirements"] = {
+                    "min_citations": 5,
+                    "style": revised_format.get("citation_style", "APA"),
+                    "include_in_sections": ["서론", "선행 연구", "본론", "논의"]
+                }
+                
+                # 참고문헌 가이드라인 강화
+                if "참고문헌" in revised_format.get("section_guidelines", {}):
+                    revised_format["section_guidelines"]["참고문헌"] += " 최소 5개 이상의 참고문헌을 포함해 주세요."
+            
+            logger.info(f"보고서 양식 수정 완료")
+            return revised_format
+            
+        except Exception as e:
+            logger.error(f"보고서 양식 수정 중 오류: {str(e)}")
+            # 오류 발생 시 원본 양식 반환
+            return original_format
+    
+    def _validate_editing_results(self, edited_paper, paper_draft, report_format):
+        """
+        편집 결과의 타당성을 검증합니다.
+        
+        Args:
+            edited_paper: 편집된 논문
+            paper_draft: 원본 논문 초안
+            report_format: 보고서 양식
+            
+        Returns:
+            Tuple[bool, str]: (타당성 여부, 피드백)
+        """
+        logger.info(f"편집 결과 검증")
+        
+        try:
+            # 편집 결과가 없는 경우
+            if not edited_paper or not isinstance(edited_paper, dict) or "content" not in edited_paper:
+                return False, "편집된 결과가 없습니다. 다시 편집을 시도해 보세요."
+            
+            edited_content = edited_paper.get("content", "")
+            original_content = paper_draft.get("content", "") if paper_draft and isinstance(paper_draft, dict) else ""
+            
+            # 내용이 너무 짧아진 경우
+            if len(edited_content) < len(original_content) * 0.8:
+                return False, f"편집 후 내용이 너무 많이 줄었습니다 (원본: {len(original_content)}자, 편집: {len(edited_content)}자). 중요 내용이 누락되지 않았는지 확인해 주세요."
+            
+            # 형식 지침 준수 여부 검증
+            formatting_issues = []
+            
+            # 인용 스타일 검증
+            citation_style = report_format.get("citation_style", "APA").upper()
+            if citation_style == "APA":
+                # APA 스타일 인용 패턴
+                if not re.search(r'\([A-Za-z가-힣]+,?\s+\d{4}\)', edited_content):
+                    formatting_issues.append("APA 형식의 인용이 올바르게 적용되지 않았습니다.")
+            
+            # 참고문헌 섹션 검증
+            if not re.search(r'참고문헌|References', edited_content, re.IGNORECASE):
+                formatting_issues.append("참고문헌 섹션이 없거나 올바르게 포맷되지 않았습니다.")
+            
+            if formatting_issues:
+                return False, f"다음 형식 문제가 발견되었습니다: {'; '.join(formatting_issues)}. 형식 지침에 맞게 수정해 주세요."
+            
+            # 모든 검증을 통과한 경우
+            return True, "편집 결과가 타당합니다."
+            
+        except Exception as e:
+            logger.error(f"편집 결과 검증 중 오류: {str(e)}")
+            # 오류 발생 시 기본적으로 통과시킴
+            return True, f"검증 중 오류가 발생했으나 진행합니다: {str(e)}"
+    
+    def _revise_editing_instructions(self, report_format, feedback):
+        """
+        피드백을 바탕으로 편집 지시를 수정합니다.
+        
+        Args:
+            report_format: 보고서 양식
+            feedback: 피드백
+            
+        Returns:
+            Dict: 수정된 편집 지시
+        """
+        logger.info(f"편집 지시 수정: {feedback}")
+        
+        try:
+            # 원본 양식 복사
+            revised_instructions = report_format.copy()
+            
+            # 피드백에 따른 수정
+            if "내용이 너무 많이 줄었습니다" in feedback:
+                # 내용 보존 지시 추가
+                revised_instructions["editing_guidelines"] = {
+                    "preserve_content": True,
+                    "focus_on_formatting": True,
+                    "minimal_content_changes": True
+                }
+            
+            if "인용이 올바르게 적용되지 않았습니다" in feedback:
+                # 인용 스타일 강화
+                revised_instructions["citation_enforcement"] = {
+                    "style": revised_instructions.get("citation_style", "APA"),
+                    "strict": True,
+                    "check_all_references": True
+                }
+            
+            if "참고문헌 섹션이 없거나" in feedback:
+                # 참고문헌 섹션 강화
+                revised_instructions["references_section"] = {
+                    "required": True,
+                    "format": "APA",
+                    "alphabetical_order": True
+                }
+                
+                # 참고문헌 섹션 가이드라인 강화
+                if "section_guidelines" in revised_instructions and "참고문헌" in revised_instructions["section_guidelines"]:
+                    revised_instructions["section_guidelines"]["참고문헌"] += " (필수 섹션, APA 형식으로 알파벳 순서로 정렬)"
+            
+            logger.info(f"편집 지시 수정 완료")
+            return revised_instructions
+            
+        except Exception as e:
+            logger.error(f"편집 지시 수정 중 오류: {str(e)}")
+            # 오류 발생 시 원본 지시 반환
+            return report_format

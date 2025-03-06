@@ -357,6 +357,9 @@ class PDFProcessor:
                     llm_result = self.metadata_chain.invoke({"text": text_for_llm})
                     llm_metadata = json.loads(llm_result["text"])
                     
+                    # Log the LLM result for debugging
+                    logger.debug(f"LLM result: {llm_result}")
+                    
                     # LLM 결과로 빈 필드 채우기
                     if not metadata["title"] and llm_metadata.get("title"):
                         metadata["title"] = llm_metadata["title"]
@@ -378,6 +381,7 @@ class PDFProcessor:
                     
                 except Exception as e:
                     logger.warning(f"LLM 메타데이터 추출 실패: {str(e)}")
+                    logger.debug(f"Failed LLM input text: {text_for_llm}")
             
             # 캐시에 저장
             self._metadata_cache[pdf_path] = metadata

@@ -9,11 +9,10 @@ import json
 from typing import Dict, Any, List, Optional, Tuple, Union
 from pydantic import BaseModel, Field, validator
 
-from langchain_core.runnables import RunnableConfig
+from langchain_core.runnables import RunnableConfig, RunnableSequence
 from langchain.schema import HumanMessage, AIMessage, SystemMessage
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
-from langchain.output_parsers import PydanticOutputParser
+from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import PydanticOutputParser
 from langchain_openai import ChatOpenAI
 
 from config.settings import OUTPUT_DIR
@@ -98,326 +97,311 @@ class EditorAgent(BaseAgent[Paper]):
         logger.info(f"{self.name} initialized")
 
     def _init_prompts(self) -> None:
-        """Initialize LLM prompts and processing chains"""
-        self.editing_parser = PydanticOutputParser(pydantic_object=EditingTask)
-        self.review_parser = PydanticOutputParser(pydantic_object=ReviewResult)
-
-        # Paper editing prompt
-        PAPER_EDITING_PROMPT = PromptTemplate(
-            template="""Act as an expert academic editor. Improve this paper:
-            {content}
-            
-            Style Guide:
-            {style_guide}
-            
-            Output Requirements:
-            {format_instructions}
-            
-            Key Focus Areas:
-            1. Technical accuracy preservation
-            2. Style guide compliance
-            3. Clarity enhancement
-            4. Structural optimization""",
-            input_variables=["content", "style_guide", "format_instructions"],
-        )
-
-        # Paper review prompt  
-        PAPER_REVIEW_PROMPT = PromptTemplate(
-            template="""Critique this academic paper:
-            {paper_content}
-            
-            Evaluation Criteria:
-            1. Technical rigor
-            2. Presentation clarity  
-            3. Argument structure
-            4. Contribution significance
-            5. Literature integration
-            
-            {format_instructions}""",
-            input_variables=["paper_content", "format_instructions"],
-        )
-
-        # Reference formatting prompt
-        REFERENCE_FORMATTING_PROMPT = PromptTemplate(
-            template="""Format references in {citation_style} style:
-            {references}
-            
-            Required Elements:
-            - Author names
-            - Publication year
-            - Title formatting
-            - Source details
-            - DOI/URL if available""",
-            input_variables=["citation_style", "references"],
-        )
-
-        # Initialize processing chains
-        self.editing_chain = LLMChain(
-            llm=self.llm,
-            prompt=PAPER_EDITING_PROMPT,
-            verbose=self.verbose
+        """Initialize prompt templates for editing tasks"""
+        # Add English language and citation requirements to editing prompts
+        self.editing_prompt_template = PromptTemplate(
+            template=PAPER_EDITING_PROMPT.template + "\n\nIMPORTANT REQUIREMENTS:\n1. The paper must be written in English.\n2. All content must be based on the vector database content.\n3. Every claim or statement must include proper citations.\n4. The paper must include a complete bibliography/references section at the end.",
+            input_variables=PAPER_EDITING_PROMPT.input_variables
         )
         
-        # 리뷰 체인 초기화
-        self.review_chain = LLMChain(
-            llm=self.llm,
-            prompt=PAPER_REVIEW_PROMPT,
-            verbose=self.verbose
+        self.review_prompt_template = PromptTemplate(
+            template=PAPER_REVIEW_PROMPT.template + "\n\nIMPORTANT: Check that the paper is written in English, includes proper citations for all claims, and has a complete bibliography.",
+            input_variables=PAPER_REVIEW_PROMPT.input_variables
         )
         
-        # 참고 문헌 형식 체인 초기화
-        self.reference_chain = LLMChain(
-            llm=self.llm,
-            prompt=REFERENCE_FORMATTING_PROMPT,
-            verbose=self.verbose
+        self.reference_formatting_prompt_template = PromptTemplate(
+            template=REFERENCE_FORMATTING_PROMPT.template + "\n\nEnsure all references are properly formatted according to the specified citation style.",
+            input_variables=REFERENCE_FORMATTING_PROMPT.input_variables
         )
         
-        logger.debug("편집 에이전트 프롬프트 및 체인 초기화 완료")
+        # Initialize chains using RunnableSequence
+        self.editing_chain = RunnableSequence(
+            first=self.editing_prompt_template,
+            last=self.llm
+        )
+        
+        self.review_chain = RunnableSequence(
+            first=self.review_prompt_template,
+            last=self.llm
+        )
+        
+        self.reference_formatting_chain = RunnableSequence(
+            first=self.reference_formatting_prompt_template,
+            last=self.llm
+        )
+        
+        logger.info("Editor agent prompts initialized with English language and citation requirements")
 
     def create_style_guide(self, style_name: str = "Standard Academic") -> StyleGuide:
-        """Generate style guide specifications"""
-        logger.info(f"Compiling {style_name} style guide")
+        """
+        Create a style guide based on the specified style name
         
-        if style_name == "APA":
+        Args:
+            style_name: Name of the style guide to create
+            
+        Returns:
+            StyleGuide object
+        """
+        # Standard Academic style guide with English language requirement
+        if style_name.lower() == "standard academic":
             return StyleGuide(
-                name="APA 7th Edition",
+                name="Standard Academic English",
                 rules=[
-                    "Use active voice where appropriate",
-                    "Maintain past tense for methodology",
-                    "Apply title case for headings",
-                    "Format in-text citations as (Author, Year)",
-                    "Include DOI for digital sources"
+                    "Use formal academic English throughout the paper",
+                    "Write in the third person perspective",
+                    "Use active voice when possible",
+                    "Avoid contractions and colloquialisms",
+                    "Use precise and specific language",
+                    "Maintain consistent terminology throughout",
+                    "All papers and reports must be written in English",
+                    "All claims must be supported by citations",
+                    "Include a complete bibliography/references section"
                 ],
                 examples={
-                    "Passive voice": "The experiment was conducted → Researchers conducted the experiment",
-                    "Citation": "(Smith et al., 2020) → (Smith, 2020; Johnson & Lee, 2019)"
+                    "formal_language": "Correct: 'The research demonstrates that...' | Incorrect: 'The research shows that...'",
+                    "third_person": "Correct: 'The authors argue that...' | Incorrect: 'I believe that...'",
+                    "active_voice": "Correct: 'The researchers conducted experiments...' | Incorrect: 'Experiments were conducted...'",
+                    "precise_language": "Correct: 'The temperature increased by 5.2 degrees' | Incorrect: 'The temperature went up a lot'",
+                    "citation": "Correct: 'This approach has shown promising results (Smith et al., 2020).' | Incorrect: 'This approach has shown promising results.'"
                 }
             )
-        # ... other style guides
+        # Add other style guides as needed
+        else:
+            # Default to standard academic with a note about the requested style
+            return StyleGuide(
+                name=f"Modified {style_name}",
+                rules=[
+                    f"Follow {style_name} conventions where applicable",
+                    "Use formal academic English throughout the paper",
+                    "All papers and reports must be written in English",
+                    "All claims must be supported by citations",
+                    "Include a complete bibliography/references section"
+                ],
+                examples={}
+            )
 
     def edit_paper(self, paper: Paper, style_guide: StyleGuide, paper_format: str = "standard") -> Paper:
-        """Execute comprehensive paper editing"""
-        logger.info(f"Editing paper: {paper.title} with format: {paper_format}")
-        try:
-            paper_content = self._compile_paper_content(paper)
+        """
+        Edit a paper according to the specified style guide
+        
+        Args:
+            paper: Paper to edit
+            style_guide: Style guide to apply
+            paper_format: Paper format type
             
-            # Add paper format instructions
-            format_instructions = {
-                "standard": "Edit as a standard academic paper format (introduction, methodology, results, discussion, conclusion).",
-                "literature_review_only": "Edit as a literature review format only. No experimental results or methodology sections needed.",
-            }
+        Returns:
+            Edited paper
+        """
+        logger.info(f"Editing paper: {paper.metadata.title} with style guide: {style_guide.name}")
+        
+        # Prepare the editing prompt with style guide and paper content
+        editing_input = {
+            "paper_content": self._paper_to_text(paper),
+            "style_guide": style_guide.name,
+            "style_rules": "\n".join([f"- {rule}" for rule in style_guide.rules]),
+            "paper_format": paper_format,
+            "language": "English"  # Explicitly specify English
+        }
+        
+        # Run the editing chain
+        editing_result = self.editing_chain.invoke(editing_input)
+        
+        # Parse the edited paper
+        edited_paper = self._parse_edited_paper(editing_result, paper)
+        
+        # Ensure the paper has a references section
+        if not any(section.title.lower() in ["references", "bibliography"] for section in edited_paper.sections):
+            # If no references section exists, add one
+            logger.warning("No references section found in edited paper. Adding one.")
+            self._add_references_section(edited_paper)
+        
+        # Verify all sections are in English
+        for section in edited_paper.sections:
+            if not self._is_english(section.content):
+                logger.warning(f"Section '{section.title}' may not be in English. Translating.")
+                section.content = self._translate_to_english(section.content)
+        
+        logger.info(f"Paper editing completed: {edited_paper.metadata.title}")
+        return edited_paper
+    
+    def _is_english(self, text: str) -> bool:
+        """
+        Check if text is primarily in English
+        
+        Args:
+            text: Text to check
             
-            format_instruction = format_instructions.get(
-                paper_format, 
-                f"Edit using custom format: {paper_format}"
-            )
+        Returns:
+            True if text is primarily in English, False otherwise
+        """
+        # Simple heuristic: check if common English words are present
+        english_words = ["the", "and", "of", "to", "in", "is", "that", "for", "it", "with"]
+        text_lower = text.lower()
+        
+        # Count occurrences of common English words
+        english_word_count = sum(1 for word in english_words if f" {word} " in f" {text_lower} ")
+        
+        # If at least 3 common English words are present, consider it English
+        return english_word_count >= 3
+    
+    def _translate_to_english(self, text: str) -> str:
+        """
+        Translate text to English
+        
+        Args:
+            text: Text to translate
             
-            result = self.editing_chain.invoke({
-                "content": paper_content,
-                "style_guide": style_guide.json(),
-                "format_instructions": self.editing_parser.get_format_instructions(),
-                "paper_format": format_instruction
-            })
-            return self._process_edits(result, paper, style_guide)
-        except Exception as e:
-            logger.error(f"Editing failed: {str(e)}")
-            return self._handle_edit_error(paper, style_guide)
-
-    def review_paper(self, paper: Paper) -> Dict[str, Any]:
-        """Conduct thorough paper evaluation"""
-        logger.info(f"Reviewing paper: {paper.title}")
-        try:
-            paper_content = self._compile_paper_content(paper)
-            result = self.review_chain.invoke({
-                "paper_content": paper_content,
-                "format_instructions": self.review_parser.get_format_instructions()
-            })
-            return self._parse_review_results(result)
-        except Exception as e:
-            logger.error(f"Review failed: {str(e)}")
-            return self._default_review_response()
+        Returns:
+            Translated text
+        """
+        # Use LLM to translate
+        translation_prompt = f"""
+        Translate the following text to academic English:
+        
+        {text}
+        
+        Translated text:
+        """
+        
+        translation_result = self.llm.invoke(translation_prompt)
+        return translation_result
+    
+    def _add_references_section(self, paper: Paper) -> None:
+        """
+        Add a references section to a paper
+        
+        Args:
+            paper: Paper to add references section to
+        """
+        # Create a references section
+        references_section = PaperSection(
+            section_id="references",
+            title="References",
+            content=self._format_references_content(paper.references)
+        )
+        
+        # Add to paper
+        paper.sections.append(references_section)
+    
+    def _format_references_content(self, references: List[Reference]) -> str:
+        """
+        Format references as text
+        
+        Args:
+            references: List of references
+            
+        Returns:
+            Formatted references text
+        """
+        if not references:
+            return "No references."
+        
+        formatted_refs = []
+        for ref in references:
+            authors = ", ".join(ref.authors) if ref.authors else "Unknown"
+            year = ref.year if ref.year else "n.d."
+            title = ref.title if ref.title else "Untitled"
+            venue = ref.venue if ref.venue else ""
+            
+            formatted_ref = f"{authors} ({year}). {title}."
+            if venue:
+                formatted_ref += f" {venue}."
+            if ref.doi:
+                formatted_ref += f" DOI: {ref.doi}"
+            elif ref.url:
+                formatted_ref += f" Retrieved from {ref.url}"
+            
+            formatted_refs.append(formatted_ref)
+        
+        return "\n\n".join(formatted_refs)
 
     def format_references(self, references: List[Reference], citation_style: str = "APA") -> List[str]:
         """
-        Format references according to the specified citation style.
-
-        Args:
-            references (List[Reference]): List of references
-            citation_style (str, optional): Citation style. Defaults to "APA"
-
-        Returns:
-            List[str]: Formatted references list
-        """
-        logger.info(f"Formatting {len(references)} references in '{citation_style}' style...")
+        Format references according to the specified citation style
         
-        # Citation style guide information
-        citation_guides = {
-            "APA": "Citations in author(year) format or (author, year) format. Example: Davis(2023) asserted that... or ...asserts(Davis, 2023)",
-            "MLA": "Citations in author surname and page number format. Example: (Smith 45)",
-            "Chicago": "Citations as footnotes. Example: Use superscript numbers¹ in text and provide footnote information at the bottom of the page",
-            "Harvard": "Citations in author, year, page format. Example: (Smith, 2023, p.45)"
+        Args:
+            references: List of references to format
+            citation_style: Citation style to use
+            
+        Returns:
+            List of formatted reference strings
+        """
+        logger.info(f"Formatting {len(references)} references in {citation_style} style")
+        
+        if not references:
+            return ["No references available."]
+        
+        # Prepare the reference formatting prompt
+        formatting_input = {
+            "references": json.dumps([ref.dict() for ref in references], indent=2),
+            "citation_style": citation_style
         }
         
-        citation_guide = citation_guides.get(citation_style, f"Custom citation style: {citation_style}")
+        # Run the reference formatting chain
+        formatting_result = self.reference_formatting_chain.invoke(formatting_input)
         
-        try:
-            # 참고 문헌 정보 준비
-            references_info = []
-            for ref in references:
-                ref_info = {
-                    "title": ref.title,
-                    "authors": ref.authors,
-                    "year": ref.year,
-                    "source": ref.source,
-                    "url": ref.url
-                }
-                references_info.append(ref_info)
-            
-            references_json = json.dumps(references_info, ensure_ascii=False)
-            
-            # 참고 문헌 형식화 수행
-            result = self.reference_chain.invoke({
-                "references": references_json,
-                "citation_style": citation_style,
-                "citation_guide": citation_guide
-            })
-            
-            # 결과 파싱
-            formatted_references = []
-            for line in result["text"].strip().split("\n"):
-                line = line.strip()
-                if line and not line.startswith("#") and not line.startswith("```"):
-                    formatted_references.append(line)
-            
-            logger.info(f"{len(formatted_references)}개의 참고 문헌 형식화 완료")
-            return formatted_references
-            
-        except Exception as e:
-            logger.error(f"참고 문헌 형식화 중 오류 발생: {str(e)}")
-            
-            # 오류 발생 시 기본 형식 반환
-            return [f"{ref.title}. {', '.join(ref.authors) if ref.authors else '알 수 없음'}. ({ref.year}). {ref.source}." 
-                   for ref in references]
+        # Split the result into individual references
+        formatted_refs = [ref.strip() for ref in formatting_result.split("\n\n") if ref.strip()]
+        
+        logger.info(f"Formatted {len(formatted_refs)} references in {citation_style} style")
+        return formatted_refs
 
     def save_formatted_paper(self, paper: Paper, output_format: str = "markdown") -> str:
         """
-        편집된 논문을 지정된 형식으로 저장합니다.
-
+        Save the formatted paper to a file
+        
         Args:
-            paper (Paper): 저장할 논문
-            output_format (str, optional): 출력 형식. 기본값은 "markdown"
-
+            paper: Paper to format and save
+            output_format: Output format (markdown, latex, docx)
+            
         Returns:
-            str: 저장된 파일 경로
+            Path to the saved file
         """
-        # 파일 이름 생성
-        safe_title = re.sub(r'[^\w\s-]', '', paper.title).strip().lower()
-        safe_title = re.sub(r'[-\s]+', '-', safe_title)
+        logger.info(f"Saving paper in {output_format} format: {paper.metadata.title}")
         
-        if output_format == "markdown":
-            filename = f"{safe_title}.md"
-            file_path = os.path.join(OUTPUT_DIR, filename)
-            
-            try:
-                # 마크다운 형식으로 논문 내용 생성
-                content = f"# {paper.title}\n\n"
-                
-                for section in paper.sections:
-                    content += f"## {section.title}\n\n{section.content}\n\n"
-                
-                # 참고 문헌 섹션 추가
-                if paper.references:
-                    content += "## References\n\n"
-                    for i, ref in enumerate(paper.references, 1):
-                        authors = ", ".join(ref.authors) if ref.authors else "Unknown"
-                        content += f"{i}. {ref.title}. {authors}. {ref.year}. {ref.source}.\n\n"
-                
-                # 파일 저장
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                logger.info(f"논문 '{paper.title}' Markdown 형식으로 저장됨: {file_path}")
-                return file_path
-                
-            except Exception as e:
-                logger.error(f"논문 저장 중 오류 발생: {str(e)}")
-                return ""
-                
-        elif output_format == "latex":
-            filename = f"{safe_title}.tex"
-            file_path = os.path.join(OUTPUT_DIR, filename)
-            
-            try:
-                # LaTeX 형식으로 논문 내용 생성
-                content = "\\documentclass{article}\n"
-                content += "\\usepackage[utf8]{inputenc}\n"
-                content += "\\usepackage{natbib}\n"
-                content += "\\usepackage{graphicx}\n"
-                content += "\\usepackage{hyperref}\n\n"
-
-                content += f"\\title{{{paper.title}}}\n"
-
-                # 저자 정보 (없으므로 기본값 사용)
-                content += "\\author{AI Paper Writer}\n"
-                content += "\\date{\\today}\n\n"
-
-                content += "\\begin{document}\n\n"
-                content += "\\maketitle\n\n"
-
-                # 초록 섹션 (있는 경우)
-                abstract_section = next((s for s in paper.sections if s.title.lower() == "초록" or s.title.lower() == "abstract"), None)
-                if abstract_section:
-                    content += "\\begin{abstract}\n"
-                    content += abstract_section.content + "\n"
-                    content += "\\end{abstract}\n\n"
-
-                # 목차
-                content += "\\tableofcontents\n\\newpage\n\n"
-
-                # 각 섹션
-                for section in paper.sections:
-                    # 초록은 이미 처리했으므로 건너뜀
-                    if section.title.lower() == "초록" or section.title.lower() == "abstract":
-                        continue
-                        
-                    content += f"\\section{{{section.title}}}\n\n"
-                    
-                    # LaTeX 특수 문자 이스케이프
-                    section_content = section.content
-                    section_content = section_content.replace("_", "\\_")
-                    section_content = section_content.replace("%", "\\%")
-                    section_content = section_content.replace("&", "\\&")
-                    section_content = section_content.replace("#", "\\#")
-                    
-                    content += section_content + "\n\n"
-                
-                # 참고 문헌
-                if paper.references:
-                    content += "\\begin{thebibliography}{99}\n\n"
-                    
-                    for i, ref in enumerate(paper.references, 1):
-                        authors = ", ".join(ref.authors) if ref.authors else "Unknown"
-                        content += f"\\bibitem{{{i}}}\n"
-                        content += f"{authors} ({ref.year}). {ref.title}. {ref.source}.\n\n"
-                    
-                    content += "\\end{thebibliography}\n\n"
-                
-                content += "\\end{document}"
-                
-                # 파일 저장
-                with open(file_path, 'w', encoding='utf-8') as f:
-                    f.write(content)
-                
-                logger.info(f"논문 '{paper.title}' LaTeX 형식으로 저장됨: {file_path}")
-                return file_path
-                
-            except Exception as e:
-                logger.error(f"논문 LaTeX 형식 저장 중 오류 발생: {str(e)}")
-                return ""
+        # Ensure the paper is in English
+        if not self._is_english(paper.sections[0].content if paper.sections else ""):
+            logger.warning("Paper may not be in English. Converting to English.")
+            for section in paper.sections:
+                if not self._is_english(section.content):
+                    section.content = self._translate_to_english(section.content)
         
+        # Ensure the paper has a references section
+        if not any(section.title.lower() in ["references", "bibliography"] for section in paper.sections):
+            logger.warning("No references section found. Adding one.")
+            self._add_references_section(paper)
+        
+        # Format the paper based on the requested output format
+        if output_format.lower() == "markdown":
+            formatted_content = self._format_as_markdown(paper)
+            file_ext = "md"
+        elif output_format.lower() == "latex":
+            formatted_content = self._format_as_latex(paper)
+            file_ext = "tex"
+        elif output_format.lower() == "docx":
+            # For docx, we'll save as markdown and note that conversion would happen externally
+            formatted_content = self._format_as_markdown(paper)
+            file_ext = "md"
+            logger.info("Note: DOCX format requires external conversion from markdown")
         else:
-            logger.error(f"지원되지 않는 출력 형식: {output_format}")
-            return ""
+            # Default to markdown
+            formatted_content = self._format_as_markdown(paper)
+            file_ext = "md"
+            logger.warning(f"Unknown format '{output_format}'. Defaulting to markdown.")
+        
+        # Create a filename based on the paper title
+        safe_title = re.sub(r'[^\w\s-]', '', paper.metadata.title).strip().lower()
+        safe_title = re.sub(r'[-\s]+', '-', safe_title)
+        timestamp = self._get_timestamp()
+        filename = f"{safe_title}-{timestamp}.{file_ext}"
+        filepath = os.path.join(OUTPUT_DIR, filename)
+        
+        # Save the formatted content to the file
+        with open(filepath, 'w', encoding='utf-8') as f:
+            f.write(formatted_content)
+        
+        logger.info(f"Paper saved to: {filepath}")
+        return filepath
 
     def _parse_edited_paper(self, edited_content: str, original_paper: Paper) -> Paper:
         """

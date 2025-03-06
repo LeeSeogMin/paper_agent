@@ -13,15 +13,25 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# API Selection from environment variables
+USE_OPENAI_API = os.environ.get("USE_OPENAI_API", "false").lower() == "true"
+USE_XAI_API = os.environ.get("USE_XAI_API", "false").lower() == "true"
+USE_ANTHROPIC_API = os.environ.get("USE_ANTHROPIC_API", "true").lower() == "true"
+
 # OpenAI API key
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-if not OPENAI_API_KEY:
-    logger.warning("OpenAI API key not found. Some functionality may be limited.")
+if USE_OPENAI_API and not OPENAI_API_KEY:
+    logger.warning("OpenAI API key not found but OpenAI API is enabled. Some functionality may be limited.")
 
 # XAI API key
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
-if not XAI_API_KEY:
-    logger.warning("XAI API key not found. Using XAI API will not be possible.")
+if USE_XAI_API and not XAI_API_KEY:
+    logger.warning("XAI API key not found but XAI API is enabled. Using XAI API will not be possible.")
+
+# Anthropic API key
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+if USE_ANTHROPIC_API and not ANTHROPIC_API_KEY:
+    logger.warning("Anthropic API key not found but Anthropic API is enabled. Using Anthropic API will not be possible.")
 
 # Semantic Scholar API key
 # If API key is not provided, we'll use the API as an unauthorized user
@@ -47,9 +57,16 @@ def check_required_api_keys():
     Check if all required API keys are available.
     Returns a tuple of (success, missing_keys)
     """
-    required_keys = {
-        "OPENAI_API_KEY": OPENAI_API_KEY,  # XAI_API_KEY 대신 OPENAI_API_KEY만 확인
-    }
+    required_keys = {}
+    
+    if USE_OPENAI_API:
+        required_keys["OPENAI_API_KEY"] = OPENAI_API_KEY
+    
+    if USE_XAI_API:
+        required_keys["XAI_API_KEY"] = XAI_API_KEY
+    
+    if USE_ANTHROPIC_API:
+        required_keys["ANTHROPIC_API_KEY"] = ANTHROPIC_API_KEY
     
     missing_keys = [key for key, value in required_keys.items() if not value]
     

@@ -14,6 +14,7 @@ from langchain.schema import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import Chroma
 from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.chains import LLMChain
 from langchain.prompts import PromptTemplate
 
@@ -63,7 +64,7 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
         pdf_storage_dir: str = PDF_STORAGE_DIR,
         chunk_size: int = CHUNK_SIZE,
         chunk_overlap: int = CHUNK_OVERLAP,
-        embedding_model: str = "text-embedding-ada-002",
+        embedding_model: str = "all-mpnet-base-v2",
         verbose: bool = False
     ):
         """
@@ -76,7 +77,7 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
             pdf_storage_dir (str, optional): PDF 저장 디렉토리. 기본값은 PDF_STORAGE_DIR
             chunk_size (int, optional): 청크 크기. 기본값은 CHUNK_SIZE
             chunk_overlap (int, optional): 청크 오버랩. 기본값은 CHUNK_OVERLAP
-            embedding_model (str, optional): 임베딩 모델. 기본값은 "text-embedding-ada-002"
+            embedding_model (str, optional): 임베딩 모델. 기본값은 "all-mpnet-base-v2"
             verbose (bool, optional): 상세 로깅 활성화 여부. 기본값은 False
         """
         super().__init__(name, description, verbose=verbose)
@@ -117,9 +118,8 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
         )
         
         # 임베딩 객체 초기화
-        self.embeddings = OpenAIEmbeddings(
-            model=embedding_model,
-            openai_api_key=OPENAI_API_KEY
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name=embedding_model
         )
         
         # 벡터 DB 초기화 (사용 시 생성)
@@ -448,7 +448,7 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
                 document_count = self.vectordb._collection.count()
             
             # 임베딩 차원 (기본 OpenAI ada-002 모델은 1536차원)
-            embedding_dimension = 1536 if "ada-002" in self.embedding_model else 768
+            embedding_dimension = 768  # all-mpnet-base-v2 모델은 768차원
             
             # 메타데이터 필드
             metadata_fields = ["title", "authors", "year", "source", "url", "is_pdf"]
@@ -467,7 +467,7 @@ class DataProcessingAgent(BaseAgent[List[Document]]):
             return VectorDBInfo(
                 collection_name=self.collection_name or "unknown",
                 document_count=0,
-                embedding_dimension=1536,
+                embedding_dimension=768,
                 metadata_fields=[]
             )
             
