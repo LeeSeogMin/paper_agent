@@ -9,45 +9,24 @@ This module contains the ResearchAgent class, which is responsible for gathering
 analyzing, and organizing research materials for academic paper writing.
 
 """
-
-
-
 import os
-
 import re
-
 import json
-
 import time
-
 import uuid
-
 import traceback
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
-
 import numpy as np
-
 from langchain.docstore.document import Document
-
 from langchain.schema import AIMessage, HumanMessage, SystemMessage
-
 from langchain.tools import tool
-
 from langchain_core.runnables import RunnableSequence
-
 from langchain_core.prompts import PromptTemplate
-
 from langchain_openai import ChatOpenAI
-
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-
 from langchain.chains.summarize import load_summarize_chain
-
 from langchain.chains import LLMChain
-
 from datetime import datetime
-
 from typing import Dict, List, Tuple, Any, Optional, Union
 
 # Markdown 모듈 import 추가
@@ -89,14 +68,8 @@ from prompts.research_prompts import (
 
 )
 
-
-
 # XAI 클라이언트 import 추가 (기존 import 섹션 아래)
-
 from utils.xai_client import XAIClient  # utils 폴더에서 가져오기
-
-
-
 
 
 class ResearchAgent(BaseAgent):
@@ -139,9 +112,7 @@ class ResearchAgent(BaseAgent):
 
         self.llm = ChatOpenAI(model_name=model_name, temperature=temperature)
 
-        self.verbose = verbose
-
-        
+        self.verbose = verbose      
 
         # Initialize chains using RunnableSequence
 
@@ -221,7 +192,8 @@ class ResearchAgent(BaseAgent):
         try:
             # Create prompt for query generation
             prompt = f"""
-You are a research assistant helping me find literature for a literature review on:
+You are a research assistant helping me find literature for a literature review on the following topic:
+
 {topic}
 
 Please generate {n_queries} specific search queries to find relevant academic papers. 
@@ -673,9 +645,13 @@ etc.
                     academic_results = academic_search(query_text, max_results=results_per_source, language='en')
                     web_results = academic_search(query_text, max_results=results_per_source, sources=["google", "arxiv", "crossref"], language='en')
                     
-                    # PDF URL이 있는 결과만 유지
-                    academic_results = [r for r in academic_results if r.get('pdf_url')]
-                    web_results = [r for r in web_results if r.get('pdf_url')]
+                    # PDF URL이 있는 결과만 유지 (필터링 강화)
+                    academic_results = [r for r in academic_results if r.get('pdf_url') and r.get('pdf_url').strip()]
+                    web_results = [r for r in web_results if r.get('pdf_url') and r.get('pdf_url').strip()]
+                    
+                    # 검색 결과 로깅
+                    logger.info(f"PDF URL이 있는 학술 검색 결과: {len(academic_results)}개")
+                    logger.info(f"PDF URL이 있는 웹 검색 결과: {len(web_results)}개")
                     
                     # 결과 결합
                     combined_results = academic_results + web_results
@@ -775,11 +751,17 @@ etc.
         Returns:
             ResearchMaterial: 생성된 연구 자료 객체
         """
-        # PDF URL 또는 PDF 경로 확인
+        # PDF URL 또는 PDF 경로 확인 - PDF 자료가 없으면 건너뜀
         pdf_url = result.get('pdf_url')
         pdf_path = result.get('pdf_path')
         
         if not pdf_url and not pdf_path:
+            logger.warning(f"PDF URL 또는 경로가 없어 자료를 생성하지 않습니다: {result.get('title', '제목 없음')}")
+            return None
+        
+        # PDF 파일이 실제로 존재하는지 확인 (pdf_path가 있는 경우)
+        if pdf_path and not os.path.exists(pdf_path):
+            logger.warning(f"PDF 파일이 존재하지 않습니다: {pdf_path}")
             return None
         
         # 저자 처리
@@ -979,10 +961,10 @@ etc.
                                 logger.error(f"Error extracting text from PDF: {str(e)}")
                                 # 내용 추출 실패 시 건너뜁니다
                                 return None
-                        # PDF 없이 초록만 있는 경우
+                        # PDF 없이 초록만 있는 경우 - 건너뜀
                         elif hasattr(material, 'abstract') and material.abstract:
-                            logger.info(f"PDF 없음, 초록을 내용으로 사용: {material.title}")
-                            material.content = material.abstract
+                            logger.warning(f"PDF 없음, 자료를 건너뜁니다: {material.title}")
+                            return None
                         else:
                             logger.warning(f"내용이 없고 추출할 방법도 없어 자료를 건너뜁니다: {material.title}")
                             return None
@@ -1423,141 +1405,103 @@ Provide a thorough analysis that will help in writing a literature review.
 
     def create_paper_outline(self, topic, analysis, materials):
         """
-        연구 주제와 분석 결과를 바탕으로 논문 개요를 생성합니다.
+        연구 주제, 분석 결과, 자료 기반으로 학술 논문 개요 생성.
         
         Args:
             topic (str): 연구 주제
-            analysis (dict): 분석 결과
-            materials (list): 연구 자료 목록
+            analysis (dict): 연구 자료 분석 결과
+            materials (List[ResearchMaterial]): 연구 자료 목록
             
         Returns:
-            dict: 논문 개요 (제목, 초록, 섹션 등)
+            dict: 논문 개요
         """
-        logger.info("논문 개요 생성 중...")
-        
-        # 자료 요약 준비
-        material_summaries = []
-        for i, material in enumerate(materials):
-            if i >= 15:  # 최대 15개 자료만 사용
-                break
-                
-            try:
-                title = getattr(material, 'title', f'자료 {i+1}')
-                authors = getattr(material, 'authors', ['저자 미상'])
-                if isinstance(authors, list):
-                    authors = ', '.join(authors[:3])
-                    if len(getattr(material, 'authors', [])) > 3:
-                        authors += ' et al.'
-                        
-                year = getattr(material, 'year', '연도 미상')
-                source = getattr(material, 'source', '출처 미상')
-                
-                # 초록 또는 내용 요약 사용
-                if hasattr(material, 'summary') and material.summary:
-                    preview = material.summary[:300] + '...' if len(material.summary) > 300 else material.summary
-                elif hasattr(material, 'abstract') and material.abstract:
-                    preview = material.abstract[:300] + '...' if len(material.abstract) > 300 else material.abstract
-                elif hasattr(material, 'content') and material.content:
-                    preview = material.content[:300] + '...' if len(material.content) > 300 else material.content
-                else:
-                    preview = "내용 없음"
-                    
-                material_summaries.append({
-                    'title': title,
-                    'authors': authors,
-                    'year': year,
-                    'source': source,
-                    'preview': preview
-                })
-            except Exception as e:
-                logger.error(f"자료 {i+1} 요약 생성 중 오류: {str(e)}")
-                
-        # 자료 요약이 없는 경우 처리
-        if not material_summaries:
-            logger.warning("요약할 자료가 없습니다.")
-            material_summaries = [{'title': '자료 없음', 'authors': '저자 미상', 'year': '연도 미상', 'preview': '내용 없음'}]
-            
-        # 분석 요약 준비
-        analysis_summary = ""
-        if analysis:
-            if 'main_themes' in analysis:
-                analysis_summary += f"주요 주제: {analysis['main_themes']}\n"
-            if 'methodologies' in analysis:
-                analysis_summary += f"주요 방법론: {analysis['methodologies']}\n"
-            if 'key_findings' in analysis:
-                analysis_summary += f"주요 발견: {analysis['key_findings']}\n"
-            if 'research_gaps' in analysis:
-                analysis_summary += f"연구 공백: {analysis['research_gaps']}\n"
-                
-        # 분석 요약이 없는 경우 처리
-        if not analysis_summary:
-            analysis_summary = "분석 결과 없음"
-            
-        # 아웃라인 생성 프롬프트
-        outline_prompt = f"""
-        다음 정보를 바탕으로 "{topic}"에 관한 문헌 리뷰 논문의 아웃라인을 작성해주세요.
-        
-        ## 분석 요약
-        {analysis_summary}
-        
-        ## 연구 자료 목록 (총 {len(material_summaries)}개)
-        {json.dumps(material_summaries, indent=2, ensure_ascii=False)}
-        
-        ## 요구사항
-        1. 논문의 제목을 작성하세요 (한글 또는 영어).
-        2. 본문 섹션만 작성하세요 - 초록, 서론, 결론 섹션은 포함하지 마세요.
-        3. 각 섹션에는 제목과 간략한 설명을 포함하세요.
-        4. 섹션 수준은 최대 2단계까지만 사용하세요 (예: 3.1, 3.2).
-        5. 참고문헌 목록은 제공된 연구 자료를 기반으로 작성하세요.
-        
-        다음 JSON 형식으로 응답해주세요:
-        ```json
-        {
-          "title": "논문 제목",
-          "sections": [
-            {
-              "title": "섹션 제목",
-              "level": 1,
-              "description": "섹션 설명"
-            },
-            {
-              "title": "하위 섹션 제목",
-              "level": 2,
-              "description": "하위 섹션 설명"
-            }
-          ],
-          "references": [
-            "참고문헌 1",
-            "참고문헌 2"
-          ]
-        }
-        ```
-        
-        중요: 초록, 서론, 결론 섹션은 포함하지 마세요! 본문 내용(연구 주제의 주요 내용, 방법론, 역사적 발전, 분석 등)에 집중하세요.
-        """
+        logger.info(f"논문 개요 생성 시작: {topic[:100]}...")
         
         try:
-            # LLM을 사용하여 아웃라인 생성
+            # 분석 결과와 자료 요약을 준비
+            analysis_summary = ""
+            if isinstance(analysis, dict):
+                if 'analysis_text' in analysis:
+                    analysis_summary = analysis['analysis_text'][:2000]  # 긴 분석 텍스트 처리
+                else:
+                    analysis_summary = json.dumps(analysis, ensure_ascii=False)[:2000]
+            elif isinstance(analysis, str):
+                analysis_summary = analysis[:2000]  # 긴 분석 텍스트 처리
+            
+            # 자료 요약 (최대 5개)
+            material_summaries = []
+            for mat in materials[:5]:
+                if hasattr(mat, 'title') and hasattr(mat, 'authors'):
+                    authors_str = ", ".join(mat.authors[:3]) if isinstance(mat.authors, list) else mat.authors
+                    mat_summary = f"- {mat.title} by {authors_str}"
+                    material_summaries.append(mat_summary)
+            
+            materials_text = "\n".join(material_summaries)
+            
+            # 프롬프트 생성 - 긴 연구 주제도 효과적으로 처리
+            outline_prompt = f"""
+당신은 학술 논문 작성을 돕는 전문 연구원입니다. 다음 연구 주제, 분석 결과, 자료를 바탕으로 학술 논문의 개요를 만들어주세요.
+
+연구 주제:
+{topic}
+
+분석 결과 요약:
+{analysis_summary}
+
+주요 연구 자료 예시:
+{materials_text}
+
+학술 논문 개요에는 다음 항목이 포함되어야 합니다:
+1. 적절한 논문 제목
+2. 초록 (Abstract) - 연구의 목적, 방법, 결과, 시사점을 간략히 요약
+3. 서론 (Introduction) - 연구 주제 소개 및 배경, 연구 목적, 연구 문제
+4. 논문의 주요 섹션들 - 문헌 리뷰, 방법론, 결과, 토론 등을 포함하는 논리적 구조
+5. 결론 및 향후 연구 방향
+
+각 섹션에는 간략한 설명을 덧붙여주세요.
+
+JSON 형태로 다음 형식에 맞게 응답해주세요:
+{{
+  "title": "논문 제목",
+  "abstract": "초록 텍스트",
+  "sections": [
+    {{
+      "title": "섹션 제목 (예: 서론)",
+      "description": "섹션에 대한 간략한 설명"
+    }},
+    // 다른 섹션들도 같은 형식으로...
+  ]
+}}
+"""
+            
+            # LLM을 사용하여 개요 생성
             response = self.llm.invoke(outline_prompt)
-            outline_text = response.content.strip()
+            response_text = response.content if hasattr(response, 'content') else str(response)
             
-            # JSON 추출
-            match = re.search(r'```(?:json)?(.*?)```', outline_text, re.DOTALL)
+            # JSON 형식 추출
+            json_pattern = r"\{[\s\S]*\}"
+            match = re.search(json_pattern, response_text)
+            
             if match:
-                outline_json = match.group(1).strip()
+                json_text = match.group(0)
+                outline = json.loads(json_text)
+                logger.info(f"논문 개요 생성 성공: '{outline.get('title', '제목 정보 없음')}'")
+                return outline
             else:
-                outline_json = outline_text
-                
-            try:
-                outline = json.loads(outline_json)
-            except json.JSONDecodeError:
-                logger.error("JSON 파싱 실패, 텍스트 분석 시도")
-                # 텍스트에서 정보 추출 시도
-                outline = self._extract_outline_from_text(outline_text)
-                
-            logger.info(f"논문 개요 생성 완료: {len(outline.get('sections', []))}개 섹션")
-            return outline
-            
+                logger.error("응답에서 JSON 형식을 찾을 수 없습니다. 텍스트 형식으로 처리합니다.")
+                # JSON 변환 실패 시 기본 개요 반환
+                return {
+                    "title": f"{topic}에 관한 연구",
+                    "abstract": "이 연구는 주제에 대한 문헌 리뷰와 분석을 제공합니다.",
+                    "sections": [
+                        {"title": "서론", "description": "연구 배경 및 목적"},
+                        {"title": "관련 연구", "description": "선행 연구 분석"},
+                        {"title": "방법론", "description": "연구 방법 설명"},
+                        {"title": "결과 및 논의", "description": "주요 발견 및 논의"},
+                        {"title": "결론", "description": "연구 결론 및 향후 방향"}
+                    ]
+                }
+        
         except Exception as e:
             logger.error(f"논문 개요 생성 중 오류: {str(e)}")
             traceback.print_exc()
@@ -1568,6 +1512,7 @@ Provide a thorough analysis that will help in writing a literature review.
     def generate_report(self, topic, analysis, materials):
         """
         연구 자료를 바탕으로 문헌 리뷰 보고서를 생성합니다.
+        기본적으로 영어로 보고서를 생성하고, 한글 번역본도 함께 저장합니다.
         
         Args:
             topic (str): 연구 주제
@@ -1607,9 +1552,10 @@ Provide a thorough analysis that will help in writing a literature review.
                 
             logger.info(f"논문 아웃라인 생성됨: {len(outline.get('sections', []))}개 섹션")
             
-            # 3. 보고서 내용 구성
+            # 3. 보고서 내용 구성 (영어)
             # 제목만 포함하고 초록 제외
-            title = outline.get('title', '토픽 모델링의 역사와 발전')
+            # 영어 제목 사용
+            title = outline.get('title', 'History and Development of Topic Modeling')
             report_content = f"# {title}\n\n"
             
             # 사용자 제공 목차 확인
@@ -1620,39 +1566,21 @@ Provide a thorough analysis that will help in writing a literature review.
                 logger.info(f"사용자가 제공한 목차를 사용합니다: {user_toc}")
                 toc = user_toc
             else:
-                # 요청 내용을 분석하여 적합한 목차 생성
-                logger.info("사용자가 목차를 제공하지 않아 자동으로 생성합니다.")
+                logger.info("자동으로 목차를 생성합니다.")
                 try:
-                    toc_prompt = f"""
-                    다음 주제에 대한 문헌 리뷰 목차를 생성해주세요:
+                    # 영어 섹션 제목 사용을 위한 목차 생성
+                    outline_text = outline.get('outline', '')
+                    if not outline_text:
+                        raise ValueError("아웃라인 텍스트가 비어있습니다.")
                     
-                    주제: {topic}
-                    
-                    분석 내용:
-                    {analysis.get('main_themes', '')}
-                    {analysis.get('key_insights', '')}
-                    
-                    목차는 학술적이고 논리적인 구조를 가져야 하며, 
-                    서론(Introduction), 관련 연구(Related Works) 외에 
-                    주제와 관련된 3-5개의 하위 섹션으로 구성해주세요.
-                    
-                    각 섹션의 제목과 간략한 설명만 제공해주세요.
-                    다음 형식으로 응답해주세요:
-                    
-                    1. [섹션명1]: [간략한 설명]
-                    2. [섹션명2]: [간략한 설명]
-                    3. ...
-                    """
-                    
-                    response = self.llm.invoke(toc_prompt)
-                    toc_text = response.content.strip()
-                    
-                    # 응답에서 목차 추출
                     toc_items = []
-                    for line in toc_text.split('\n'):
-                        if ':' in line and any(c.isdigit() for c in line.split(':')[0]):
-                            parts = line.split(':', 1)
-                            section_num = parts[0].strip().rstrip('.')
+                    lines = outline_text.split('\n')
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            parts = line.split('.', 1)
+                            if len(parts) < 2:
+                                continue
                             section_info = parts[1].strip()
                             if section_info:
                                 title_parts = section_info.split('-', 1) if '-' in section_info else [section_info, '']
@@ -1663,88 +1591,132 @@ Provide a thorough analysis that will help in writing a literature review.
                                     'description': section_desc
                                 })
                     
-                    # 최소 2개 이상의 섹션 확보
+                    # 최소 2개 이상의 섹션 확보 (영어 제목 사용)
                     if len(toc_items) < 2:
                         toc_items = [
-                            {'title': 'Introduction', 'description': '연구 배경 및 목적'},
-                            {'title': 'Related Works', 'description': '관련 연구 동향 분석'}
+                            {'title': 'Introduction', 'description': 'Research background and purpose'},
+                            {'title': 'Related Works', 'description': 'Analysis of related research trends'}
                         ]
                     
                     toc = toc_items
                     
                 except Exception as e:
                     logger.error(f"목차 자동 생성 중 오류 발생: {e}")
-                    # 기본 목차 설정
+                    # 기본 목차 설정 (영어)
                     toc = [
-                        {'title': 'Introduction', 'description': '연구 배경 및 목적'},
-                        {'title': 'Related Works', 'description': '관련 연구 동향 분석'}
+                        {'title': 'Introduction', 'description': 'Research background and purpose'},
+                        {'title': 'Related Works', 'description': 'Analysis of related research trends'}
                     ]
             
             # 각 섹션에 대한 내용 생성
             section_count = 0
             for section in toc:
-                section_title = section.get('title', '제목 없음')
+                section_title = section.get('title', 'Untitled')
                 section_desc = section.get('description', '')
                 
                 report_content += f"## {section_title}\n\n"
                 section_count += 1
                 
                 try:
-                    # 각 섹션에 대한 상세 내용 생성
+                    # 각 섹션에 대한 상세 내용 생성 (영어로 프롬프트 작성)
                     section_prompt = f"""
-                    다음은 '{title}' 제목의 문헌 리뷰 논문의 섹션입니다:
+                    The following is a section for a literature review paper titled '{title}':
                     
-                    섹션: {section_title}
-                    설명: {section_desc}
+                    Section: {section_title}
+                    Description: {section_desc}
                     
-                    이 섹션에 대해 약 500-700단어의 학술적이고 상세한 내용을 작성해주세요.
-                    주제: {topic}
-                    분석 내용: {analysis.get('main_themes', '')}
+                    Please write approximately 500-700 words of academic and detailed content for this section.
+                    Topic: {topic}
+                    Analysis: {analysis.get('main_themes', '')}
                     
-                    학술 논문 스타일로 작성하고, 적절한 소제목을 포함하세요.
+                    Write in an academic paper style and include appropriate subheadings.
                     """
                     
                     # 서론(Introduction)인 경우 특별한 프롬프트 사용
                     if section_title.lower() in ['introduction', 'intro', '서론', '소개', 'introduce']:
+                        # 참고문헌 정보를 문자열로 변환하여 제공
+                        references_info = ""
+                        for i, ref in enumerate(references[:10], 1):  # 너무 많은 정보를 주지 않기 위해 10개로 제한
+                            author = ref.get('authors', 'Unknown Author')
+                            if isinstance(author, list) and len(author) > 0:
+                                author_text = ', '.join(author[:3])
+                                if len(ref.get('authors', [])) > 3:
+                                    author_text += ' et al.'
+                            else:
+                                author_text = str(author)
+                            
+                            title = ref.get('title', 'Unknown Title')
+                            year = ref.get('year', '')
+                            references_info += f"{i}. {author_text} ({year}). {title}\n"
+                        
+                        # 사용자 지정 서론 단어 수 확인
+                        intro_words_text = "approximately 400-600 words"
+                        if hasattr(self, 'intro_words') and self.intro_words:
+                            intro_words_text = f"approximately {self.intro_words} words"
+                        
                         section_prompt = f"""
-                        다음 주제에 대한 연구 보고서의 서론을 작성해주세요:
+                        Please write an introduction for a research paper on the following topic:
                         
-                        주제: {topic}
+                        Topic: {topic}
                         
-                        서론에는 다음 내용이 포함되어야 합니다:
-                        1. 연구 주제 소개 및 배경
-                        2. 연구의 목적과 의의
-                        3. 주요 연구 질문
-                        4. 보고서의 구성 설명
+                        The introduction should include:
+                        1. Introduction to the research topic and background
+                        2. Purpose and significance of the research
+                        3. Main research questions
+                        4. Structure of the report
                         
-                        약 300-500단어로 학술적이고 명확한 서론을 작성해주세요.
+                        Important: You must cite appropriate academic literature in the introduction. Choose at least 3-5 references from the list below to cite:
+                        
+                        Reference List:
+                        {references_info}
+                        
+                        Citation format: Use either "(Author, Year)" or "Author(Year) states..." format for in-text citations.
+                        Example: "Recent research (Smith et al., 2022) suggests..." or "Johnson(2020) argues..."
+                        
+                        Please write an academic and clear introduction in {intro_words_text}. 
+                        Cite the selected literature to support your arguments in the introduction.
                         """
                     
                     # 관련 연구(Related Works)인 경우 특별한 프롬프트 사용
                     elif section_title.lower() in ['related works', 'related work', '관련 연구', '선행 연구']:
+                        # 사용자 지정 관련 연구 단어 수 확인
+                        related_works_words_text = "approximately 700-800 words"
+                        if hasattr(self, 'related_works_words') and self.related_works_words:
+                            related_works_words_text = f"approximately {self.related_works_words} words"
+                        
+                        # 영어로 관련 연구 프롬프트 작성
                         section_prompt = f"""
-                        다음 주제에 대한 문헌 리뷰(Related works)를 작성해주세요:
+                        Please write a literature review for the following research topic:
                         
-                        주제: {topic}
+                        Topic: {topic}
                         
-                        다음 분석 내용을 참고하세요:
-                        {analysis.get('main_themes', '')}
-                        {analysis.get('key_insights', '')}
+                        Write a comprehensive literature review in {related_works_words_text}, covering:
+                        1. Key themes and trends in the research area
+                        2. Major insights from existing literature
+                        3. Research gaps and contradictions in current knowledge
+                        4. How your research relates to existing knowledge
                         
-                        문헌 리뷰에는 다음 내용이 포함되어야 합니다:
-                        1. 관련 연구 영역의 주요 흐름과 발전 과정
-                        2. 주요 연구자들의 접근 방식과 발견
-                        3. 최신 연구 동향과 쟁점
-                        4. 연구 격차와 향후 연구 방향
+                        Important: Properly cite at least 7-10 references from the literature. Use the reference list provided below.
                         
-                        약 700-800단어로 학술적이고 상세한 문헌 리뷰를 작성해주세요.
-                        주요 참고문헌과 인용을 적절히 포함해주세요.
+                        Reference List:
+                        {references_info}
+                        
+                        Citation format: Use either "(Author, Year)" or "Author(Year) states..." format for in-text citations.
+                        Example: "Recent research (Smith et al., 2022) suggests..." or "Johnson(2020) argues..."
+                        
+                        Organize the literature review by themes rather than simply listing studies chronologically.
                         """
                     
-                    response = self.llm.invoke(section_prompt)
-                    section_content = response.content.strip()
+                    # 각 섹션에 대한 내용 생성
+                    section_content = self.llm.chat_completion([
+                        {"role": "system", "content": "You are an expert academic writer. You write in clear, concise, and scholarly English. Use academic language appropriate for a literature review."},
+                        {"role": "user", "content": section_prompt}
+                    ])
                     
-                    report_content += f"{section_content}\n\n"
+                    if section_content:
+                        report_content += f"{section_content}\n\n"
+                    else:
+                        report_content += "Content generation failed for this section.\n\n"
                     
                 except Exception as e:
                     logger.error(f"섹션 '{section_title}' 내용 생성 중 오류 발생: {e}")
@@ -1756,8 +1728,8 @@ Provide a thorough analysis that will help in writing a literature review.
             # 참고문헌 포맷팅 (이미 상단에서 추출했음)
             try:
                 for i, ref in enumerate(references, 1):
-                    author = ref.get('authors', '저자 미상')
-                    title = ref.get('title', '제목 미상')
+                    author = ref.get('authors', 'Unknown Author')
+                    title = ref.get('title', 'Unknown Title')
                     year = ref.get('year', '')
                     
                     if isinstance(author, list) and len(author) > 0:
@@ -1773,21 +1745,31 @@ Provide a thorough analysis that will help in writing a literature review.
             except Exception as e:
                 logger.error(f"참고문헌 생성 중 오류 발생: {e}")
             
-            # 3. 보고서 저장
+            # 4. 한글 번역본 생성
+            logger.info("영어 보고서 생성 완료, 한글 번역본 생성 시작")
+            korean_report_content = self._translate_report_to_korean(report_content)
+            
+            # 5. 보고서 저장 (영어 및 한글 버전)
             os.makedirs('output', exist_ok=True)
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = f'output/literature_review_{timestamp}.md'
             
-            with open(output_file, 'w', encoding='utf-8') as f:
+            # 영어 버전 저장
+            english_output_file = f'output/literature_review_en_{timestamp}.md'
+            with open(english_output_file, 'w', encoding='utf-8') as f:
                 f.write(report_content)
-                
-            logger.info(f"문헌 리뷰 보고서가 '{output_file}'에 저장되었습니다.")
+            logger.info(f"영어 문헌 리뷰 보고서가 '{english_output_file}'에 저장되었습니다.")
             
-            # 4. HTML 변환 시도 (선택적)
+            # 한글 버전 저장
+            korean_output_file = f'output/literature_review_ko_{timestamp}.md'
+            with open(korean_output_file, 'w', encoding='utf-8') as f:
+                f.write(korean_report_content)
+            logger.info(f"한글 문헌 리뷰 보고서가 '{korean_output_file}'에 저장되었습니다.")
+            
+            # 6. HTML 변환 시도 (선택적, 영어 버전만)
             if MARKDOWN_AVAILABLE:
                 try:
-                    html_file = output_file.replace('.md', '.html')
-                    with open(output_file, 'r', encoding='utf-8') as md_file:
+                    html_file = english_output_file.replace('.md', '.html')
+                    with open(english_output_file, 'r', encoding='utf-8') as md_file:
                         # 'extra' 및 'tables' 확장을 사용하여 더 풍부한 마크다운 기능 지원
                         html_content = markdown.markdown(md_file.read(), extensions=['extra', 'tables'])
                     
@@ -1887,11 +1869,118 @@ Provide a thorough analysis that will help in writing a literature review.
                         </head>
                         <body>
                         {html_content}
-                        <div class="timestamp">생성 시간: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+                        <div class="timestamp">Generated at: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
                         </body>
                         </html>""")
                     
                     logger.info(f"HTML 버전의 보고서가 '{html_file}'에 저장되었습니다.")
+                    
+                    # 한글 버전도 HTML로 변환
+                    korean_html_file = korean_output_file.replace('.md', '.html')
+                    with open(korean_output_file, 'r', encoding='utf-8') as md_file:
+                        korean_html_content = markdown.markdown(md_file.read(), extensions=['extra', 'tables'])
+                    
+                    with open(korean_html_file, 'w', encoding='utf-8') as f:
+                        f.write(f"""<!DOCTYPE html>
+                        <html>
+                        <head>
+                            <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                            <title>{title} (한글)</title>
+                            <style>
+                                body {{ 
+                                    font-family: 'Malgun Gothic', 'Segoe UI', Arial, sans-serif; 
+                                    line-height: 1.6; 
+                                    max-width: 900px; 
+                                    margin: 0 auto; 
+                                    padding: 30px; 
+                                    color: #333;
+                                    background-color: #fdfdfd;
+                                }}
+                                h1 {{ 
+                                    color: #2c3e50; 
+                                    border-bottom: 2px solid #eaecef;
+                                    padding-bottom: 10px;
+                                }}
+                                h2 {{ 
+                                    color: #3498db; 
+                                    margin-top: 30px;
+                                    border-bottom: 1px solid #eaecef;
+                                    padding-bottom: 7px;
+                                }}
+                                h3 {{ 
+                                    color: #2980b9; 
+                                    margin-top: 25px;
+                                }}
+                                blockquote {{ 
+                                    border-left: 4px solid #4a90e2; 
+                                    padding: 10px 15px; 
+                                    margin: 20px 0; 
+                                    background-color: #f8f9fa;
+                                    color: #555; 
+                                }}
+                                code {{ 
+                                    background-color: #f6f8fa; 
+                                    padding: 2px 4px; 
+                                    border-radius: 3px;
+                                    font-family: Consolas, monospace;
+                                }}
+                                pre {{ 
+                                    background-color: #f6f8fa; 
+                                    padding: 16px; 
+                                    border-radius: 5px;
+                                    overflow-x: auto;
+                                }}
+                                a {{ 
+                                    color: #4183c4; 
+                                    text-decoration: none;
+                                }}
+                                a:hover {{ 
+                                    text-decoration: underline; 
+                                }}
+                                table {{
+                                    border-collapse: collapse;
+                                    width: 100%;
+                                    margin: 25px 0;
+                                }}
+                                table, th, td {{
+                                    border: 1px solid #ddd;
+                                }}
+                                th, td {{
+                                    padding: 10px;
+                                    text-align: left;
+                                }}
+                                th {{
+                                    background-color: #f2f2f2;
+                                }}
+                                tr:nth-child(even) {{
+                                    background-color: #f9f9f9;
+                                }}
+                                img {{
+                                    max-width: 100%;
+                                    height: auto;
+                                }}
+                                .references {{
+                                    margin-top: 40px;
+                                    border-top: 1px solid #eaecef;
+                                    padding-top: 20px;
+                                }}
+                                .timestamp {{
+                                    color: #888;
+                                    font-size: 0.9em;
+                                    margin-top: 40px;
+                                    text-align: right;
+                                }}
+                            </style>
+                        </head>
+                        <body>
+                        {korean_html_content}
+                        <div class="timestamp">생성 시간: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
+                        </body>
+                        </html>""")
+                    
+                    logger.info(f"한글 HTML 버전의 보고서가 '{korean_html_file}'에 저장되었습니다.")
+                    
                 except Exception as e:
                     logger.error(f"HTML 변환 중 오류 발생: {e}")
             else:
@@ -1899,7 +1988,8 @@ Provide a thorough analysis that will help in writing a literature review.
             
             return {
                 "success": True,
-                "file_path": output_file,
+                "english_file_path": english_output_file,
+                "korean_file_path": korean_output_file,
                 "section_count": section_count,
                 "reference_count": len(references)
             }
@@ -1907,20 +1997,122 @@ Provide a thorough analysis that will help in writing a literature review.
         except Exception as e:
             logger.error(f"보고서 생성 중 오류 발생: {e}")
             return None
+            
+    def _translate_report_to_korean(self, english_report):
+        """
+        영어 보고서를 한글로 번역합니다.
+        
+        Args:
+            english_report (str): 영어로 작성된 보고서 내용
+            
+        Returns:
+            str: 한글로 번역된 보고서 내용
+        """
+        logger.info("영어 보고서를 한글로 번역하는 작업 시작")
+        
+        try:
+            # 보고서 제목 추출
+            title_match = re.match(r'# (.*?)\n', english_report)
+            title = title_match.group(1) if title_match else "Literature Review"
+            
+            # 보고서를 섹션으로 분할
+            sections = re.split(r'(## .*?\n)', english_report)
+            
+            translated_report = ""
+            
+            # 제목 번역
+            translation_prompt = f"""
+            Translate the following academic paper title from English to Korean:
+            
+            {title}
+            
+            Provide only the Korean translation with no additional text or explanation.
+            """
+            
+            translated_title = self.llm.chat_completion([
+                {"role": "system", "content": "You are a professional translator specializing in academic content translation from English to Korean."},
+                {"role": "user", "content": translation_prompt}
+            ])
+            
+            translated_report += f"# {translated_title}\n\n"
+            
+            # 각 섹션 번역
+            for i in range(1, len(sections)):
+                section = sections[i]
+                
+                # 섹션 제목 부분인 경우
+                if section.startswith('## '):
+                    # 섹션 제목 번역
+                    section_title = section.strip().replace('## ', '')
+                    
+                    translation_prompt = f"""
+                    Translate the following section title from English to Korean:
+                    
+                    {section_title}
+                    
+                    Provide only the Korean translation with no additional text or explanation.
+                    """
+                    
+                    translated_section_title = self.llm.chat_completion([
+                        {"role": "system", "content": "You are a professional translator specializing in academic content translation from English to Korean."},
+                        {"role": "user", "content": translation_prompt}
+                    ])
+                    
+                    translated_report += f"## {translated_section_title}\n\n"
+                
+                # 섹션 내용 부분인 경우
+                else:
+                    # References 섹션은 번역하지 않고 원본 그대로 사용
+                    if i > 0 and sections[i-1].strip() == '## References':
+                        translated_report += section
+                        continue
+                    
+                    # 내용이 있는 경우만 번역
+                    if section.strip():
+                        # 섹션 내용 번역
+                        translation_prompt = f"""
+                        Translate the following academic content from English to Korean.
+                        Preserve all formatting, including paragraphs, bullet points, and citations.
+                        Keep all citations in their original format. For example, "(Smith et al., 2022)" should remain unchanged.
+                        Keep all technical terms appropriately translated in the academic context.
+                        
+                        Content to translate:
+                        
+                        {section}
+                        
+                        Provide only the Korean translation with no additional text or explanation.
+                        """
+                        
+                        translated_content = self.llm.chat_completion([
+                            {"role": "system", "content": "You are a professional translator specializing in academic content translation from English to Korean."},
+                            {"role": "user", "content": translation_prompt}
+                        ])
+                        
+                        translated_report += f"{translated_content}\n\n"
+            
+            logger.info("영어 보고서의 한글 번역 완료")
+            return translated_report
+            
+        except Exception as e:
+            logger.error(f"보고서 번역 중 오류 발생: {e}")
+            # 오류 발생 시 원본 영어 보고서 반환
+            return english_report
 
-
+    
 
     def run(self, topic=None, **kwargs):
         """
         연구 에이전트 실행 메서드
         
         Args:
-            topic (str): 연구 주제
+            topic (str): 연구 주제 - 길이 제한 없이 상세한 주제를 입력할 수 있습니다.
             **kwargs: 추가 매개변수
                 - max_sources (int): 최대 소스 수 (기본값: 30)
                 - toc (List[Dict]): 사용자가 제공하는 목차 (선택 사항)
                     형식: [{'title': '제목1', 'description': '설명1'}, ...]
                 - citation_style (str): 인용 스타일 (기본값: 'APA')
+                - intro_words (int): 서론 섹션 단어 수 (기본값: 400-600)
+                - related_works_words (int): 관련 연구 섹션 단어 수 (기본값: 700-800)
             
         Returns:
             dict: 연구 결과
@@ -1928,6 +2120,15 @@ Provide a thorough analysis that will help in writing a literature review.
         if not topic:
             logger.error("연구 주제가 제공되지 않았습니다.")
             return {"status": "error", "message": "연구 주제가 필요합니다."}
+        
+        # 연구 주제 로깅 및 길이 체크
+        topic_length = len(topic)
+        token_estimate = topic_length // 4  # 대략적인 토큰 수 추정
+        logger.info(f"연구 주제 입력됨: 길이 {topic_length}자 (약 {token_estimate} 토큰)")
+        
+        # 주제가 매우 긴 경우 (10,000자 이상) 경고 로그 추가
+        if topic_length > 10000:
+            logger.warning(f"연구 주제가 매우 깁니다 ({topic_length}자). 처리 시간이 오래 걸릴 수 있습니다.")
         
         try:
             # 1. 연구 자료 수집
@@ -1946,6 +2147,15 @@ Provide a thorough analysis that will help in writing a literature review.
                     self.user_toc = None
             else:
                 self.user_toc = None
+            
+            # 서론과 관련 연구 섹션의 분량 설정 (사용자 지정 가능)
+            self.intro_words = kwargs.get("intro_words", None)
+            self.related_works_words = kwargs.get("related_works_words", None)
+            
+            if self.intro_words:
+                logger.info(f"사용자가 지정한 서론 단어 수: {self.intro_words}")
+            if self.related_works_words:
+                logger.info(f"사용자가 지정한 관련 연구 단어 수: {self.related_works_words}")
             
             # 각 소스별 10개 결과, 최종 max_sources개 선정
             materials = self.collect_research_materials(
