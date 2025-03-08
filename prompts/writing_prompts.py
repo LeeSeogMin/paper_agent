@@ -126,6 +126,8 @@ The introduction should follow this structure:
 4. Explanation of the significance and potential contributions of the research
 5. Overview of the paper structure
 
+Ensure to cite relevant literature to support the background information and to highlight the research gap. Use the appropriate citation style (e.g., APA, MLA) as required.
+
 Write an introduction that captures reader interest and clearly establishes the context of the research.
 """,
     input_variables=["title", "research_background", "research_problem", "research_purpose", "research_significance"],
