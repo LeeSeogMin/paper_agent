@@ -1438,6 +1438,25 @@ Provide a thorough analysis that will help in writing a literature review.
             
             materials_text = "\n".join(material_summaries)
             
+            # 사용자가 요청한 목차 확인
+            user_toc = getattr(self, 'toc', None)
+            
+            # 사용자 정의 목차가 있는 경우 프롬프트에 추가
+            toc_instruction = ""
+            if user_toc:
+                logger.info(f"사용자 정의 목차를 사용합니다: {len(user_toc)} 섹션")
+                toc_sections = []
+                for section in user_toc:
+                    title = section.get('title', '')
+                    desc = section.get('description', '')
+                    toc_sections.append(f"- {title}: {desc}")
+                toc_text = "\n".join(toc_sections)
+                toc_instruction = f"""
+사용자가 다음과 같은 목차를 요청했습니다. 관련 연구(Related Works)를 포함하여 이 목차에 따라 논문 개요를 작성하세요:
+
+{toc_text}
+"""
+            
             # 프롬프트 생성 - 긴 연구 주제도 효과적으로 처리
             outline_prompt = f"""
 당신은 학술 논문 작성을 돕는 전문 연구원입니다. 다음 연구 주제, 분석 결과, 자료를 바탕으로 학술 논문의 개요를 만들어주세요.
@@ -1451,12 +1470,15 @@ Provide a thorough analysis that will help in writing a literature review.
 주요 연구 자료 예시:
 {materials_text}
 
+{toc_instruction}
 학술 논문 개요에는 다음 항목이 포함되어야 합니다:
 1. 적절한 논문 제목
 2. 초록 (Abstract) - 연구의 목적, 방법, 결과, 시사점을 간략히 요약
 3. 서론 (Introduction) - 연구 주제 소개 및 배경, 연구 목적, 연구 문제
 4. 논문의 주요 섹션들 - 문헌 리뷰, 방법론, 결과, 토론 등을 포함하는 논리적 구조
 5. 결론 및 향후 연구 방향
+
+중요: 이 논문은 보고서 전체에서 최소 25개 이상의 다양한 학술 참고문헌을 인용해야 합니다.
 
 각 섹션에는 간략한 설명을 덧붙여주세요.
 
@@ -1470,7 +1492,8 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
       "description": "섹션에 대한 간략한 설명"
     }},
     // 다른 섹션들도 같은 형식으로...
-  ]
+  ],
+  "citation_requirement": "보고서 전체에서 최소 25개 이상의 참고문헌을 인용해야 합니다."
 }}
 """
             
@@ -1485,12 +1508,20 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
             if match:
                 json_text = match.group(0)
                 outline = json.loads(json_text)
+                # 인용 요구사항 추가
+                if "citation_requirement" not in outline:
+                    outline["citation_requirement"] = "보고서 전체에서 최소 25개 이상의 참고문헌을 인용해야 합니다."
+                
+                # 사용자 정의 목차가 있었다면 기록
+                if user_toc:
+                    outline["user_toc_used"] = True
+                    
                 logger.info(f"논문 개요 생성 성공: '{outline.get('title', '제목 정보 없음')}'")
                 return outline
             else:
                 logger.error("응답에서 JSON 형식을 찾을 수 없습니다. 텍스트 형식으로 처리합니다.")
                 # JSON 변환 실패 시 기본 개요 반환
-                return {
+                default_outline = {
                     "title": f"{topic}에 관한 연구",
                     "abstract": "이 연구는 주제에 대한 문헌 리뷰와 분석을 제공합니다.",
                     "sections": [
@@ -1499,8 +1530,16 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
                         {"title": "방법론", "description": "연구 방법 설명"},
                         {"title": "결과 및 논의", "description": "주요 발견 및 논의"},
                         {"title": "결론", "description": "연구 결론 및 향후 방향"}
-                    ]
+                    ],
+                    "citation_requirement": "보고서 전체에서 최소 25개 이상의 참고문헌을 인용해야 합니다."
                 }
+                
+                # 사용자 정의 목차가 있다면 적용
+                if user_toc:
+                    default_outline["sections"] = user_toc
+                    default_outline["user_toc_used"] = True
+                    
+                return default_outline
         
         except Exception as e:
             logger.error(f"논문 개요 생성 중 오류: {str(e)}")
@@ -1530,7 +1569,10 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
             
             # 참고문헌 수 제한 로직 추가 (materials에서 추출된 참고문헌이 많을 경우)
             # run 메서드에서 final_result_count의 기본값은 max_sources로 오버라이드되며 기본값은 30
-            target_ref_count = getattr(self, 'final_result_count', 30)  # 기본값 30 설정
+            target_ref_count = getattr(self, 'final_result_count', 50)  # 기본값 50 설정
+            
+            # 참고문헌은 최소 25개 이상 유지
+            min_ref_count = 25
             
             # 참고문헌이 target_ref_count보다 많으면 제한
             if len(references) > target_ref_count:
@@ -1543,7 +1585,9 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
                                          ref.get('title', '')                # 제목 오름차순
                                      ))
                 references = sorted_refs[:target_ref_count]
-            
+            elif len(references) < min_ref_count:
+                logger.warning(f"참고문헌이 {len(references)}개로 최소 요구사항 {min_ref_count}개보다 적습니다.")
+                
             # 2. 보고서 아웃라인 생성
             outline = self.create_paper_outline(topic, analysis, materials)
             if not outline:
@@ -1634,77 +1678,49 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
                     
                     # 서론(Introduction)인 경우 특별한 프롬프트 사용
                     if section_title.lower() in ['introduction', 'intro', '서론', '소개', 'introduce']:
-                        # 참고문헌 정보를 문자열로 변환하여 제공
-                        references_info = ""
-                        for i, ref in enumerate(references[:10], 1):  # 너무 많은 정보를 주지 않기 위해 10개로 제한
-                            author = ref.get('authors', 'Unknown Author')
-                            if isinstance(author, list) and len(author) > 0:
-                                author_text = ', '.join(author[:3])
-                                if len(ref.get('authors', [])) > 3:
-                                    author_text += ' et al.'
-                            else:
-                                author_text = str(author)
-                            
-                            title = ref.get('title', 'Unknown Title')
-                            year = ref.get('year', '')
-                            references_info += f"{i}. {author_text} ({year}). {title}\n"
-                        
-                        # 사용자 지정 서론 단어 수 확인
-                        intro_words_text = "approximately 400-600 words"
-                        if hasattr(self, 'intro_words') and self.intro_words:
-                            intro_words_text = f"approximately {self.intro_words} words"
-                        
                         section_prompt = f"""
-                        Please write an introduction for a research paper on the following topic:
+                        다음 주제에 대한 연구 보고서의 서론을 작성해주세요:
                         
-                        Topic: {topic}
+                        주제: {topic}
                         
-                        The introduction should include:
-                        1. Introduction to the research topic and background
-                        2. Purpose and significance of the research
-                        3. Main research questions
-                        4. Structure of the report
+                        서론에는 다음 내용이 포함되어야 합니다:
+                        1. 연구 주제 소개 및 배경
+                        2. 연구의 목적과 의의
+                        3. 주요 연구 질문
+                        4. 보고서의 구성 설명
                         
-                        Important: You must cite appropriate academic literature in the introduction. Choose at least 3-5 references from the list below to cite:
+                        필수 요구사항:
+                        - 반드시 관련 출처를 인용하여 주장을 뒷받침하고, 연구 맥락을 설정하며, 연구 격차를 강조해야 합니다.
+                        - 일관된 인용 형식을 사용하세요.
+                        - 서론은 700-800단어 분량으로 작성하세요.
+                        - 단락과 섹션 간의 논리적 흐름을 보장하세요.
                         
-                        Reference List:
-                        {references_info}
-                        
-                        Citation format: Use either "(Author, Year)" or "Author(Year) states..." format for in-text citations.
-                        Example: "Recent research (Smith et al., 2022) suggests..." or "Johnson(2020) argues..."
-                        
-                        Please write an academic and clear introduction in {intro_words_text}. 
-                        Cite the selected literature to support your arguments in the introduction.
+                        학술적이고 명확한 서론을 작성해주세요.
                         """
                     
                     # 관련 연구(Related Works)인 경우 특별한 프롬프트 사용
-                    elif section_title.lower() in ['related works', 'related work', '관련 연구', '선행 연구']:
+                    elif section_title.lower() in ['related works', 'literature review', '관련 연구', '문헌 검토', '선행 연구']:
                         # 사용자 지정 관련 연구 단어 수 확인
-                        related_works_words_text = "approximately 700-800 words"
+                        related_works_words_text = "approximately 1400-1600 words"
                         if hasattr(self, 'related_works_words') and self.related_works_words:
-                            related_works_words_text = f"approximately {self.related_works_words} words"
+                            related_works_words_text = f"approximately {self.related_works_words * 2} words"
                         
-                        # 영어로 관련 연구 프롬프트 작성
                         section_prompt = f"""
-                        Please write a literature review for the following research topic:
+                        Please write a literature review/related works section for a research paper on the following topic:
                         
                         Topic: {topic}
                         
                         Write a comprehensive literature review in {related_works_words_text}, covering:
-                        1. Key themes and trends in the research area
-                        2. Major insights from existing literature
-                        3. Research gaps and contradictions in current knowledge
-                        4. How your research relates to existing knowledge
                         
-                        Important: Properly cite at least 7-10 references from the literature. Use the reference list provided below.
+                        1. Historical development of research on this topic
+                        2. Current state of research and key findings
+                        3. Major debates and controversies
+                        4. Research gaps that your paper addresses
                         
-                        Reference List:
-                        {references_info}
-                        
+                        Important: You must cite appropriate academic literature. Use at least 12-15 different sources in this section.
                         Citation format: Use either "(Author, Year)" or "Author(Year) states..." format for in-text citations.
-                        Example: "Recent research (Smith et al., 2022) suggests..." or "Johnson(2020) argues..."
                         
-                        Organize the literature review by themes rather than simply listing studies chronologically.
+                        Be sure to critically analyze the literature and not just summarize. Organize the review thematically rather than chronologically.
                         """
                     
                     # 각 섹션에 대한 내용 생성
@@ -2102,21 +2118,28 @@ JSON 형태로 다음 형식에 맞게 응답해주세요:
 
     def run(self, topic=None, **kwargs):
         """
-        연구 에이전트 실행 메서드
+        연구 에이전트 실행: 주제에 대한 연구 자료 수집 및 분석 진행
         
         Args:
-            topic (str): 연구 주제 - 길이 제한 없이 상세한 주제를 입력할 수 있습니다.
-            **kwargs: 추가 매개변수
-                - max_sources (int): 최대 소스 수 (기본값: 30)
-                - toc (List[Dict]): 사용자가 제공하는 목차 (선택 사항)
-                    형식: [{'title': '제목1', 'description': '설명1'}, ...]
-                - citation_style (str): 인용 스타일 (기본값: 'APA')
-                - intro_words (int): 서론 섹션 단어 수 (기본값: 400-600)
-                - related_works_words (int): 관련 연구 섹션 단어 수 (기본값: 700-800)
+            topic (str): 연구 주제
+            **kwargs: 추가 설정 (task, research_plan, max_queries, results_per_source 등)
             
         Returns:
-            dict: 연구 결과
+            적절한 결과 반환 (task에 따라 다름)
         """
+        logger.info(f"ResearchAgent 실행 시작: 주제='{topic}', 작업='{kwargs.get('task', 'collect_materials')}'")
+        
+        # 기본 설정값
+        task = kwargs.get('task', 'collect_materials')
+        research_plan = kwargs.get('research_plan', {})
+        max_queries = kwargs.get('max_queries', 3)
+        results_per_source = kwargs.get('results_per_source', 10)
+        max_sources = kwargs.get('max_sources', 50)  # 기본값을 50으로 변경
+        
+        # 최종 결과 수
+        final_result_count = kwargs.get('final_result_count', max_sources)
+        self.final_result_count = final_result_count
+        
         if not topic:
             logger.error("연구 주제가 제공되지 않았습니다.")
             return {"status": "error", "message": "연구 주제가 필요합니다."}

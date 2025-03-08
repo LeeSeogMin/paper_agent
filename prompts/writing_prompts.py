@@ -126,7 +126,11 @@ The introduction should follow this structure:
 4. Explanation of the significance and potential contributions of the research
 5. Overview of the paper structure
 
-Ensure to cite relevant literature to support the background information and to highlight the research gap. Use the appropriate citation style (e.g., APA, MLA) as required.
+IMPORTANT REQUIREMENTS:
+- You MUST cite relevant sources throughout the introduction to support claims, establish context, and highlight research gaps
+- Use appropriate citation format consistently
+- The introduction should be 700-800 words in length
+- Ensure a logical flow between paragraphs and sections
 
 Write an introduction that captures reader interest and clearly establishes the context of the research.
 """,
