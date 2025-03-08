@@ -344,24 +344,50 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         research_summary = self.workflow_state.research_summary
         summary_text = f"## 연구 주제: {research_summary.topic}\n\n"
         summary_text += "### 주요 발견\n\n"
-        for finding in research_summary.key_findings:
-            summary_text += f"- {finding}\n"
-        summary_text += f"\n### 수집된 자료 ({len(research_summary.collected_materials)}개)\n\n"
-        for i, material in enumerate(research_summary.collected_materials, 1):
-            summary_text += f"{i}. **{material.title}**"
-            if material.authors:
-                summary_text += f" - {', '.join(material.authors)}"
-            if material.year:
-                summary_text += f" ({material.year})"
-            summary_text += f"\n   {material.summary[:150]}...\n\n"
-        if research_summary.gaps:
-            summary_text += "### 식별된 연구 격차\n\n"
+        
+        # 주요 발견 목록이 있는지 확인하고 안전하게 접근
+        if hasattr(research_summary, 'key_findings') and research_summary.key_findings:
+            for finding in research_summary.key_findings:
+                summary_text += f"- {finding}\n"
+        else:
+            summary_text += "- 주요 발견 정보가 아직 없습니다.\n"
+            
+        # 수집된 자료 목록이 있는지 확인하고 안전하게 접근
+        if hasattr(research_summary, 'collected_materials') and research_summary.collected_materials:
+            summary_text += f"\n### 수집된 자료 ({len(research_summary.collected_materials)}개)\n\n"
+            for i, material in enumerate(research_summary.collected_materials, 1):
+                authors = getattr(material, 'authors', ['Unknown'])
+                if isinstance(authors, list) and authors:
+                    author_text = authors[0] if isinstance(authors[0], str) else getattr(authors[0], 'name', 'Unknown')
+                else:
+                    author_text = 'Unknown'
+                    
+                year = getattr(material, 'year', 'Unknown')
+                summary_text += f"{i}. **{material.title}** - {author_text} et al., {year}\n"
+                
+                if hasattr(material, 'summary') and material.summary:
+                    summary_text += f"   *요약: {material.summary[:200]}...*\n\n"
+                else:
+                    abstract = getattr(material, 'abstract', '')
+                    if abstract:
+                        summary_text += f"   *초록: {abstract[:200]}...*\n\n"
+                    else:
+                        summary_text += f"   *내용 없음*\n\n"
+        else:
+            summary_text += "\n### 수집된 자료\n\n- 아직 수집된 자료가 없습니다.\n"
+            
+        # 연구 격차 정보가 있는지 확인하고 안전하게 접근
+        if hasattr(research_summary, 'gaps') and research_summary.gaps:
+            summary_text += "\n### 식별된 연구 격차\n\n"
             for gap in research_summary.gaps:
                 summary_text += f"- {gap}\n"
-        if research_summary.next_steps:
+                
+        # 다음 단계 정보가 있는지 확인하고 안전하게 접근
+        if hasattr(research_summary, 'next_steps') and research_summary.next_steps:
             summary_text += "\n### 권장 다음 단계\n\n"
             for step in research_summary.next_steps:
                 summary_text += f"- {step}\n"
+                
         return summary_text
 
     def get_paper_summary(self) -> Optional[str]:

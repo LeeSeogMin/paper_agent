@@ -24,25 +24,13 @@ import uuid
 
 import traceback
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
+import numpy as np
 
-# markdown 모듈을 선택적으로 임포트
-try:
-    import markdown
-    MARKDOWN_AVAILABLE = True
-except ImportError:
-    MARKDOWN_AVAILABLE = False
-    logger.warning("markdown 모듈을 찾을 수 없습니다. HTML 변환 기능이 비활성화됩니다.")
+from langchain.docstore.document import Document
 
-from typing import List, Dict, Any, Optional, Tuple, Union
-
-from datetime import datetime
-
-
-
-from langchain.agents import AgentExecutor, create_openai_tools_agent
-
-from langchain.schema import Document
+from langchain.schema import AIMessage, HumanMessage, SystemMessage
 
 from langchain.tools import tool
 
@@ -52,13 +40,15 @@ from langchain_core.prompts import PromptTemplate
 
 from langchain_openai import ChatOpenAI
 
-from langchain.schema.messages import HumanMessage, SystemMessage
-
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
 from langchain.chains.summarize import load_summarize_chain
 
 from langchain.chains import LLMChain
+
+from datetime import datetime
+
+from typing import Dict, List, Tuple, Any, Optional, Union
 
 
 
@@ -338,157 +328,126 @@ etc.
 
     
 
-    def evaluate_source(self, source: Dict, topic: str) -> Tuple[float, str]:
-
+    def evaluate_source(self, source, topic, query=None, threshold=0.3, use_llm=True):
         """
-
-        Evaluate a research source for relevance to the topic.
-
+        소스의 관련성을 평가합니다. LLM이나 키워드 일치를 통해 평가할 수 있습니다.
         
-
         Args:
-
-            source (Dict): Source data
-
-            topic (str): Research topic
-
+            source (dict): 평가할 소스
+            topic (str): 연구 주제
+            query (str, optional): 검색 쿼리
+            threshold (float, optional): 관련성 임계값
+            use_llm (bool, optional): LLM을 사용하여 평가할지 여부
             
-
         Returns:
-
-            Tuple[float, str]: (relevance score, explanation)
-
+            tuple: (평가 결과, 관련성 점수)
         """
-
-        logger.info(f"Evaluating source: {source.get('title', 'Unknown source')}")
-
-        
-
         try:
-
-            # 소스 형식 표준화 - Google 검색과 학술 검색 통합 처리
-
-            formatted_source = {
-
-                "title": source.get('title', '제목 없음'),
-
-                "abstract": source.get('abstract', source.get('snippet', '')),
-
-                "authors": source.get('authors', ''),
-
-                "year": source.get('year', source.get('published_date', '연도 미상')),
-
-                "venue": source.get('venue', source.get('source', 'Web Source')),
-
-                "citation_count": source.get('citation_count', 0)
-
-            }
-
-            
-
-            # LLM에게 간단한 평가만 요청
-
-            messages = [
-
-                SystemMessage(content="You are a research assistant evaluating the relevance of sources."),
-
-                HumanMessage(content=f"""
-
-                    Evaluate the relevance of this source to the topic "{topic}".
-
-                    
-
-                    SOURCE:
-
-                    Title: {formatted_source['title']}
-
-                    Abstract: {formatted_source['abstract'][:500]}...
-
-                    
-
-                    Rate the relevance from 0.0 to 1.0 and explain why.
-
-                    Format: {{
-
-                        "relevance_score": [0.0-1.0],
-
-                        "explanation": "Your explanation"
-
-                    }}
-
-                """)
-
-            ]
-
-            
-
-            response = self.llm.invoke(messages)
-
-            
-
-            # 응답 파싱 (JSON 형식으로 반환되었다고 가정)
-
-            response_text = response.content
-
-            
-
-            # JSON 부분 추출 시도
-
-            if '{' in response_text and '}' in response_text:
-
-                json_str = response_text[response_text.find('{'):response_text.rfind('}')+1]
-
-                result = json.loads(json_str)
-
-            else:
-
-                # JSON 형식이 아니면 텍스트에서 점수 추출 시도
-
-                score_match = re.search(r'relevance_score["\s:]+([0-9.]+)', response_text)
-
-                score = float(score_match.group(1)) if score_match else 0.7
-
+            # 소스에 필요한 필드가 없는 경우 최소 점수 반환
+            for field in ['title', 'url']:
+                if not source.get(field):
+                    logger.warning(f"소스에 필수 필드 '{field}'가 없습니다: {source}")
+                    return None, 0.0
                 
-
+            default_score = 0.5  # 기본 관련성 점수
+            source_title = source.get('title', '')
+            
+            if not use_llm:
+                # 키워드 일치에 따른 간단한 점수 계산
+                relevance_score = default_score
+                keywords = topic.lower().split()
+                title_lower = source_title.lower()
+                
+                # 제목에 키워드가 있으면 점수 상승
+                for keyword in keywords:
+                    if keyword in title_lower:
+                        relevance_score += 0.1
+                
+                # 쿼리가 있고 제목에 쿼리 키워드가 있으면 점수 상승
+                if query:
+                    query_keywords = query.lower().split()
+                    for keyword in query_keywords:
+                        if keyword in title_lower and keyword not in keywords:
+                            relevance_score += 0.05
+                
+                # 최대 1.0으로 제한
+                relevance_score = min(relevance_score, 1.0)
+                
+                # 결과 정보 구성
                 result = {
-
-                    "relevance_score": score,
-
-                    "explanation": response_text
-
+                    "relevance_score": relevance_score,
+                    "evaluation": "자동 키워드 평가",
+                    "rationale": "키워드 일치 기반 평가"
                 }
-
+                
+                return result, relevance_score
             
-
-            relevance_score = result.get('relevance_score', 0.7)
-
-            explanation = result.get('explanation', 'No explanation provided')
-
+            # LLM을 사용한 평가
+            content_preview = source.get('abstract', '') or source.get('description', '') or source.get('text_preview', '') or ''
+            if not content_preview and 'content' in source:
+                content_preview = source['content'][:500] if len(source['content']) > 500 else source['content']
             
-
-            # 점수가 문자열이면 변환
-
-            if isinstance(relevance_score, str):
-
-                try:
-
-                    relevance_score = float(relevance_score)
-
-                except:
-
-                    relevance_score = 0.7
-
+            # 메타데이터 구성
+            authors = source.get('authors', [])
+            authors_str = ', '.join(authors) if authors else 'Unknown'
+            year = source.get('year', 'Unknown')
             
-
-            return relevance_score, explanation
-
+            # 평가 프롬프트 작성
+            prompt = (
+                f"당신은 연구 논문과 자료의 관련성을 평가하는 전문가 연구원입니다. 다음 논문이 연구 주제와 얼마나 관련이 있는지 평가해주세요.\n\n"
+                f"연구 주제: {topic}\n"
+                f"검색 쿼리: {query if query else topic}\n\n"
+                f"논문 정보:\n"
+                f"제목: {source_title}\n"
+                f"저자: {authors_str}\n"
+                f"연도: {year}\n"
+                f"내용 미리보기: {content_preview[:1000] if content_preview else 'No preview available'}\n\n"
+                f"이 논문이 주제와 얼마나 관련이 있는지 0.0에서 1.0 사이의 점수로 평가하고, 그 이유를 설명해주세요.\n"
+                f"평가 결과는 다음 JSON 형식으로 제공해주세요:\n"
+                f"```json\n"
+                f"{{\n"
+                f"  \"relevance_score\": float,  // 0.0에서 1.0 사이의 관련성 점수\n"
+                f"  \"evaluation\": string,  // 간단한 평가 요약\n"
+                f"  \"rationale\": string  // 평가 이유 설명\n"
+                f"}}\n"
+                f"```"
+            )
             
-
+            # LLM 호출
+            result_text = self.llm.invoke(prompt).content
+            
+            # JSON 추출
+            pattern = r"```json\s*([\s\S]*?)\s*```"
+            match = re.search(pattern, result_text)
+            if match:
+                json_str = match.group(1)
+                result = json.loads(json_str)
+            else:
+                pattern = r"{[\s\S]*?}"
+                match = re.search(pattern, result_text)
+                if match:
+                    json_str = match.group(0)
+                    result = json.loads(json_str)
+                else:
+                    # JSON을 찾을 수 없는 경우 기본값 반환
+                    logger.warning(f"LLM 응답에서 JSON을 추출할 수 없습니다: {result_text}")
+                    result = {
+                        "relevance_score": default_score,
+                        "evaluation": "평가 실패",
+                        "rationale": "결과 파싱 실패"
+                    }
+            
+            relevance_score = float(result.get("relevance_score", default_score))
+            
+            # 최소 임계값과 비교
+            if relevance_score < threshold:
+                logger.info(f"관련성 점수({relevance_score})가 임계값({threshold}) 미만으로 소스를 제외합니다: {source_title}")
+            
+            return result, relevance_score
+            
         except Exception as e:
-
-            logger.error(f"Error evaluating source: {str(e)}", exc_info=True)
-
-            return 0.7, f"Error evaluating source: {str(e)}. Using default relevance score."
+            logger.error(f"소스 평가 중 오류 발생: {str(e)}")
+            return None, 0.0
 
     
 
@@ -553,317 +512,173 @@ etc.
             
 
             # 로컬 폴더와 pdfs 폴더의 PDF 파일 수 확인
-
             from utils.pdf_downloader import PDF_STORAGE_PATH
-
             
-
             local_dir = "data/local"
-
             pdfs_dir = PDF_STORAGE_PATH
-
             
-
             # 각 디렉토리의 PDF 파일 수 계산
-
             local_pdf_count = len([f for f in os.listdir(local_dir) if f.lower().endswith('.pdf')]) if os.path.exists(local_dir) else 0
-
             pdfs_pdf_count = len([f for f in os.listdir(pdfs_dir) if f.lower().endswith('.pdf')]) if os.path.exists(pdfs_dir) else 0
-
             
-
             total_pdf_count = local_pdf_count + pdfs_pdf_count
-
             logger.info(f"PDF 파일 수: 로컬 폴더 {local_pdf_count}개, pdfs 폴더 {pdfs_pdf_count}개, 총 {total_pdf_count}개")
-
             
-
             # PDF 파일이 30개 이상인 경우 외부 검색 건너뛰기
-
             skip_external_search = total_pdf_count >= 30
-
             if skip_external_search:
-
                 logger.info(f"PDF 파일이 30개 이상 ({total_pdf_count}개) 존재하여 외부 검색을 건너뜁니다.")
-
                 search_scope = "local_only"
-
             
-
             # 1. 로컬 PDF 파일 처리 및 벡터화 (로컬 검색 허용 시)
-
             if search_scope in ["local_only", "all"]:
-
                 from utils.pdf_processor import process_local_pdfs
-
                 local_papers = process_local_pdfs(local_dir="data/local", vector_db_path="data/vector_db")
-
                 
-
                 # 로컬 PDF는 관련성 점수와 상관없이 모두 포함
-
                 for paper in local_papers:
-
                     relevance_score, explanation = self.evaluate_source(paper, topic)
-
                     material = self._create_research_material(paper, "local", relevance_score, explanation)
-
                     if material:
-
                         all_materials.append(material)
-
                 
-
                 # 로컬 PDF 처리 후 papers.json 파일 저장
-
                 if local_papers and len(local_papers) > 0:
-
                     # 모든 자료를 papers.json에 저장
-
                     materials_to_save = []
-
                     for paper in local_papers:
-
                         # 연구 자료 생성 (관련성 점수는 기본값 사용)
-
                         material = {
-
                             "id": paper.get("id", f"local_{uuid.uuid4().hex[:8]}"),
-
                             "title": paper.get("title", ""),
-
                             "authors": paper.get("authors", []),
-
                             "year": paper.get("year", ""),
-
                             "abstract": paper.get("abstract", ""),
-
                             "content": "",
-
                             "url": "",
-
                             "pdf_url": "",
-
                             "local_path": paper.get("pdf_path", ""),
-
                             "relevance_score": 1.0,  # 로컬 파일은 모두 최대 관련성 점수 부여
-
                             "evaluation": "로컬 파일",
-
                             "query_id": "local",
-
                             "citation_count": 0,
-
                             "venue": "",
-
                             "source": "local"
-
                         }
-
                         
-
                         materials_to_save.append(material)
-
                     
-
                     self.save_research_materials_to_json(materials_to_save, file_path='data/papers.json')
-
                     logger.info(f"{len(local_papers)}개의 로컬 PDF 파일 정보를 data/papers.json에 저장했습니다.")
-
                 
-
                 # 2. 로컬 데이터베이스 검색
-
                 local_results = self.search_local_papers(topic, max_results=results_per_source)
-
                 local_results = [r for r in local_results if r.get('pdf_url') or 'pdf_path' in r]
-
                 
-
                 for result in local_results:
-
                     relevance_score, explanation = self.evaluate_source(result, topic)
-
                     
-
                     # 모든 로컬 파일 포함 (관련성 점수와 상관없이)
-
                     material = self._create_research_material(result, "local_db", relevance_score, explanation)
-
                     if material:
-
                         all_materials.append(material)
-
                 
-
                 # pdfs 폴더의 PDF 파일도 모두 포함
-
                 if os.path.exists(pdfs_dir):
-
                     from utils.pdf_processor import PDFProcessor
-
                     pdf_processor = PDFProcessor(use_llm=True)
-
                     
-
                     for pdf_file in os.listdir(pdfs_dir):
-
                         if pdf_file.lower().endswith('.pdf'):
-
                             pdf_path = os.path.join(pdfs_dir, pdf_file)
-
                             try:
-
                                 pdf_result = pdf_processor.process_pdf(pdf_path)
-
                                 
-
                                 if pdf_result["success"]:
-
                                     metadata = pdf_result["metadata"]
-
                                     
-
                                     paper_info = {
-
                                         "id": f"pdfs_{os.path.splitext(pdf_file)[0]}",
-
                                         "title": metadata.get("title", ""),
-
                                         "authors": metadata.get("authors", []),
-
                                         "abstract": metadata.get("abstract", ""),
-
                                         "year": metadata.get("year", ""),
-
                                         "pdf_path": pdf_path
-
                                     }
-
                                     
-
                                     # pdfs 폴더의 파일도 관련성 점수와 상관없이 포함
-
                                     relevance_score, explanation = self.evaluate_source(paper_info, topic)
-
+                                    
                                     material = self._create_research_material(paper_info, "pdfs", relevance_score, explanation)
-
                                     if material:
-
                                         all_materials.append(material)
-
                             except Exception as e:
-
                                 logger.error(f"pdfs 폴더 PDF 처리 중 오류: {pdf_file} - {str(e)}")
-
             
-
             # 외부 검색이 허용된 경우에만 실행
-
             if search_scope in ["web_only", "all"] and not skip_external_search:
-
                 # 3. 검색 쿼리 생성 또는 계획에서 가져오기
-
                 search_queries = []
-
                 if research_plan and "search_strategy" in research_plan and "queries" in research_plan["search_strategy"]:
-
                     # 계획에서 제공된 쿼리 사용
-
                     predefined_queries = research_plan["search_strategy"]["queries"]
-
                     search_queries = [SearchQuery(id=f"q{i}", text=q) for i, q in enumerate(predefined_queries[:max_queries])]
-
                 else:
-
                     # 자동 쿼리 생성
-
                     search_queries = self.generate_search_queries(topic, n_queries=max_queries)
-
                 
-
                 # 4. 외부 학술 검색 (영어 자료만)
-
                 for query in search_queries:
-
                     query_text = query.text
-
                     logger.info(f"Processing query: {query_text}")
-
                     
-
                     # 학술 검색 및 웹 검색 실행 (영어만)
-
                     academic_results = academic_search(query_text, max_results=results_per_source, language='en')
-
                     web_results = academic_search(query_text, max_results=results_per_source, sources=["google", "arxiv", "crossref"], language='en')
-
                     
-
                     # PDF URL이 있는 결과만 유지
-
                     academic_results = [r for r in academic_results if r.get('pdf_url')]
-
                     web_results = [r for r in web_results if r.get('pdf_url')]
-
                     
-
-                    # 결과 결합 및 평가
-
+                    # 결과 결합
                     combined_results = academic_results + web_results
-
                     
-
-                    # 각 결과 평가
-
-                    evaluated_results = []
-
-                    for result in combined_results:
-
-                        relevance_score, explanation = self.evaluate_source(result, topic)
-
-                        result['relevance_score'] = relevance_score
-
-                        result['evaluation'] = explanation
-
-                        evaluated_results.append(result)
-
+                    # 병렬 처리로 결과 평가
+                    def evaluate_single_result(result):
+                        try:
+                            relevance_score, explanation = self.evaluate_source(result, topic)
+                            result['relevance_score'] = relevance_score
+                            result['evaluation'] = explanation
+                            return result
+                        except Exception as e:
+                            logger.error(f"결과 평가 중 오류: {str(e)}")
+                            # 오류 시 기본 점수 할당
+                            result['relevance_score'] = 0.3
+                            result['evaluation'] = f"평가 오류: {str(e)}"
+                            return result
                     
-
+                    # 병렬 처리로 결과 평가
+                    logger.info(f"병렬 처리로 {len(combined_results)}개 결과 평가 중...")
+                    with ThreadPoolExecutor(max_workers=5) as executor:
+                        evaluated_results = list(executor.map(evaluate_single_result, combined_results))
+                    
                     # 관련성 점수로 정렬하고 상위 결과만 선택
-
                     evaluated_results.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
-
                     top_results = evaluated_results[:results_per_source]
-
                     
-
                     # 관련성 기준 이상인 결과만 최종 자료로 변환
-
                     for result in top_results:
-
                         if result.get('relevance_score', 0) >= 0.3:  # 관련성 최소 기준을 0.3으로 낮춤
-
                             material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
-
                             if material:
-
                                 all_materials.append(material)
-
             
-
             # 자료가 없는 경우 처리
-
             if not all_materials:
-
                 if search_scope == "local_only":
-
                     logger.error("로컬 자료가 없습니다. 외부 검색을 고려하세요.")
-
                 else:
-
                     logger.error("검색 결과가 없습니다. 프로세스를 중단합니다.")
-
                 return []
 
             
@@ -1111,19 +926,19 @@ etc.
         enriched_materials = []
         
         try:
-            # 추가 정보 가져오기 (PDF 내용 등)
-            for i, material in enumerate(materials):
-                logger.info(f"자료 강화 중: {getattr(material, 'title', f'자료 {i+1}')}")
-                
+            # 단일 자료 강화를 위한 내부 함수
+            def enrich_single_material(material, index):
                 try:
+                    logger.info(f"자료 강화 중: {getattr(material, 'title', f'자료 {index+1}')}")
+                    
                     # 필수 필드 확인
                     has_title = hasattr(material, 'title') and material.title
                     has_authors = hasattr(material, 'authors') and material.authors
                     
                     # 제목이나 저자가 없는 자료는 건너뜁니다
                     if not has_title or not has_authors:
-                        logger.warning(f"필수 메타데이터(제목/저자)가 없어 자료를 건너뜁니다: {getattr(material, 'id', f'자료 {i+1}')}")
-                        continue
+                        logger.warning(f"필수 메타데이터(제목/저자)가 없어 자료를 건너뜁니다: {getattr(material, 'id', f'자료 {index+1}')}")
+                        return None
                     
                     # PDF에서 내용 추출 (이미 있으면 건너뜀)
                     if not hasattr(material, 'content') or not material.content:
@@ -1137,23 +952,23 @@ etc.
                                 else:
                                     logger.warning(f"PDF에서 충분한 내용을 추출하지 못했습니다: {material.pdf_path}")
                                     # 내용이 없으면 건너뜁니다
-                                    continue
+                                    return None
                             except Exception as e:
                                 logger.error(f"Error extracting text from PDF: {str(e)}")
                                 # 내용 추출 실패 시 건너뜁니다
-                                continue
+                                return None
                         # PDF 없이 초록만 있는 경우
                         elif hasattr(material, 'abstract') and material.abstract:
                             logger.info(f"PDF 없음, 초록을 내용으로 사용: {material.title}")
                             material.content = material.abstract
                         else:
                             logger.warning(f"내용이 없고 추출할 방법도 없어 자료를 건너뜁니다: {material.title}")
-                            continue
+                            return None
                     
                     # 내용이 있는지 최종 확인
                     if not hasattr(material, 'content') or not material.content or len(material.content) < 100:
                         logger.warning(f"내용이 부족하여 자료를 건너뜁니다: {material.title}")
-                        continue
+                        return None
                         
                     # 내용 요약 (이미 있으면 건너뜀)
                     if not hasattr(material, 'summary') or not material.summary:
@@ -1227,13 +1042,21 @@ etc.
                     except Exception as e:
                         logger.warning(f"유사 문서 검색 중 오류: {str(e)}")
                     
-                    # 강화된 자료 추가
-                    enriched_materials.append(material)
+                    return material
                     
                 except Exception as e:
-                    logger.error(f"자료 {getattr(material, 'title', f'자료 {i+1}')} 강화 중 오류: {str(e)}")
-                    # 오류가 발생해도 다른 자료 처리 계속
-                    continue
+                    logger.error(f"자료 {getattr(material, 'title', f'자료 {index+1}')} 강화 중 오류: {str(e)}")
+                    return None
+            
+            # 병렬 처리로 자료 강화
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                material_indices = [(material, idx) for idx, material in enumerate(materials)]
+                enriched_materials_list = list(executor.map(
+                    lambda x: enrich_single_material(*x), material_indices
+                ))
+                
+                # None 값 제거
+                enriched_materials = [m for m in enriched_materials_list if m is not None]
             
             # 결과 수 로그
             if len(enriched_materials) < len(materials):
@@ -1933,14 +1756,14 @@ Provide a thorough analysis that will help in writing a literature review.
             # 2. 연구 자료 강화 (내용 및 요약 추가 + 벡터 DB 처리)
 
             enriched_materials = self.enrich_research_materials(materials)
-
             
-
             # 연구 자료 JSON 파일로 저장
-
             self.save_research_materials_to_json(enriched_materials)
 
-
+            # 병렬로 연구 자료 벡터화
+            logger.info("연구 자료 벡터화 시작...")
+            self.vectorize_materials(enriched_materials)
+            logger.info("연구 자료 벡터화 완료")
 
             # 3. 연구 자료 분석
 
@@ -2326,234 +2149,143 @@ Provide a thorough analysis that will help in writing a literature review.
 
             logger.error(f"키워드 추출 중 오류 발생: {str(e)}", exc_info=True)
 
-            return ["인공지능", "머신러닝", "딥러닝", "AI", "연구동향"]  # 기본 키워드 반환
+            # 오류 발생 시 기본 키워드 반환
+
+            return ["인공지능", "머신러닝", "딥러닝", "AI", "연구동향"]
 
 
 
     def extract_references(self, materials):
-
         """
-
-        연구 자료에서 참고문헌 정보 추출
-
+        연구 자료에서 참고문헌 정보를 추출합니다.
         
-
         Args:
-
             materials: 연구 자료 목록
-
             
-
         Returns:
-
-            List[Dict]: 참고문헌 목록
-
+            list: 참고문헌 목록
         """
-
-        logger.info(f"{len(materials)}개 자료에서 참고문헌 추출 중")
-
-        
-
         references = []
-
         
-
         for material in materials:
-
-            # 각 자료를 참고문헌으로 변환
-
             try:
-
-                # authors 필드가 문자열인지 리스트인지 확인
-
-                if isinstance(material.authors, str):
-
-                    author_text = material.authors
-
-                elif isinstance(material.authors, list):
-
-                    if all(isinstance(a, str) for a in material.authors):
-
-                        author_text = ", ".join(material.authors)
-
-                    else:
-
-                        # 복잡한 객체가 있을 경우 처리
-
-                        author_text = ", ".join(str(a) for a in material.authors)
-
-                else:
-
-                    author_text = "Unknown"
-
-                
-
-                # 연도 처리
-
-                year = material.year if material.year else "n.d."
-
-                
-
-                reference = {
-
-                    "id": material.id,
-
-                    "title": material.title,
-
-                    "authors": author_text,
-
-                    "year": year,
-
-                    "source": getattr(material, 'source', ''),
-
-                    "url": material.url
-
+                ref_entry = {
+                    "title": getattr(material, 'title', 'Unknown Title'),
+                    "authors": getattr(material, 'authors', []),
+                    "year": getattr(material, 'year', 'Unknown'),
+                    "venue": getattr(material, 'source', 'Unknown Source')
                 }
-
-                
-
-                references.append(reference)
-
-                
-
+                references.append(ref_entry)
             except Exception as e:
-
-                logger.error(f"참고문헌 변환 중 오류: {str(e)}")
-
-        
-
-        logger.info(f"{len(references)}개 참고문헌 추출됨")
-
+                logger.error(f"참고문헌 추출 중 오류: {str(e)}")
+                
         return references
-
-
-
-    def save_research_materials_to_json(self, materials: List[Union[ResearchMaterial, Dict]], file_path: str = 'data/papers.json') -> None:
-
+    
+    def vectorize_materials(self, materials):
         """
-
-        연구 자료를 JSON 파일로 저장
-
+        연구 자료를 병렬로 벡터화합니다.
         
-
         Args:
-
-            materials: 저장할 연구 자료 목록 (ResearchMaterial 객체 또는 딕셔너리)
-
-            file_path: 저장할 파일 경로
-
+            materials (List[ResearchMaterial]): 벡터화할 연구 자료 목록
+            
+        Returns:
+            bool: 성공 여부
         """
-
         try:
-
-            # 디렉토리 생성
-
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
+            logger.info(f"총 {len(materials)}개 연구 자료 벡터화 시작")
             
-
-            # 직렬화 가능한 형태로 변환
-
-            materials_data = []
-
-            for material in materials:
-
+            # 단일 자료 벡터화 함수
+            def vectorize_single_material(material):
                 try:
-
-                    if hasattr(material, 'dict'):
-
-                        # ResearchMaterial 객체인 경우
-
-                        material_dict = material.dict()
-
-                    elif isinstance(material, dict):
-
-                        # 이미 딕셔너리인 경우
-
-                        material_dict = material
-
+                    # PDF URL 또는 경로가 있는 경우 PDF 벡터화
+                    if hasattr(material, 'pdf_url') and material.pdf_url:
+                        logger.info(f"PDF URL 벡터화 중: {material.title}")
+                        process_and_vectorize_paper(material.pdf_url)
+                        return True
+                    elif hasattr(material, 'pdf_path') and material.pdf_path:
+                        logger.info(f"PDF 파일 벡터화 중: {material.title}")
+                        process_and_vectorize_paper(material.pdf_path)
+                        return True
+                    # 내용이 있는 경우 텍스트 벡터화
+                    elif hasattr(material, 'content') and material.content and len(material.content) > 100:
+                        logger.info(f"내용 벡터화 중: {material.title}")
+                        # 내용을 청크로 나누고 벡터화
+                        from utils.vector_db import vectorize_content
+                        vectorize_content(
+                            content=material.content,
+                            title=material.title,
+                            material_id=material.id
+                        )
+                        return True
                     else:
-
-                        logger.warning(f"Unsupported material type: {type(material)}")
-
-                        continue
-
-                    
-
-                    materials_data.append(material_dict)
-
+                        logger.warning(f"벡터화 불가: {material.title} - 내용 또는 PDF URL/경로 필요")
+                        return False
                 except Exception as e:
-
-                    logger.warning(f"Error processing material for JSON: {str(e)}")
-
-                    continue
-
+                    logger.warning(f"자료 '{material.title}' 벡터화 중 오류 발생, 건너뜁니다: {str(e)}")
+                    return False
             
-
-            # datetime 객체를 문자열로 변환하는 함수 정의
-
-            def json_serial(obj):
-
-                if isinstance(obj, datetime):
-
-                    return obj.isoformat()
-
-                raise TypeError(f"Type {type(obj)} not serializable")
-
+            # 병렬 처리로 벡터화 실행
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = []
+                for material in materials:
+                    futures.append(executor.submit(vectorize_single_material, material))
+                
+                # 결과 수집
+                results = []
+                for future in as_completed(futures):
+                    results.append(future.result())
             
-
-            # Save to JSON file
-
-            with open(file_path, 'w', encoding='utf-8') as f:
-
-                json.dump(materials_data, f, ensure_ascii=False, indent=2, default=json_serial)
-
-            logger.info(f"Research materials saved to {file_path}")
-
+            vectorized_count = sum(1 for r in results if r)
+            logger.info(f"벡터화 완료: {vectorized_count}/{len(materials)} 자료")
+            return True
+            
         except Exception as e:
-
-            logger.error(f"Failed to save research materials to JSON: {str(e)}")
-
-
-
-    # XAI 클라이언트 사용 부분 (정확한 위치는 파일 내용에 따라 다를 수 있음)
-
-    def _analyze_research_topic(self, topic, context=None):
-
-        """XAI API를 사용하여 연구 주제 분석"""
-
+            logger.error(f"벡터화 과정 중 오류 발생: {str(e)}")
+            traceback.print_exc()
+            return False
         
-
-        # 싱글톤 인스턴스 가져오기
-
-        xai_client = XAIClient.get_instance()
-
+    def save_research_materials_to_json(self, materials: List[Union[ResearchMaterial, Dict]], file_path: str = 'data/papers.json') -> None:
+        """
+        연구 자료를 JSON 파일로 저장합니다.
         
-
-        messages = [
-
-            {"role": "system", "content": "You are a helpful research assistant."},
-
-            {"role": "user", "content": f"Analyze this research topic: {topic}"}
-
-        ]
-
-        
-
-        if context:
-
-            messages[1]["content"] += f"\n\nAdditional context: {context}"
-
-        
-
+        Args:
+            materials: 저장할 연구 자료 목록 (ResearchMaterial 객체 또는 딕셔너리)
+            file_path: 저장할 파일 경로
+        """
         try:
-
-            response = xai_client.chat_completion(messages=messages)
-
-            return response.get("choices", [{}])[0].get("message", {}).get("content", "")
-
+            # 디렉토리 생성
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # 직렬화 가능한 형태로 변환
+            materials_data = []
+            for material in materials:
+                try:
+                    if hasattr(material, 'dict'):
+                        # ResearchMaterial 객체인 경우
+                        material_dict = material.dict()
+                    elif isinstance(material, dict):
+                        # 이미 딕셔너리인 경우
+                        material_dict = material
+                    else:
+                        logger.warning(f"지원되지 않는 자료 유형: {type(material)}")
+                        continue
+                    
+                    materials_data.append(material_dict)
+                except Exception as e:
+                    logger.warning(f"자료 JSON 처리 중 오류: {str(e)}")
+                    continue
+            
+            # datetime 객체를 문자열로 변환하는 함수 정의
+            def json_serial(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                raise TypeError(f"Type {type(obj)} not serializable")
+            
+            # JSON 파일로 저장
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(materials_data, f, ensure_ascii=False, indent=2, default=json_serial)
+            logger.info(f"연구 자료가 {file_path}에 저장됨")
+            
         except Exception as e:
-
-            self.logger.error(f"XAI API 호출 오류: {str(e)}")
-
-            return f"주제 분석 중 오류 발생: {str(e)}"
+            logger.error(f"연구 자료를 JSON으로 저장하는 데 실패: {str(e)}")
+            traceback.print_exc()
