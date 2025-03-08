@@ -361,3 +361,110 @@ def process_and_vectorize_paper(pdf_path: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"PDF 벡터화 중 오류: {str(e)}", exc_info=True)
         return None
+
+
+def vectorize_content(content: str, title: str, material_id: str) -> Dict[str, Any]:
+    """
+    텍스트 콘텐츠를 벡터화하여 저장
+    
+    Args:
+        content: 벡터화할 텍스트 콘텐츠
+        title: 문서 제목
+        material_id: 문서 ID
+        
+    Returns:
+        Dict[str, Any]: 처리된 문서 정보
+    """
+    import os
+    import hashlib
+    from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain_community.vectorstores import Chroma
+    
+    try:
+        if not content or len(content) < 100:
+            logger.warning(f"문서 내용이 부족합니다: {title}")
+            return None
+        
+        # 중복 체크 - 해시 값 생성
+        content_hash = hashlib.md5(content[:5000].encode()).hexdigest()
+        
+        # 이미 저장된 해시 값 확인
+        hash_file = os.path.join(VECTOR_DB_PATH, "content_hashes.json")
+        existing_hashes = {}
+        if os.path.exists(hash_file):
+            with open(hash_file, 'r') as f:
+                existing_hashes = json.load(f)
+        
+        # 중복 확인
+        if content_hash in existing_hashes:
+            logger.info(f"중복 문서 발견, 기존 ID 사용: {existing_hashes[content_hash]}")
+            return {
+                "id": existing_hashes[content_hash],
+                "title": title,
+                "is_duplicate": True
+            }
+        
+        # 텍스트 분할
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000, 
+            chunk_overlap=200
+        )
+        chunks = text_splitter.split_text(content)
+        
+        # 벡터 DB 저장 경로 생성
+        os.makedirs(VECTOR_DB_PATH, exist_ok=True)
+        collection_name = "research_papers"  # 모든 논문을 하나의 컬렉션에 저장
+        
+        # research_papers 디렉토리 명시적으로 생성
+        research_papers_dir = os.path.join(VECTOR_DB_PATH, "research_papers")
+        os.makedirs(research_papers_dir, exist_ok=True)
+        
+        # 임베딩 및 벡터 DB 저장
+        embeddings = HuggingFaceEmbeddings(model_name="all-mpnet-base-v2")
+        metadata = [{"source": "text", "paper_id": material_id, "chunk": i, "title": title} for i in range(len(chunks))]
+        
+        # 기존 컬렉션이 있는지 확인
+        try:
+            # 컬렉션 이름을 명시적으로 지정
+            persist_directory = research_papers_dir
+            
+            vectorstore = Chroma(
+                persist_directory=persist_directory,
+                embedding_function=embeddings,
+                collection_name=collection_name
+            )
+            # 기존 컬렉션에 새 문서 추가
+            vectorstore.add_texts(
+                texts=chunks,
+                metadatas=metadata
+            )
+        except Exception as e:
+            # 컬렉션이 없으면 새로 생성
+            logger.info(f"Creating new vector collection: {collection_name}")
+            vectorstore = Chroma.from_texts(
+                texts=chunks,
+                embedding=embeddings,
+                metadatas=metadata,
+                persist_directory=persist_directory,
+                collection_name=collection_name
+            )
+        
+        vectorstore.persist()
+        
+        # 해시 저장
+        existing_hashes[content_hash] = material_id
+        with open(hash_file, 'w') as f:
+            json.dump(existing_hashes, f)
+        
+        # 문서 메타데이터 반환
+        return {
+            "id": material_id,
+            "title": title,
+            "vector_collection": collection_name,
+            "content_length": len(content),
+            "chunks": len(chunks)
+        }
+        
+    except Exception as e:
+        logger.error(f"텍스트 벡터화 중 오류 발생: {str(e)}")
+        return None

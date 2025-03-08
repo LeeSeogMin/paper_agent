@@ -369,12 +369,15 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
         if not self.workflow_state or not self.workflow_state.paper:
             return None
         paper = self.workflow_state.paper
-        paper_content = f"# {paper.title}\n\n"
-        paper_content += f"## 초록\n\n{paper.abstract}\n\n"
-        for section in paper.sections:
-            paper_content += f"## {section.title}\n\n"
-            content_preview = section.content[:1000] + "..." if len(section.content) > 1000 else section.content
-            paper_content += f"{content_preview}\n\n"
+        paper_content = f"# {getattr(paper, 'title', 'Untitled Paper')}\n\n"
+        paper_content += f"## 초록\n\n{getattr(paper, 'abstract', '초록 정보가 없습니다.')}\n\n"
+        
+        # sections 속성이 있는지 확인하고 안전하게 처리
+        sections = getattr(paper, 'sections', [])
+        for section in sections:
+            section_title = getattr(section, 'title', '제목 없는 섹션')
+            section_content = getattr(section, 'content', '내용 없음')
+            paper_content += f"## {section_title}\n\n{section_content}\n\n"
         try:
             # LLMChain을 사용하여 요약 생성
             result = self.summary_chain.invoke({"title": paper.title, "content": paper_content})
@@ -1864,54 +1867,96 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             }
     
     def _validate_research_results(self, research_materials, topic):
-        """
-        연구 결과의 타당성을 검증합니다.
-        
-        Args:
-            research_materials: 연구 결과
-            topic: 연구 주제
-            
-        Returns:
-            Tuple[bool, str]: (타당성 여부, 피드백)
-        """
-        logger.info(f"연구 결과 검증: {len(research_materials) if research_materials else 0}개 자료")
-        
+        """연구 결과의 타당성 검증"""
         try:
-            # 결과가 없는 경우
             if not research_materials or len(research_materials) == 0:
-                return False, "연구 결과가 없습니다. 다시 분석을 시도해 보세요."
+                return False, "연구 자료가 없습니다"
+                
+            logger.info(f"연구 자료 {len(research_materials)}개 검증 중...")
             
-            # 내용 및 요약 검증
-            missing_content = 0
-            missing_summary = 0
+            # 필수 필드를 갖춘 자료만 필터링
+            valid_materials = []
             for material in research_materials:
-                if not hasattr(material, 'content') or not material.content:
-                    missing_content += 1
-                if not hasattr(material, 'summary') or not material.summary:
-                    missing_summary += 1
+                # 필수 필드 확인 (제목, 저자, 연도, 발표학술지, 본문)
+                has_title = hasattr(material, 'title') and material.title
+                has_authors = hasattr(material, 'authors') and material.authors
+                has_year = hasattr(material, 'year') and material.year
+                has_source = hasattr(material, 'source') and material.source
+                has_content = hasattr(material, 'content') and material.content and len(material.content) > 100
+                
+                if has_title and has_authors and has_content:  # 최소 필수 조건: 제목, 저자, 본문
+                    if not has_year or not has_source:  # 연도나 발표학술지가 없으면 LLM으로 보완 시도
+                        try:
+                            prompt = f"""
+                            다음 논문 정보를 바탕으로 누락된 정보를 추론해주세요:
+                            제목: {material.title}
+                            저자: {', '.join(material.authors) if isinstance(material.authors, list) else material.authors}
+                            
+                            필요한 정보:
+                            1. 발행 연도 (알 수 없으면 '미상'으로 표시)
+                            2. 발표 학술지 또는 컨퍼런스 (알 수 없으면 '미상'으로 표시)
+                            
+                            JSON 형식으로 답변해주세요: {{"year": "연도", "source": "출처"}}
+                            """
+                            
+                            result = self.llm.invoke(prompt)
+                            enriched_data = self._extract_json_from_response(result.content)
+                            
+                            if not has_year and 'year' in enriched_data:
+                                material.year = enriched_data['year']
+                                has_year = True
+                                
+                            if not has_source and 'source' in enriched_data:
+                                material.source = enriched_data['source']
+                                has_source = True
+                                
+                            logger.info(f"자료 정보 보완: {material.title}")
+                        except Exception as e:
+                            logger.warning(f"LLM을 통한 자료 보완 실패: {str(e)}")
+                    
+                    valid_materials.append(material)
+                else:
+                    logger.warning(f"필수 필드 누락으로 자료 제외: {getattr(material, 'title', '제목 없음')}")
             
-            if missing_content > len(research_materials) * 0.5:
-                return False, f"많은 자료({missing_content}/{len(research_materials)})에 내용이 없습니다. 내용 추출을 다시 시도해 보세요."
+            # 필터링된 자료로 교체
+            filtered_count = len(research_materials) - len(valid_materials)
+            if filtered_count > 0:
+                logger.info(f"{filtered_count}개 자료가 필수 데이터 부족으로 제외됨. 유효 자료 {len(valid_materials)}개로 진행.")
+                
+                # 원본 research_materials를 변경 (참조가 전달된 경우를 대비)
+                if hasattr(research_materials, 'clear'):
+                    research_materials.clear()
+                    research_materials.extend(valid_materials)
             
-            if missing_summary > len(research_materials) * 0.5:
-                return False, f"많은 자료({missing_summary}/{len(research_materials)})에 요약이 없습니다. 요약 생성을 다시 시도해 보세요."
+            # 최소 자료 수 확인
+            if len(valid_materials) < 3:
+                return False, f"유효한 연구 자료가 부족합니다 (현재 {len(valid_materials)}개, 최소 3개 필요)"
+                
+            # 주제 관련성 검사
+            relevance_score = 0
+            for material in valid_materials:
+                # 제목이나 본문에 주제와 관련된 키워드가 있는지 확인
+                title_lower = material.title.lower() if hasattr(material, 'title') else ""
+                content_preview = material.content[:1000].lower() if hasattr(material, 'content') else ""
+                
+                # 주제에서 키워드 추출
+                keywords = [kw.lower() for kw in topic.split() if len(kw) > 3]
+                
+                # 키워드 매칭 확인
+                matched_keywords = [kw for kw in keywords if kw in title_lower or kw in content_preview]
+                if matched_keywords:
+                    relevance_score += 1
             
-            # 주제 관련성 검증
-            low_relevance = 0
-            for material in research_materials:
-                if hasattr(material, 'relevance_score') and material.relevance_score < 0.6:
-                    low_relevance += 1
+            avg_relevance = relevance_score / len(valid_materials) if valid_materials else 0
             
-            if low_relevance > len(research_materials) * 0.3:
-                return False, f"관련성이 낮은 자료({low_relevance}/{len(research_materials)})가 많습니다. 더 관련성 높은 자료를 선별해 보세요."
-            
-            # 모든 검증을 통과한 경우
-            return True, "연구 결과가 타당합니다."
+            if avg_relevance < 0.5:  # 50% 미만의 자료만 관련성이 있으면 부적합
+                return False, f"연구 자료의 주제 관련성이 낮습니다 (관련성 점수: {avg_relevance:.2f})"
+                
+            return True, "연구 자료가 검증되었습니다"
             
         except Exception as e:
             logger.error(f"연구 결과 검증 중 오류: {str(e)}")
-            # 오류 발생 시 기본적으로 통과시킴
-            return True, f"검증 중 오류가 발생했으나 진행합니다: {str(e)}"
+            return False, f"검증 오류: {str(e)}"
     
     def _revise_research_plan(self, original_plan, feedback):
         """
@@ -2325,3 +2370,121 @@ class CoordinatorAgent(BaseAgent[PaperWorkflowState]):
             logger.error(f"편집 지시 수정 중 오류: {str(e)}")
             # 오류 발생 시 원본 지시 반환
             return report_format
+
+    def _determine_output_format(self, requirements):
+        """
+        요청 유형에 따라 적절한 출력 형식 결정
+        
+        Args:
+            requirements (dict): 사용자 요구사항
+        
+        Returns:
+            dict: 출력 형식 설정
+        """
+        paper_type = requirements.get('paper_type', '')
+        task_type = requirements.get('task_type', '')
+        
+        # 학술 논문의 경우 표준 논문 양식 유지
+        if paper_type in ['academic_paper', 'research_paper']:
+            return {
+                'format': 'academic_paper',
+                'template': 'standard_academic',
+                'citation_style': 'APA'
+            }
+        
+        # 문헌 리뷰 등 다른 유형의 경우 유연한 형식 적용
+        elif task_type in ['literature_review', 'report', 'summary']:
+            return {
+                'format': 'flexible_report',
+                'template': 'narrative',
+                'citation_style': 'minimal'
+            }
+        
+        # 기본값
+        return {
+            'format': 'standard_report',
+            'template': 'professional',
+            'citation_style': 'simple'
+        }
+
+    def _determine_document_length(self, requirements):
+        """
+        논문 유형별 표준 문서 길이 결정
+        
+        Args:
+            requirements (dict): 사용자 요구사항
+        
+        Returns:
+            dict: 문서 길이 설정 (MS Word 기준)
+        """
+        paper_type = requirements.get('paper_type', '')
+        task_type = requirements.get('task_type', '')
+        
+        # 학술 논문 길이 설정 (MS Word 기준 10장 내외)
+        if paper_type in ['academic_paper', 'research_paper', 'experimental_research']:
+            return {
+                'page_range': (8, 12),  # 10장 내외
+                'word_count_range': (2400, 3600),  # 1장당 약 300단어 기준
+                'format': 'academic',
+                'font': 'Times New Roman',
+                'font_size': 12,
+                'line_spacing': 1.5
+            }
+        
+        # 문헌 리뷰 길이 설정 (MS Word 기준 2-3장)
+        elif task_type in ['literature_review', 'survey']:
+            return {
+                'page_range': (2, 3),  # 2-3장
+                'word_count_range': (600, 900),  # 1장당 약 300단어 기준
+                'format': 'review',
+                'font': 'Arial',
+                'font_size': 11,
+                'line_spacing': 1.5
+            }
+        
+        # 기타 보고서 및 요약 문서
+        else:
+            return {
+                'page_range': (4, 6),  # 4-6장
+                'word_count_range': (1200, 1800),  # 1장당 약 300단어 기준
+                'format': 'professional',
+                'font': 'Calibri',
+                'font_size': 11,
+                'line_spacing': 1.15
+            }
+
+    def delegate_writing_task(self, requirements):
+        """
+        작성 에이전트에 구체적인 작성 지시
+        
+        Args:
+            requirements (dict): 사용자 요구사항
+        
+        Returns:
+            dict: 작성 에이전트에 전달할 상세 지시사항
+        """
+        output_format = self._determine_output_format(requirements)
+        document_length = self._determine_document_length(requirements)
+        
+        writing_instructions = {
+            'topic': requirements.get('topic', ''),
+            'task_type': requirements.get('task_type', 'general_writing'),
+            'output_format': output_format,
+            'length_constraints': document_length,
+            'additional_guidelines': requirements.get('additional_instructions', '')
+        }
+        
+        return writing_instructions
+
+def safe_unpack_search_results(results):
+    try:
+        # 다양한 결과 형식에 대응
+        if isinstance(results, list):
+            return results[0], results[1] if len(results) > 1 else 1.0
+        elif isinstance(results, tuple):
+            return results
+        else:
+            return results, 1.0
+    except Exception as e:
+        logger.error(f"결과 언패킹 실패: {e}")
+        return None, None

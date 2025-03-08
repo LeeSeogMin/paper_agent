@@ -1,0 +1,1138 @@
+2025-03-07 21:41:19,668 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 21:41:19,669 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 21:41:19,669 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 21:41:19,669 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.98 MB
+2025-03-07 21:41:19,669 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 21:41:19,673 - paper_agent - ERROR - [TASK-ERROR] 워크플로우 시작 - 실패 - 소요 시간: 0.28초
+2025-03-07 21:41:19,673 - paper_agent - ERROR - 예외 정보: 3 validation errors for WorkflowState
+template_name
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+style_guide
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+citation_style
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+2025-03-07 21:41:19,674 - paper_agent - ERROR - 스택 트레이스: Traceback (most recent call last):
+  File "C:\Dev\paper_agent\utils\logger.py", line 108, in wrapper
+    result = func(*args, **kwargs)
+  File "C:\Dev\paper_agent\agents\coordinator_agent.py", line 279, in start_workflow
+    self.workflow_state = PaperWorkflowState(**workflow_config)
+  File "C:\Users\user\miniconda3\envs\paper\lib\site-packages\pydantic\main.py", line 214, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+pydantic_core._pydantic_core.ValidationError: 3 validation errors for WorkflowState
+template_name
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+style_guide
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+citation_style
+  Field required [type=missing, input_value={'topic': 'Topic Modeling...ages', 'verbose': False}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.10/v/missing
+
+2025-03-07 22:02:47,587 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:02:47,587 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:02:47,588 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:02:47,588 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:02:47,588 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 151.23 MB
+2025-03-07 22:02:47,588 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:02:47,588 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:02:47,588 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:02:47,596 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:02:47,597 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:02:47,597 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.01초
+2025-03-07 22:02:47,597 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:02:47,598 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:02:47,599 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:02:47,599 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:02:47,599 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:02:47,599 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:02:47,599 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:02:47,599 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:02:52,769 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:02:52,769 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.17초
+2025-03-07 22:02:52,770 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.17초
+2025-03-07 22:02:52,770 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링에 대한 문헌 고찰...
+2025-03-07 22:02:52,770 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 연구 (Literature Review)
+2025-03-07 22:02:52,770 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 고찰, 키워드 추출, 방법론
+2025-03-07 22:02:52,770 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:02:52,770 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 153.02 MB
+2025-03-07 22:02:52,771 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:02:53,254 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:02:53,254 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:02:53,738 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:02:53,738 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'ResearchAgent' object has no attribute 'conduct_research'
+2025-03-07 22:02:53,739 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:02:53,739 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 6.43초
+2025-03-07 22:04:14,109 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:04:14,110 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:04:14,110 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:04:14,110 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:04:14,110 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.84 MB
+2025-03-07 22:04:14,111 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:04:14,111 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:04:14,111 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:04:14,111 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:04:14,112 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:04:14,112 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:04:14,112 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:04:14,113 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:04:14,113 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:04:14,113 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:04:14,113 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:04:14,114 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:04:14,114 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:04:14,114 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:04:19,402 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:04:19,403 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.29초
+2025-03-07 22:04:19,403 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.29초
+2025-03-07 22:04:19,403 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌 조사...
+2025-03-07 22:04:19,403 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사 및 텍스트 분석
+2025-03-07 22:04:19,403 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 텍스트 분석
+2025-03-07 22:04:19,404 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:04:19,404 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.63 MB
+2025-03-07 22:04:19,404 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:04:19,889 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:04:19,889 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:04:20,373 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:04:20,373 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:04:20,373 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:04:20,373 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:04:20,373 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:04:20,374 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:04:20,374 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:04:20,374 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌 조사...'
+2025-03-07 22:04:20,374 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:04:20,374 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:04:20,374 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:04:20,375 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:04:20,375 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.53 MB
+2025-03-07 22:04:20,376 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:04:20,376 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:04:20,377 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:04:20,377 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:04:20,377 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:04:23,390 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 3.01초
+2025-03-07 22:04:23,390 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 3.01초
+2025-03-07 22:04:23,391 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 텍스트 분석
+2025-03-07 22:04:23,391 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링을 활용한 문헌 조사의 중요성과 적용 가능성 탐구'
+2025-03-07 22:04:23,391 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링을 통해 어떻게 문헌 조사의 효율성을 향상시킬 수 있는가?'
+2025-03-07 22:04:23,391 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '다양한 데이터 소스에서 어떻게 토픽 모델링을 적용하여 인사이트를 추출할 수 있는가?'
+2025-03-07 22:04:23,391 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 3.01초
+2025-03-07 22:04:23,391 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 3.01초
+2025-03-07 22:04:23,391 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 3.01초
+2025-03-07 22:04:23,393 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc744 \ud65c\uc6a9\ud55c \ubb38\ud5cc \uc870\uc0...'
+2025-03-07 22:04:23,393 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:04:23,393 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:04:23,393 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링을 활용한 문헌 조사의 중요성과 적용 가능성 탐구...'
+2025-03-07 22:04:23,393 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌 조사, 텍스트 분석
+2025-03-07 22:04:23,394 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:04:31,802 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 8.41초
+2025-03-07 22:04:31,803 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 8.41초
+2025-03-07 22:04:31,803 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:04:31,803 - paper_agent - INFO - [DATA] 자료 1: 'Topic Modeling: A Review and Future Directions' by John Smith, Emily Johnson (2018)
+2025-03-07 22:04:31,803 - paper_agent - INFO - [DATA] 자료 2: 'Exploring the Impact of Topic Modeling on Bibliographic Data Analysis' by Maria Garcia, David Lee (2016)
+2025-03-07 22:04:31,803 - paper_agent - INFO - [DATA] 자료 3: 'Applications of Topic Modeling in Digital Humanities Research' by Anna Wang, Michael Brown (2019)
+2025-03-07 22:04:31,804 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 8.41초
+2025-03-07 22:04:31,804 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 8.41초
+2025-03-07 22:04:31,804 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 8.41초
+2025-03-07 22:04:31,804 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:04:31,804 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:04:31,804 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:04:31,804 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:04:31,804 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:04:31,804 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:04:31,805 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:04:31,805 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:04:31,805 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:04:31,805 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:04:31,805 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:04:31,805 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:04:31,805 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:04:31,805 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:04:31,806 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:04:31,806 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:04:31,806 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:04:31,806 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:04:31,806 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:04:31,806 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:04:31,808 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:04:31,808 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:04:31,808 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:04:31,808 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:04:31,808 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.74 MB
+2025-03-07 22:04:31,809 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:04:31,809 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:04:31,809 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 11.44초
+2025-03-07 22:04:31,809 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:04:31,809 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:04:31,809 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:04:31,810 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 11.44초
+2025-03-07 22:04:31,810 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: "WorkflowState" object has no field "research_results"
+2025-03-07 22:04:31,811 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:04:31,811 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 17.98초
+2025-03-07 22:05:07,785 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:05:07,786 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:05:07,786 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:05:07,786 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:05:07,786 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.88 MB
+2025-03-07 22:05:07,786 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:05:07,787 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:05:07,787 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:05:07,787 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:05:07,787 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:05:07,787 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:05:07,787 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:05:07,788 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:05:07,789 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:05:07,789 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:05:07,789 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:05:07,789 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:05:07,789 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:05:07,789 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:05:12,239 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:05:12,239 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 4.45초
+2025-03-07 22:05:12,239 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 4.45초
+2025-03-07 22:05:12,240 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 논문의 문헌 조사...
+2025-03-07 22:05:12,240 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사 및 주제 모델링
+2025-03-07 22:05:12,240 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 주제 동향
+2025-03-07 22:05:12,240 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:05:12,240 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.68 MB
+2025-03-07 22:05:12,240 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:05:12,720 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:05:12,720 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:05:13,209 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:05:13,210 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:05:13,210 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:05:13,210 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:05:13,210 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:05:13,210 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:05:13,211 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:05:13,211 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 논문의 문헌 조사...'
+2025-03-07 22:05:13,211 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:05:13,211 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:05:13,211 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:05:13,212 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:05:13,212 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.30 MB
+2025-03-07 22:05:13,213 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:05:13,213 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:05:13,214 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:05:13,214 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:05:13,214 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:05:16,098 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.88초
+2025-03-07 22:05:16,099 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.88초
+2025-03-07 22:05:16,099 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 주제 동향
+2025-03-07 22:05:16,099 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링 논문의 문헌 조사를 통한 주제 동향 파악'
+2025-03-07 22:05:16,099 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링 논문들의 연구 트렌드는 무엇인가?'
+2025-03-07 22:05:16,099 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '다양한 학술 자료를 기반으로 한 주제 모델링의 발전 방향은 무엇인가?'
+2025-03-07 22:05:16,100 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.89초
+2025-03-07 22:05:16,100 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.89초
+2025-03-07 22:05:16,100 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.89초
+2025-03-07 22:05:16,100 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1 \ub17c\ubb38\uc758 \ubb38\ud5cc \uc870\uc0ac\ub9...'
+2025-03-07 22:05:16,100 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:05:16,100 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:05:16,100 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링 논문의 문헌 조사를 통한 주제 동향 파악...'
+2025-03-07 22:05:16,101 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌 조사, 주제 동향
+2025-03-07 22:05:16,101 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:05:25,267 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 9.16초
+2025-03-07 22:05:25,267 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 9.16초
+2025-03-07 22:05:25,267 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:05:25,267 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily Brown (2017)
+2025-03-07 22:05:25,268 - paper_agent - INFO - [DATA] 자료 2: 'Analyzing Trends in Topic Modeling Research: A Bibliometric Study' by Maria Garcia, Robert Johnson (2019)
+2025-03-07 22:05:25,268 - paper_agent - INFO - [DATA] 자료 3: 'Topic Modeling in Social Media: A Literature Review' by Sophie Lee, David Wang (2016)
+2025-03-07 22:05:25,268 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 9.17초
+2025-03-07 22:05:25,268 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 9.17초
+2025-03-07 22:05:25,268 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 9.17초
+2025-03-07 22:05:25,268 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:05:25,268 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:05:25,269 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:05:25,269 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:05:25,269 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:05:25,270 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:05:25,270 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:05:25,271 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:05:25,271 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:05:25,271 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:05:25,272 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:05:25,272 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:05:25,272 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:05:25,273 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:05:25,273 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.48 MB
+2025-03-07 22:05:25,273 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:05:25,273 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:05:25,273 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 12.06초
+2025-03-07 22:05:25,273 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:05:25,273 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:05:25,274 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:05:25,274 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 12.06초
+2025-03-07 22:05:25,274 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: complete_research() missing 1 required positional argument: 'research_summary'
+2025-03-07 22:05:25,275 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:05:25,275 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 17.77초
+2025-03-07 22:06:01,613 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:06:01,613 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:06:01,614 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:06:01,614 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:06:01,614 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.88 MB
+2025-03-07 22:06:01,614 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:06:01,615 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:06:01,615 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:06:01,615 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:06:01,616 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:06:01,616 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:06:01,616 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:06:01,617 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:06:01,617 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:06:01,617 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:06:01,617 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:06:01,618 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:06:01,618 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:06:01,618 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:06:05,429 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:06:05,429 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 3.81초
+2025-03-07 22:06:05,429 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 3.81초
+2025-03-07 22:06:05,429 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링의 현재 동향과 연구 방향성 파악...
+2025-03-07 22:06:05,430 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사
+2025-03-07 22:06:05,430 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 자연어 처리
+2025-03-07 22:06:05,430 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:06:05,430 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.68 MB
+2025-03-07 22:06:05,430 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:06:05,917 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:06:05,918 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:06:06,409 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:06:06,410 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:06:06,410 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:06:06,410 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:06:06,410 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:06:06,410 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링의 현재 동향과 연구 방향성 파악...'
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:06:06,411 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:06:06,411 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.42 MB
+2025-03-07 22:06:06,413 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:06:06,413 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:06:06,413 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:06:06,413 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:06:06,413 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:06:08,514 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.10초
+2025-03-07 22:06:08,514 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.10초
+2025-03-07 22:06:08,515 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 자연어 처리
+2025-03-07 22:06:08,515 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링의 현재 동향과 미래 연구 방향성 조사'
+2025-03-07 22:06:08,515 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링 분야에서 현재 활발히 연구되고 있는 주제는 무엇인가?'
+2025-03-07 22:06:08,515 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '주제 모델링 기술의 발전을 위한 새로운 방향은 무엇인가?'
+2025-03-07 22:06:08,516 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.10초
+2025-03-07 22:06:08,516 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.10초
+2025-03-07 22:06:08,516 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.10초
+2025-03-07 22:06:08,516 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc758 \ud604\uc7ac \ub3d9\ud5a5\uacfc \ubbf8\ub7...'
+2025-03-07 22:06:08,516 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:06:08,516 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:06:08,517 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링의 현재 동향과 미래 연구 방향성 조사...'
+2025-03-07 22:06:08,517 - paper_agent - INFO - [SEARCH] 검색 키워드: 토픽 모델링, 문헌 조사, 자연어 처리
+2025-03-07 22:06:08,517 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:06:16,016 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 7.50초
+2025-03-07 22:06:16,017 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 7.50초
+2025-03-07 22:06:16,017 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:06:16,017 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Natural Language Processing' by Alice Lee, Bob Smith (2020)
+2025-03-07 22:06:16,018 - paper_agent - INFO - [DATA] 자료 2: 'Current Trends in Topic Modeling: A Bibliometric Analysis' by David Johnson, Emily Wang (2019)
+2025-03-07 22:06:16,018 - paper_agent - INFO - [DATA] 자료 3: 'Exploring the Use of Topic Modeling in Digital Humanities: A Case Study' by Grace Kim, Hiroshi Yamamoto (2018)
+2025-03-07 22:06:16,018 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 7.50초
+2025-03-07 22:06:16,018 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 7.50초
+2025-03-07 22:06:16,018 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 7.50초
+2025-03-07 22:06:16,018 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:06:16,018 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:06:16,018 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:06:16,019 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:06:16,019 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [STATS] 연도 2021: 1개 자료
+2025-03-07 22:06:16,020 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:06:16,020 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:06:16,021 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:06:16,021 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:06:16,021 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:06:16,023 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:06:16,023 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:06:16,023 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:06:16,023 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:06:16,023 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.63 MB
+2025-03-07 22:06:16,023 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:06:16,023 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:06:16,024 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 9.61초
+2025-03-07 22:06:16,024 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:06:16,024 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:06:16,024 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:06:16,024 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 9.61초
+2025-03-07 22:06:16,024 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:06:16,025 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:06:16,025 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 14.69초
+2025-03-07 22:08:14,531 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:08:14,531 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:08:14,532 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:08:14,532 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:08:14,532 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.73 MB
+2025-03-07 22:08:14,532 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:08:14,532 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:08:14,533 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:08:14,533 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:08:14,533 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:08:14,533 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:08:14,533 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:08:14,534 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:08:14,535 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:08:14,535 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:08:14,535 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:08:14,535 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:08:14,535 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:08:14,536 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:08:19,857 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:08:19,858 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.32초
+2025-03-07 22:08:19,858 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.32초
+2025-03-07 22:08:19,858 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌고찰...
+2025-03-07 22:08:19,858 - paper_agent - INFO - [ANALYSIS] 연구 분야: 언어학, 문헌학
+2025-03-07 22:08:19,858 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌고찰, 자연어처리
+2025-03-07 22:08:19,859 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:08:19,859 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.79 MB
+2025-03-07 22:08:19,859 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:08:20,339 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:08:20,339 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:08:20,826 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:08:20,826 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:08:20,826 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:08:20,826 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:08:20,827 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:08:20,827 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:08:20,827 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:08:20,827 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌고찰...'
+2025-03-07 22:08:20,827 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:08:20,827 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:08:20,827 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:08:20,828 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:08:20,828 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.51 MB
+2025-03-07 22:08:20,829 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:08:20,829 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:08:20,829 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:08:20,829 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:08:20,829 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:08:23,094 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.26초
+2025-03-07 22:08:23,095 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.26초
+2025-03-07 22:08:23,095 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌고찰, 자연어처리
+2025-03-07 22:08:23,095 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링을 통한 문헌고찰 연구'
+2025-03-07 22:08:23,095 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링을 활용한 문헌고찰의 잠재적 이점은 무엇인가?'
+2025-03-07 22:08:23,096 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '다양한 학술 자료에서의 토픽 모델링의 적용 가능성은 어떻게 되는가?'
+2025-03-07 22:08:23,096 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.27초
+2025-03-07 22:08:23,096 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.27초
+2025-03-07 22:08:23,096 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.27초
+2025-03-07 22:08:23,096 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc744 \ud1b5\ud55c \ubb38\ud5cc\uace0\ucc30 \uc5...'
+2025-03-07 22:08:23,096 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:08:23,096 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:08:23,096 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링을 통한 문헌고찰 연구...'
+2025-03-07 22:08:23,097 - paper_agent - INFO - [SEARCH] 검색 키워드: 토픽 모델링, 문헌고찰, 자연어처리
+2025-03-07 22:08:23,097 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:08:30,871 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 7.77초
+2025-03-07 22:08:30,871 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 7.77초
+2025-03-07 22:08:30,872 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:08:30,872 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Natural Language Processing' by John Smith, Emily Johnson (2018)
+2025-03-07 22:08:30,872 - paper_agent - INFO - [DATA] 자료 2: 'Enhancing Literature Review with Topic Modeling: A Case Study in Healthcare Research' by Maria Garcia, Mohammed Ahmed (2016)
+2025-03-07 22:08:30,872 - paper_agent - INFO - [DATA] 자료 3: 'Topic Modeling for Textual Data: A Review' by Anna Lee, David Brown (2015)
+2025-03-07 22:08:30,872 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 7.78초
+2025-03-07 22:08:30,873 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 7.78초
+2025-03-07 22:08:30,873 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 7.78초
+2025-03-07 22:08:30,873 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:08:30,873 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:08:30,873 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:08:30,873 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:08:30,874 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:08:30,874 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:08:30,874 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:08:30,874 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:08:30,874 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:08:30,874 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [STATS] 연도 2015: 1개 자료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:08:30,875 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:08:30,875 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:08:30,875 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:08:30,876 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:08:30,876 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:08:30,877 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:08:30,878 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:08:30,878 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:08:30,878 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:08:30,878 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.78 MB
+2025-03-07 22:08:30,878 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:08:30,878 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:08:30,879 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 10.05초
+2025-03-07 22:08:30,879 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:08:30,879 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:08:30,879 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:08:30,879 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 10.05초
+2025-03-07 22:08:30,879 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:08:30,880 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:08:30,881 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 16.65초
+2025-03-07 22:09:13,335 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:09:13,336 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:09:13,336 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:09:13,336 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:09:13,336 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.66 MB
+2025-03-07 22:09:13,336 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:09:13,336 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:09:13,337 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:09:13,337 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:09:13,337 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:09:13,337 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:09:13,337 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:09:13,339 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:09:13,339 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:09:13,339 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:09:13,339 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:09:13,340 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:09:13,340 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:09:13,340 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:09:23,039 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:09:23,039 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 9.70초
+2025-03-07 22:09:23,039 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 9.70초
+2025-03-07 22:09:23,040 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌 조사의 목적을 깊이 파악하고 기존 연구 동향을 분석하는 것...
+2025-03-07 22:09:23,040 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사 및 주제 모델링
+2025-03-07 22:09:23,040 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 텍스트 마이닝
+2025-03-07 22:09:23,040 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:09:23,040 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.72 MB
+2025-03-07 22:09:23,041 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:09:23,527 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:09:23,528 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:09:24,012 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:09:24,012 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:09:24,013 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:09:24,013 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:09:24,013 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:09:24,013 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:09:24,013 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:09:24,013 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌 조사의 목적을 깊이 파악하고 기존 연구 동향을 분석하는 것...'
+2025-03-07 22:09:24,014 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:09:24,014 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:09:24,014 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:09:24,014 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:09:24,014 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.34 MB
+2025-03-07 22:09:24,016 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:09:24,016 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:09:24,016 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:09:24,016 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:09:24,016 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:09:28,318 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 4.30초
+2025-03-07 22:09:28,318 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 4.30초
+2025-03-07 22:09:28,319 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 텍스트 마이닝
+2025-03-07 22:09:28,319 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링을 활용한 문헌 조사의 목적과 기존 연구 동향 분석'
+2025-03-07 22:09:28,319 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링을 통해 어떻게 문헌 조사의 목적을 깊이 파악할 수 있는가?'
+2025-03-07 22:09:28,319 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '기존 주제 모델링 연구 동향은 어떠한가?'
+2025-03-07 22:09:28,319 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 4.30초
+2025-03-07 22:09:28,319 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 4.30초
+2025-03-07 22:09:28,320 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 4.30초
+2025-03-07 22:09:28,320 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc744 \ud65c\uc6a9\ud55c \ubb38\ud5cc \uc870\uc0...'
+2025-03-07 22:09:28,320 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:09:28,320 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:09:28,320 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링을 활용한 문헌 조사의 목적과 기존 연구 동향 분석...'
+2025-03-07 22:09:28,320 - paper_agent - INFO - [SEARCH] 검색 키워드: 토픽 모델링, 문헌 조사, 텍스트 마이닝
+2025-03-07 22:09:28,320 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:09:43,400 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 15.08초
+2025-03-07 22:09:43,400 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 15.08초
+2025-03-07 22:09:43,401 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:09:43,401 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily White (2018)
+2025-03-07 22:09:43,401 - paper_agent - INFO - [DATA] 자료 2: 'Exploring the Role of Topic Modeling in Literature Reviews' by Sarah Johnson, Michael Brown (2016)
+2025-03-07 22:09:43,401 - paper_agent - INFO - [DATA] 자료 3: 'Topic Modeling for Document Clustering: A Comparative Study' by Anna Lee, David Clark, Maria Garcia (2017)
+2025-03-07 22:09:43,401 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 15.08초
+2025-03-07 22:09:43,401 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 15.08초
+2025-03-07 22:09:43,402 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 15.08초
+2025-03-07 22:09:43,402 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:09:43,402 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:09:43,402 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:09:43,402 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:09:43,402 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:09:43,402 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:09:43,403 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:09:43,403 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:09:43,403 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:09:43,403 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:09:43,403 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:09:43,403 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:09:43,403 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:09:43,404 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:09:43,404 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:09:43,404 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:09:43,404 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:09:43,404 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:09:43,404 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:09:43,404 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:09:43,406 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:09:43,406 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:09:43,406 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:09:43,407 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:09:43,407 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.65 MB
+2025-03-07 22:09:43,407 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:09:43,407 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:09:43,407 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 19.39초
+2025-03-07 22:09:43,408 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:09:43,408 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:09:43,408 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:09:43,408 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 19.40초
+2025-03-07 22:09:43,408 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:09:43,409 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:09:43,409 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 30.35초
+2025-03-07 22:10:36,982 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:10:36,983 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:10:36,983 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:10:36,983 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:10:36,983 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.87 MB
+2025-03-07 22:10:36,983 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:10:36,984 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:10:36,984 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:10:36,984 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:10:36,984 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:10:36,984 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:10:36,984 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:10:36,985 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:10:36,986 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:10:36,986 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:10:36,986 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:10:36,986 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:10:36,986 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:10:36,986 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:10:43,225 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:10:43,226 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 6.24초
+2025-03-07 22:10:43,226 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 6.24초
+2025-03-07 22:10:43,226 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌고찰을 통한 특정 주제에 대한 문헌 연구...
+2025-03-07 22:10:43,226 - paper_agent - INFO - [ANALYSIS] 연구 분야: 언어학 및 문헌학
+2025-03-07 22:10:43,227 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌고찰, 토픽 모델링, 키워드 추출
+2025-03-07 22:10:43,227 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:10:43,227 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.90 MB
+2025-03-07 22:10:43,227 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:10:43,714 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:10:43,714 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:10:44,201 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:10:44,201 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:10:44,201 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:10:44,202 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:10:44,202 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:10:44,202 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:10:44,202 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:10:44,202 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌고찰을 통한 특정 주제에 대한 문헌 연구...'
+2025-03-07 22:10:44,202 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:10:44,203 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:10:44,203 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:10:44,203 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:10:44,203 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.48 MB
+2025-03-07 22:10:44,204 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:10:44,205 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:10:44,205 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:10:44,205 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:10:44,205 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:10:47,066 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.86초
+2025-03-07 22:10:47,066 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.86초
+2025-03-07 22:10:47,067 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌고찰, 토픽 모델링, 키워드 추출
+2025-03-07 22:10:47,067 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링을 활용한 문헌고찰을 통한 특정 주제에 대한 연구'
+2025-03-07 22:10:47,067 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링을 통해 특정 주제의 핵심 토픽은 무엇인가?'
+2025-03-07 22:10:47,067 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '주제 모델링을 통해 특정 주제의 발전 경향을 어떻게 파악할 수 있는가?'
+2025-03-07 22:10:47,068 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.86초
+2025-03-07 22:10:47,068 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.86초
+2025-03-07 22:10:47,068 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.86초
+2025-03-07 22:10:47,068 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc744 \ud65c\uc6a9\ud55c \ubb38\ud5cc\uace0\ucc3...'
+2025-03-07 22:10:47,068 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:10:47,068 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:10:47,068 - paper_agent - INFO - [CONFIG] 핵심 개념: 4개, 연구 초점: '주제 모델링을 활용한 문헌고찰을 통한 특정 주제에 대한 연구...'
+2025-03-07 22:10:47,068 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌고찰, 토픽 모델링
+2025-03-07 22:10:47,069 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:10:55,472 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 8.40초
+2025-03-07 22:10:55,472 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 8.40초
+2025-03-07 22:10:55,472 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:10:55,473 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily Brown (2018)
+2025-03-07 22:10:55,473 - paper_agent - INFO - [DATA] 자료 2: 'Exploring Topic Modeling for Literature Review: A Case Study in Sociology' by Maria Garcia, Robert Lee (2016)
+2025-03-07 22:10:55,473 - paper_agent - INFO - [DATA] 자료 3: 'Topic Modeling for Research Synthesis: A Methodological Review' by Anna Wang, Michael Davis (2019)
+2025-03-07 22:10:55,473 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 8.41초
+2025-03-07 22:10:55,473 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 8.41초
+2025-03-07 22:10:55,473 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 8.41초
+2025-03-07 22:10:55,474 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:10:55,474 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:10:55,474 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:10:55,474 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:10:55,474 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:10:55,474 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:10:55,475 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:10:55,475 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:10:55,475 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:10:55,475 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:10:55,475 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:10:55,476 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:10:55,476 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:10:55,476 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:10:55,476 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:10:55,476 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:10:55,476 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:10:55,477 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:10:55,477 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:10:55,477 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:10:55,479 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:10:55,479 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:10:55,479 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:10:55,479 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:10:55,479 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.73 MB
+2025-03-07 22:10:55,480 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:10:55,480 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:10:55,480 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 11.28초
+2025-03-07 22:10:55,480 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:10:55,480 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:10:55,480 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:10:55,481 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 11.28초
+2025-03-07 22:10:55,481 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:10:55,482 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:10:55,482 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 18.77초
+2025-03-07 22:11:35,321 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:11:35,321 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:11:35,322 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:11:35,322 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:11:35,322 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 151.21 MB
+2025-03-07 22:11:35,322 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:11:35,323 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:11:35,323 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:11:35,323 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:11:35,324 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:11:35,324 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:11:35,324 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:11:35,325 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:11:35,325 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:11:35,325 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:11:35,325 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:11:35,326 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:11:35,326 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:11:35,326 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:11:40,823 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:11:40,824 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.50초
+2025-03-07 22:11:40,824 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.50초
+2025-03-07 22:11:40,824 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌 조사를 통해 현재 연구 동향을 파악하고 향후 연구 방향을 제시하는 것...
+2025-03-07 22:11:40,824 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사 및 주제 모델링
+2025-03-07 22:11:40,824 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 연구 동향, 응용 분야, 문제점
+2025-03-07 22:11:40,825 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:11:40,825 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.96 MB
+2025-03-07 22:11:40,825 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:11:41,312 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:11:41,312 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:11:41,806 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:11:41,807 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:11:41,807 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:11:41,807 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:11:41,807 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:11:41,808 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:11:41,808 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:11:41,808 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌 조사를 통해 현재 연구 동향을 파악하고 향후 연구 방향을 제시하는 것...'
+2025-03-07 22:11:41,808 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:11:41,808 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:11:41,809 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:11:41,809 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:11:41,810 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.80 MB
+2025-03-07 22:11:41,811 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:11:41,811 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:11:41,811 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:11:41,811 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:11:41,812 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:11:45,798 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 3.99초
+2025-03-07 22:11:45,798 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 3.99초
+2025-03-07 22:11:45,799 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 연구 동향, 응용 분야, 문제점
+2025-03-07 22:11:45,799 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링을 활용한 문헌 조사를 통해 현재 연구 동향 파악 및 향후 연구 방향 도출'
+2025-03-07 22:11:45,799 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링을 통해 도출된 문헌 조사 결과의 트렌드는 무엇인가?'
+2025-03-07 22:11:45,799 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '주제 모델링을 통해 발견된 연구 동향은 어떤 새로운 가능성을 제시하는가?'
+2025-03-07 22:11:45,799 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 3.99초
+2025-03-07 22:11:45,799 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 3.99초
+2025-03-07 22:11:45,799 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 3.99초
+2025-03-07 22:11:45,799 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1\uc744 \ud65c\uc6a9\ud55c \ubb38\ud5cc \uc870\uc0...'
+2025-03-07 22:11:45,800 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:11:45,800 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:11:45,800 - paper_agent - INFO - [CONFIG] 핵심 개념: 5개, 연구 초점: '주제 모델링을 활용한 문헌 조사를 통해 현재 연구 동향 파악 및 향후 연구 방향 도출...'
+2025-03-07 22:11:45,800 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌 조사, 연구 동향
+2025-03-07 22:11:45,800 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:11:59,407 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 13.61초
+2025-03-07 22:11:59,408 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 13.61초
+2025-03-07 22:11:59,408 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:11:59,408 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily Brown (2018)
+2025-03-07 22:11:59,409 - paper_agent - INFO - [DATA] 자료 2: 'Current Trends in Topic Modeling Research: A Bibliometric Analysis' by Maria Garcia, Yuki Tanaka (2020)
+2025-03-07 22:11:59,409 - paper_agent - INFO - [DATA] 자료 3: 'Enhancing Topic Coherence in LDA through Semantic Similarity Measures' by Chen Wei, Arun Kumar (2019)
+2025-03-07 22:11:59,409 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 13.61초
+2025-03-07 22:11:59,409 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 13.61초
+2025-03-07 22:11:59,409 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 13.61초
+2025-03-07 22:11:59,410 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:11:59,410 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:11:59,410 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:11:59,410 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:11:59,410 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:11:59,410 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:11:59,411 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:11:59,411 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:11:59,411 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:11:59,411 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [STATS] 연도 2021: 1개 자료
+2025-03-07 22:11:59,412 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:11:59,413 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:11:59,413 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:11:59,413 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:11:59,413 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:11:59,415 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:11:59,415 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:11:59,415 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:11:59,416 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:11:59,416 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 155.05 MB
+2025-03-07 22:11:59,416 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:11:59,416 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:11:59,416 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 17.61초
+2025-03-07 22:11:59,416 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:11:59,417 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:11:59,417 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:11:59,417 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 17.61초
+2025-03-07 22:11:59,417 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:11:59,418 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:11:59,418 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 24.40초
+2025-03-07 22:12:54,985 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:12:54,985 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:12:54,986 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:12:54,986 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:12:54,986 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 151.27 MB
+2025-03-07 22:12:54,986 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:12:54,986 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:12:54,987 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:12:54,987 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:12:54,988 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:12:54,988 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:12:54,988 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:12:54,989 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:12:54,989 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:12:54,989 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:12:54,989 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:12:54,989 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:12:54,990 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:12:54,990 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:13:00,216 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:13:00,216 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.23초
+2025-03-07 22:13:00,217 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.23초
+2025-03-07 22:13:00,217 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주요 주제인 토픽 모델링에 대한 문헌 조사 목적...
+2025-03-07 22:13:00,217 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사 및 토픽 모델링
+2025-03-07 22:13:00,217 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 키워드 추출
+2025-03-07 22:13:00,217 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:13:00,218 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 153.07 MB
+2025-03-07 22:13:00,218 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:13:00,707 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:13:00,707 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:13:01,201 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:13:01,201 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:13:01,201 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:13:01,202 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:13:01,202 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:13:01,202 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:13:01,202 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:13:01,202 - paper_agent - INFO - [CONFIG] 문제 진술: '주요 주제인 토픽 모델링에 대한 문헌 조사 목적...'
+2025-03-07 22:13:01,203 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:13:01,203 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:13:01,203 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:13:01,203 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:13:01,203 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.72 MB
+2025-03-07 22:13:01,205 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:13:01,205 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:13:01,205 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:13:01,205 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:13:01,205 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:13:03,979 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.77초
+2025-03-07 22:13:03,979 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.77초
+2025-03-07 22:13:03,980 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 토픽 모델링, 문헌 조사, 키워드 추출
+2025-03-07 22:13:03,980 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제인 토픽 모델링을 활용한 문헌 조사의 중요성과 효과적인 방법론 탐구'
+2025-03-07 22:13:03,980 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '토픽 모델링을 통해 어떻게 문헌 조사의 효율성을 높일 수 있는가?'
+2025-03-07 22:13:03,980 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '다양한 문헌 소스를 통합하여 효과적인 주제 모델링을 어떻게 구축할 수 있는가?'
+2025-03-07 22:13:03,981 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.78초
+2025-03-07 22:13:03,981 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.78초
+2025-03-07 22:13:03,981 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.78초
+2025-03-07 22:13:03,981 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c\uc778 \ud1a0\ud53d \ubaa8\ub378\ub9c1\uc744 \ud65c\uc6a9\ud55c \ubb...'
+2025-03-07 22:13:03,981 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:13:03,981 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:13:03,982 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제인 토픽 모델링을 활용한 문헌 조사의 중요성과 효과적인 방법론 탐구...'
+2025-03-07 22:13:03,982 - paper_agent - INFO - [SEARCH] 검색 키워드: 토픽 모델링, 문헌 조사, 키워드 추출
+2025-03-07 22:13:03,982 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:13:11,992 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 8.01초
+2025-03-07 22:13:11,992 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 8.01초
+2025-03-07 22:13:11,993 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:13:11,993 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily Johnson (2017)
+2025-03-07 22:13:11,993 - paper_agent - INFO - [DATA] 자료 2: 'Enhancing Literature Review with Topic Modeling: A Case Study in Healthcare Research' by Maria Garcia, David Lee (2019)
+2025-03-07 22:13:11,993 - paper_agent - INFO - [DATA] 자료 3: 'Automatic Keyword Extraction for Improved Document Clustering using Topic Modeling' by Sophia Wang, Michael Brown (2016)
+2025-03-07 22:13:11,993 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 8.01초
+2025-03-07 22:13:11,993 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 8.01초
+2025-03-07 22:13:11,993 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 8.01초
+2025-03-07 22:13:11,993 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:13:11,994 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:13:11,994 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:13:11,994 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:13:11,994 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:13:11,994 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:13:11,995 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:13:11,995 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:13:11,995 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:13:11,995 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:13:11,995 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:13:11,995 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:13:11,995 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:13:11,995 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:13:11,996 - paper_agent - INFO - [STATS] 연도 2021: 1개 자료
+2025-03-07 22:13:11,996 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:13:11,996 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:13:11,996 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:13:11,996 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:13:11,996 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:13:11,998 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:13:11,998 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:13:11,998 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:13:11,999 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:13:11,999 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 155.00 MB
+2025-03-07 22:13:11,999 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:13:11,999 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:13:11,999 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 10.80초
+2025-03-07 22:13:11,999 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:13:12,000 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:13:12,000 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:13:12,000 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 10.80초
+2025-03-07 22:13:12,000 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: "WorkflowState" object has no field "key_findings"
+2025-03-07 22:13:12,001 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:13:12,001 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 17.31초
+2025-03-07 22:14:01,608 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:14:01,608 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:14:01,609 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:14:01,609 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:14:01,609 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 151.38 MB
+2025-03-07 22:14:01,609 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:14:01,609 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:14:01,610 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:14:01,610 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:14:01,610 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:14:01,610 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:14:01,610 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:14:01,611 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:14:01,612 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:14:01,612 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:14:01,612 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:14:01,612 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:14:01,612 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:14:01,612 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:14:07,362 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:14:07,362 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.75초
+2025-03-07 22:14:07,362 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.75초
+2025-03-07 22:14:07,363 - paper_agent - INFO - [ANALYSIS] 연구 목적: 문헌 조사를 통해 주제 모델링의 최신 동향을 파악하고 분석...
+2025-03-07 22:14:07,363 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문헌 조사와 주제 모델링
+2025-03-07 22:14:07,363 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 토픽 모델링, 텍스트 마이닝
+2025-03-07 22:14:07,363 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:14:07,363 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 153.17 MB
+2025-03-07 22:14:07,363 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:14:07,857 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:14:07,857 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:14:08,346 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:14:08,347 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:14:08,347 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:14:08,347 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:14:08,347 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:14:08,347 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:14:08,347 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:14:08,348 - paper_agent - INFO - [CONFIG] 문제 진술: '문헌 조사를 통해 주제 모델링의 최신 동향을 파악하고 분석...'
+2025-03-07 22:14:08,348 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:14:08,348 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:14:08,348 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:14:08,348 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:14:08,348 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.92 MB
+2025-03-07 22:14:08,350 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:14:08,350 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:14:08,350 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:14:08,351 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:14:08,351 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:14:11,165 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.81초
+2025-03-07 22:14:11,166 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.81초
+2025-03-07 22:14:11,166 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 조사, 텍스트 마이닝
+2025-03-07 22:14:11,166 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링 문헌 조사의 최신 동향 파악'
+2025-03-07 22:14:11,167 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '주제 모델링의 최근 발전 방향은 무엇인가?'
+2025-03-07 22:14:11,167 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '주제 모델링을 적용한 문헌 조사의 장단점은 무엇인가?'
+2025-03-07 22:14:11,167 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.82초
+2025-03-07 22:14:11,167 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.82초
+2025-03-07 22:14:11,167 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.82초
+2025-03-07 22:14:11,167 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1 \ubb38\ud5cc \uc870\uc0ac\uc758 \ucd5c\uc2e0 \ub...'
+2025-03-07 22:14:11,168 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:14:11,168 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:14:11,168 - paper_agent - INFO - [CONFIG] 핵심 개념: 3개, 연구 초점: '주제 모델링 문헌 조사의 최신 동향 파악...'
+2025-03-07 22:14:11,168 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌 조사, 텍스트 마이닝
+2025-03-07 22:14:11,168 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:14:20,004 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 8.84초
+2025-03-07 22:14:20,005 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 8.84초
+2025-03-07 22:14:20,005 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:14:20,005 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling in Text Mining' by John Smith, Emily Lee (2020)
+2025-03-07 22:14:20,005 - paper_agent - INFO - [DATA] 자료 2: 'Recent Advances in Topic Modeling: A Comprehensive Review' by Anna Sato, David Johnson, Maria Garcia (2019)
+2025-03-07 22:14:20,006 - paper_agent - INFO - [DATA] 자료 3: 'Topic Modeling in Social Media: A Literature Review' by Sarah Brown, Michael Wang (2018)
+2025-03-07 22:14:20,006 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 8.84초
+2025-03-07 22:14:20,006 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 8.84초
+2025-03-07 22:14:20,006 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 8.84초
+2025-03-07 22:14:20,006 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:14:20,006 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:14:20,006 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:14:20,006 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:14:20,007 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:14:20,007 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:14:20,007 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:14:20,007 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:14:20,007 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:14:20,007 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [STATS] 연도 2016: 1개 자료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [STATS] 연도 2018: 1개 자료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:14:20,008 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:14:20,008 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:14:20,009 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:14:20,009 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:14:20,009 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:14:20,010 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:14:20,010 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:14:20,010 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:14:20,011 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:14:20,011 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 155.20 MB
+2025-03-07 22:14:20,011 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:14:20,011 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:14:20,011 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 11.66초
+2025-03-07 22:14:20,012 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:14:20,012 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:14:20,012 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:14:20,012 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 11.67초
+2025-03-07 22:14:20,012 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:14:20,013 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:14:20,014 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 18.69초
+2025-03-07 22:31:25,410 - paper_agent - INFO - [TASK-START] 워크플로우 시작 - logger.py:108 (wrapper)
+2025-03-07 22:31:25,411 - paper_agent - INFO - [CONFIG] 워크플로우 설정 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:31:25,411 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review, 형식: custom, 출력: markdown
+2025-03-07 22:31:25,411 - paper_agent - INFO - [CONFIG] 템플릿: topic_modeling_review, 스타일: academic, 인용: APA
+2025-03-07 22:31:25,411 - paper_agent - INFO - [MEMORY] 워크플로우 시작 전 - 메모리 사용량: 150.73 MB
+2025-03-07 22:31:25,412 - paper_agent - INFO - [DECISION] APA 인용 스타일이 강제 적용됩니다.
+2025-03-07 22:31:25,412 - paper_agent - INFO - [TIMER-END] 워크플로우 상태 초기화 - 소요 시간: 0.00초
+2025-03-07 22:31:25,412 - paper_agent - INFO - [FILE] 업로드된 파일 처리: data/workflow_config.json
+2025-03-07 22:31:25,412 - paper_agent - INFO - [FILE] 파일 크기: 2.63KB, 내용 길이: 2642자
+2025-03-07 22:31:25,412 - paper_agent - INFO - [DATA] JSON 연구 자료 로드 완료: 10 항목
+2025-03-07 22:31:25,412 - paper_agent - INFO - [TIMER-END] 파일 처리 - 소요 시간: 0.00초
+2025-03-07 22:31:25,413 - paper_agent - INFO - [TASK-START] 사용자 요청 분석 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:321
+2025-03-07 22:31:25,414 - paper_agent - INFO - [TASK] 사용자 요청 분석 시작 - 호출자: logger.py:108 (wrapper)
+2025-03-07 22:31:25,414 - paper_agent - INFO - [INPUT] 주제/목적: 'Topic Modeling Literature Review'
+2025-03-07 22:31:25,414 - paper_agent - INFO - [INPUT] 논문 유형: literature_review
+2025-03-07 22:31:25,414 - paper_agent - INFO - [INPUT] 추가 지시사항: 없음
+2025-03-07 22:31:25,414 - paper_agent - INFO - [INPUT] 요청된 예상 분량: 3-4 pages
+2025-03-07 22:31:25,414 - paper_agent - INFO - [TIMER-END] 프롬프트 구성 - 소요 시간: 0.00초
+2025-03-07 22:31:25,414 - paper_agent - INFO - [API] 사용자 요청 분석을 위한 XAI API 호출 중...
+2025-03-07 22:31:31,394 - paper_agent - INFO - 보고서 형식 생성 완료: 3개 섹션 구조
+2025-03-07 22:31:31,394 - paper_agent - INFO - [TASK-END] 사용자 요청 분석 - 소요 시간: 5.98초
+2025-03-07 22:31:31,395 - paper_agent - INFO - [TIMER-END] 사용자 요청 분석 - 소요 시간: 5.98초
+2025-03-07 22:31:31,395 - paper_agent - INFO - [ANALYSIS] 연구 목적: 주제 모델링 문헌 고찰을 통한 특정 주제에 대한 이해 깊이 탐구...
+2025-03-07 22:31:31,395 - paper_agent - INFO - [ANALYSIS] 연구 분야: 문학 연구
+2025-03-07 22:31:31,395 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 고찰, 핵심 주제, 발전 동향
+2025-03-07 22:31:31,395 - paper_agent - INFO - [ANALYSIS] 예상 복잡도: 중간
+2025-03-07 22:31:31,396 - paper_agent - INFO - [MEMORY] 사용자 요청 분석 후 - 메모리 사용량: 152.53 MB
+2025-03-07 22:31:31,396 - paper_agent - INFO - Using OpenAI API with model: gpt-4o-mini
+2025-03-07 22:31:31,883 - paper_agent - INFO - [INIT] 리서치 에이전트 초기화됨
+2025-03-07 22:31:31,883 - paper_agent - INFO - [CONFIG] 캐시 디렉토리: data/cache
+2025-03-07 22:31:32,380 - paper_agent - INFO - ResearchAgent initialized with OpenAI integration
+2025-03-07 22:31:32,380 - paper_agent - INFO - [TASK-START] 연구 수행 - 호출자: C:\Dev\paper_agent\agents\coordinator_agent.py:349
+2025-03-07 22:31:32,380 - paper_agent - INFO - [TASK] 연구 수행 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:31:32,380 - paper_agent - INFO - [CONFIG] 논문 유형: literature_review
+2025-03-07 22:31:32,381 - paper_agent - INFO - [TASK-START] 연구 실행 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:1899
+2025-03-07 22:31:32,381 - paper_agent - INFO - [TASK] 연구 시작 - 주제: 'Topic Modeling Literature Review...' (길이: 32자)
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 연구 계획 제공됨 - 구성요소: problem_statement, analysis_approach, required_data_sources, implementation_steps, expected_outcomes
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 문제 진술: '주제 모델링 문헌 고찰을 통한 특정 주제에 대한 이해 깊이 탐구...'
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 필요 데이터 소스: 3개
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 소스 1: academic_papers
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 소스 2: conference_proceedings
+2025-03-07 22:31:32,381 - paper_agent - INFO - [CONFIG] 소스 3: books
+2025-03-07 22:31:32,382 - paper_agent - INFO - [MEMORY] 연구 시작 - 메모리 사용량: 154.16 MB
+2025-03-07 22:31:32,383 - paper_agent - INFO - [TIMER-END] 캐시 확인 - 소요 시간: 0.00초
+2025-03-07 22:31:32,383 - paper_agent - INFO - [CACHE] 캐시 없음 - 새로운 연구 진행
+2025-03-07 22:31:32,383 - paper_agent - INFO - [TASK-START] 연구 방향 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:170
+2025-03-07 22:31:32,383 - paper_agent - INFO - [STEP] 연구 방향 분석 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:31:32,384 - paper_agent - INFO - [API] 연구 방향 분석 API 호출
+2025-03-07 22:31:35,044 - paper_agent - INFO - [TIMER-END] 방향 분석 API 호출 - 소요 시간: 2.66초
+2025-03-07 22:31:35,045 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 API 호출 시간: 2.66초
+2025-03-07 22:31:35,045 - paper_agent - INFO - [ANALYSIS] 핵심 개념: 주제 모델링, 문헌 고찰, 핵심 주제, 발전 동향
+2025-03-07 22:31:35,045 - paper_agent - INFO - [ANALYSIS] 연구 초점: '주제 모델링 문헌 고찰을 통해 특정 주제에 대한 이해 깊이 탐구'
+2025-03-07 22:31:35,045 - paper_agent - INFO - [ANALYSIS] 연구 질문 1: '다양한 주제 모델링 기법을 적용하여 문학 리뷰에서의 특정 주제 식별 가능성은?'
+2025-03-07 22:31:35,045 - paper_agent - INFO - [ANALYSIS] 연구 질문 2: '문헌 고찰을 통해 발전된 주제에 대한 연구 동향은 무엇인가?'
+2025-03-07 22:31:35,046 - paper_agent - INFO - [TASK-END] 연구 방향 분석 - 소요 시간: 2.66초
+2025-03-07 22:31:35,046 - paper_agent - INFO - [TIMER-END] 연구 방향 분석 - 소요 시간: 2.66초
+2025-03-07 22:31:35,046 - paper_agent - INFO - [PERFORMANCE] 연구 방향 분석 시간: 2.66초
+2025-03-07 22:31:35,046 - paper_agent - INFO - [ANALYSIS] 연구 방향: '{"research_focus": "\uc8fc\uc81c \ubaa8\ub378\ub9c1 \ubb38\ud5cc \uace0\ucc30\uc744 \ud1b5\ud574 \ud...'
+2025-03-07 22:31:35,046 - paper_agent - INFO - [TASK-START] 연구 자료 수집 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:177
+2025-03-07 22:31:35,046 - paper_agent - INFO - [STEP] 연구 자료 수집 시작 - 주제: 'Topic Modeling Literature Review'
+2025-03-07 22:31:35,046 - paper_agent - INFO - [CONFIG] 핵심 개념: 4개, 연구 초점: '주제 모델링 문헌 고찰을 통해 특정 주제에 대한 이해 깊이 탐구...'
+2025-03-07 22:31:35,047 - paper_agent - INFO - [SEARCH] 검색 키워드: 주제 모델링, 문헌 고찰, 핵심 주제
+2025-03-07 22:31:35,047 - paper_agent - INFO - [API] 연구 자료 수집 API 호출
+2025-03-07 22:31:42,861 - paper_agent - INFO - [TIMER-END] 자료 수집 API 호출 - 소요 시간: 7.81초
+2025-03-07 22:31:42,862 - paper_agent - INFO - [PERFORMANCE] 연구 자료 수집 API 호출 시간: 7.81초
+2025-03-07 22:31:42,862 - paper_agent - INFO - [DATA] 5개 자료 수집됨
+2025-03-07 22:31:42,862 - paper_agent - INFO - [DATA] 자료 1: 'A Survey of Topic Modeling Techniques in Text Mining' by John Smith, Emily Johnson (2017)
+2025-03-07 22:31:42,862 - paper_agent - INFO - [DATA] 자료 2: 'Analyzing Research Trends in Topic Modeling: A Bibliometric Study' by Maria Garcia, David Lee (2019)
+2025-03-07 22:31:42,862 - paper_agent - INFO - [DATA] 자료 3: 'Exploring Applications of Topic Modeling in Social Media Analysis: A Literature Review' by Sophia Chen, Michael Brown (2020)
+2025-03-07 22:31:42,863 - paper_agent - INFO - [TASK-END] 연구 자료 수집 - 소요 시간: 7.82초
+2025-03-07 22:31:42,863 - paper_agent - INFO - [TIMER-END] 자료 수집 - 소요 시간: 7.82초
+2025-03-07 22:31:42,863 - paper_agent - INFO - [PERFORMANCE] 자료 수집 시간: 7.82초
+2025-03-07 22:31:42,863 - paper_agent - INFO - [DATA] 수집된 자료: 5개
+2025-03-07 22:31:42,863 - paper_agent - INFO - [TASK-START] 연구 자료 분석 - 호출자: C:\Dev\paper_agent\agents\research_agent.py:184
+2025-03-07 22:31:42,863 - paper_agent - INFO - [STEP] 연구 자료 분석 시작 - 5개 자료
+2025-03-07 22:31:42,863 - paper_agent - INFO - [PROGRESS] 자료 분석: 1/5 (20.0%)
+2025-03-07 22:31:42,864 - paper_agent - INFO - [PROGRESS] 자료 분석: 2/5 (40.0%)
+2025-03-07 22:31:42,864 - paper_agent - INFO - [PROGRESS] 자료 분석: 3/5 (60.0%)
+2025-03-07 22:31:42,864 - paper_agent - INFO - [PROGRESS] 자료 분석: 4/5 (80.0%)
+2025-03-07 22:31:42,864 - paper_agent - INFO - [PROGRESS] 자료 분석: 5/5 (100.0%)
+2025-03-07 22:31:42,864 - paper_agent - INFO - [PROGRESS] 자료 5/5 분석 완료 - 평균 처리 시간: 0.00초/자료
+2025-03-07 22:31:42,864 - paper_agent - INFO - [STATS] 총 5/5 자료 분석 완료
+2025-03-07 22:31:42,864 - paper_agent - INFO - [STATS] 연도 2015: 1개 자료
+2025-03-07 22:31:42,864 - paper_agent - INFO - [STATS] 연도 2017: 1개 자료
+2025-03-07 22:31:42,865 - paper_agent - INFO - [STATS] 연도 2019: 1개 자료
+2025-03-07 22:31:42,865 - paper_agent - INFO - [STATS] 연도 2020: 1개 자료
+2025-03-07 22:31:42,865 - paper_agent - INFO - [STATS] 연도 2021: 1개 자료
+2025-03-07 22:31:42,865 - paper_agent - INFO - [TASK-END] 연구 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:31:42,865 - paper_agent - INFO - [TIMER-END] 자료 분석 - 소요 시간: 0.00초
+2025-03-07 22:31:42,865 - paper_agent - INFO - [PERFORMANCE] 자료 분석 시간: 0.00초
+2025-03-07 22:31:42,865 - paper_agent - INFO - [DATA] 최종 분석된 자료: 5개
+2025-03-07 22:31:42,865 - paper_agent - ERROR - [ERROR] 캐시 저장 중 오류: 'ResearchMaterial' object has no attribute 'keywords'
+2025-03-07 22:31:42,867 - paper_agent - ERROR - [TRACE] 호출 스택: research_agent.py:191 (run)
+2025-03-07 22:31:42,867 - paper_agent - INFO - [TIMER-END] 캐시 저장 - 소요 시간: 0.00초
+2025-03-07 22:31:42,867 - paper_agent - INFO - [CACHE] 캐시 저장 완료: data/cache\research_Topic_Modeling_Literature_Review.json
+2025-03-07 22:31:42,867 - paper_agent - INFO - [PERFORMANCE] 캐시 저장 시간: 0.00초
+2025-03-07 22:31:42,868 - paper_agent - INFO - [MEMORY] 연구 완료 - 메모리 사용량: 154.47 MB
+2025-03-07 22:31:42,868 - paper_agent - INFO - [STATS] 연구 완료 - 총 자료 수: 5개
+2025-03-07 22:31:42,868 - paper_agent - INFO - [STATS] 자료 유형 'ResearchMaterial': 5개
+2025-03-07 22:31:42,868 - paper_agent - INFO - [TASK-END] 연구 실행 - 소요 시간: 10.49초
+2025-03-07 22:31:42,868 - paper_agent - INFO - [TASK] 연구 요약 생성 시작 - 자료 수: 5
+2025-03-07 22:31:42,868 - paper_agent - INFO - [TASK] 연구 요약 생성 완료
+2025-03-07 22:31:42,868 - paper_agent - INFO - [TASK] 연구 수행 완료 - 수집된 자료: 5개
+2025-03-07 22:31:42,869 - paper_agent - INFO - [TASK-END] 연구 수행 - 소요 시간: 10.49초
+2025-03-07 22:31:42,869 - paper_agent - ERROR - [ERROR] 워크플로우 시작 중 오류 발생: 'dict' object has no attribute 'key_findings'
+2025-03-07 22:31:42,870 - paper_agent - ERROR - [TRACE] 호출 스택: logger.py:108 (wrapper)
+2025-03-07 22:31:42,870 - paper_agent - INFO - [TASK-END] 워크플로우 시작 - 소요 시간: 17.74초
