@@ -50,7 +50,12 @@ from datetime import datetime
 
 from typing import Dict, List, Tuple, Any, Optional, Union
 
-
+# Markdown 모듈 import 추가
+try:
+    import markdown
+    MARKDOWN_AVAILABLE = True
+except ImportError:
+    MARKDOWN_AVAILABLE = False
 
 from utils.logger import logger
 
@@ -451,7 +456,7 @@ etc.
 
     
 
-    def collect_research_materials(self, topic, research_plan=None, max_queries=3, results_per_source=10, final_result_count=20):
+    def collect_research_materials(self, topic, research_plan=None, max_queries=3, results_per_source=10, final_result_count=30):
 
         """
 
@@ -537,10 +542,27 @@ etc.
                 
                 # 로컬 PDF는 관련성 점수와 상관없이 모두 포함
                 for paper in local_papers:
-                    relevance_score, explanation = self.evaluate_source(paper, topic)
-                    material = self._create_research_material(paper, "local", relevance_score, explanation)
-                    if material:
-                        all_materials.append(material)
+                    try:
+                        # 논문 평가 수행
+                        evaluation_result, relevance_score = self.evaluate_source(paper, topic)
+                        # 평가 결과와 점수로 연구 자료 생성 (파라미터 순서 변경: 평가 결과, 점수)
+                        material = self._create_research_material(paper, "local", evaluation_result, relevance_score)
+                        if material:
+                            all_materials.append(material)
+                    except Exception as e:
+                        logger.warning(f"로컬 논문 처리 중 오류: {str(e)}")
+                        # 오류 발생 시 기본값으로 자료 생성 시도
+                        try:
+                            material = self._create_research_material(
+                                paper, 
+                                "local", 
+                                {"evaluation": "자동 평가", "rationale": "기본 평가"}, 
+                                0.7  # 기본 점수
+                            )
+                            if material:
+                                all_materials.append(material)
+                        except Exception as inner_e:
+                            logger.error(f"로컬 논문의 기본 처리도 실패: {str(inner_e)}")
                 
                 # 로컬 PDF 처리 후 papers.json 파일 저장
                 if local_papers and len(local_papers) > 0:
@@ -576,12 +598,27 @@ etc.
                 local_results = [r for r in local_results if r.get('pdf_url') or 'pdf_path' in r]
                 
                 for result in local_results:
-                    relevance_score, explanation = self.evaluate_source(result, topic)
-                    
-                    # 모든 로컬 파일 포함 (관련성 점수와 상관없이)
-                    material = self._create_research_material(result, "local_db", relevance_score, explanation)
-                    if material:
-                        all_materials.append(material)
+                    try:
+                        # 논문 평가 수행
+                        evaluation_result, relevance_score = self.evaluate_source(result, topic)
+                        # 평가 결과와 점수로 연구 자료 생성 (파라미터 순서 변경: 평가 결과, 점수)
+                        material = self._create_research_material(result, "local_db", evaluation_result, relevance_score)
+                        if material:
+                            all_materials.append(material)
+                    except Exception as e:
+                        logger.warning(f"로컬 논문 처리 중 오류: {str(e)}")
+                        # 오류 발생 시 기본값으로 자료 생성 시도
+                        try:
+                            material = self._create_research_material(
+                                result, 
+                                "local_db", 
+                                {"evaluation": "자동 평가", "rationale": "기본 평가"}, 
+                                0.7  # 기본 점수
+                            )
+                            if material:
+                                all_materials.append(material)
+                        except Exception as inner_e:
+                            logger.error(f"로컬 논문의 기본 처리도 실패: {str(inner_e)}")
                 
                 # pdfs 폴더의 PDF 파일도 모두 포함
                 if os.path.exists(pdfs_dir):
@@ -607,9 +644,9 @@ etc.
                                     }
                                     
                                     # pdfs 폴더의 파일도 관련성 점수와 상관없이 포함
-                                    relevance_score, explanation = self.evaluate_source(paper_info, topic)
+                                    evaluation_result, relevance_score = self.evaluate_source(paper_info, topic)
                                     
-                                    material = self._create_research_material(paper_info, "pdfs", relevance_score, explanation)
+                                    material = self._create_research_material(paper_info, "pdfs", evaluation_result, relevance_score)
                                     if material:
                                         all_materials.append(material)
                             except Exception as e:
@@ -646,9 +683,9 @@ etc.
                     # 병렬 처리로 결과 평가
                     def evaluate_single_result(result):
                         try:
-                            relevance_score, explanation = self.evaluate_source(result, topic)
+                            evaluation_result, relevance_score = self.evaluate_source(result, topic)
+                            result['evaluation'] = evaluation_result
                             result['relevance_score'] = relevance_score
-                            result['evaluation'] = explanation
                             return result
                         except Exception as e:
                             logger.error(f"결과 평가 중 오류: {str(e)}")
@@ -669,7 +706,7 @@ etc.
                     # 관련성 기준 이상인 결과만 최종 자료로 변환
                     for result in top_results:
                         if result.get('relevance_score', 0) >= 0.3:  # 관련성 최소 기준을 0.3으로 낮춤
-                            material = self._create_research_material(result, query.id, result.get('relevance_score', 0), result.get('evaluation', ''))
+                            material = self._create_research_material(result, query.id, result.get('evaluation', ''), result.get('relevance_score', 0))
                             if material:
                                 all_materials.append(material)
             
@@ -725,91 +762,76 @@ etc.
 
     
 
-    def _create_research_material(self, result, query_id, relevance_score, evaluation):
-
-        """자료로부터 ResearchMaterial 객체 생성 (helper 메서드)"""
-
+    def _create_research_material(self, result, query_id, evaluation_result, relevance_score):
+        """
+        자료로부터 ResearchMaterial 객체 생성 (helper 메서드)
+        
+        Args:
+            result (dict): 자료 정보
+            query_id (str): 쿼리 ID
+            evaluation_result (dict/str): 평가 결과 객체 또는 문자열
+            relevance_score (float): 관련성 점수
+            
+        Returns:
+            ResearchMaterial: 생성된 연구 자료 객체
+        """
         # PDF URL 또는 PDF 경로 확인
-
         pdf_url = result.get('pdf_url')
-
         pdf_path = result.get('pdf_path')
-
         
-
         if not pdf_url and not pdf_path:
-
             return None
-
         
-
         # 저자 처리
-
         if isinstance(result.get('authors', ''), str):
-
             authors_list = [author.strip() for author in result.get('authors', '').split(',') if author.strip()]
-
         else:
-
             authors_list = result.get('authors', [])
-
         
-
         # 연도 처리
-
         year_value = result.get('year', result.get('published_date', ''))
-
         if isinstance(year_value, str):
-
             # 연도만 추출 시도
-
             year_match = re.search(r'(19|20)\d{2}', year_value)
-
             if year_match:
-
                 year_int = int(year_match.group(0))
-
             else:
-
+                # 숫자로 변환할 수 없는 경우 None 대신 문자열로 설정
+                # 이후 문자열이 int 필드에 들어갈 때 ResearchMaterial 생성 시 처리될 것임
                 year_int = None
-
         else:
-
             year_int = year_value
-
         
-
         # 연구 자료 생성
-
-        return ResearchMaterial(
-
-            id=result.get("id") or f"paper_{uuid.uuid4().hex[:8]}",
-
-            title=result.get("title", ""),
-
-            authors=authors_list,
-
-            year=year_int,
-
-            abstract=result.get("abstract", ""),
-
-            url=result.get("url", ""),
-
-            pdf_url=pdf_url,
-
-            pdf_path=pdf_path,  # PDF 경로 추가
-
-            relevance_score=relevance_score,
-
-            evaluation=evaluation,
-
-            query_id=query_id,
-
-            content="",
-
-            summary=""
-
-        )
+        try:
+            # 평가 결과 처리 - 문자열이나 딕셔너리로 들어올 수 있음
+            if isinstance(evaluation_result, dict):
+                evaluation_str = evaluation_result.get('evaluation', '') or evaluation_result.get('rationale', '')
+            else:
+                evaluation_str = str(evaluation_result) if evaluation_result else ''
+            
+            # 관련성 점수 확인
+            if relevance_score is None:
+                relevance_score = 0.5  # 기본값 설정
+            
+            return ResearchMaterial(
+                id=result.get("id") or f"paper_{uuid.uuid4().hex[:8]}",
+                title=result.get("title", ""),
+                authors=authors_list,
+                year=year_int,
+                abstract=result.get("abstract", ""),
+                url=result.get("url", ""),
+                pdf_url=pdf_url,
+                pdf_path=pdf_path,  # PDF 경로 추가
+                relevance_score=relevance_score,
+                evaluation=evaluation_str,  # 문자열로 변환된 평가
+                query_id=query_id,
+                content="",
+                summary=""
+            )
+        except Exception as e:
+            logger.error(f"ResearchMaterial 생성 중 오류: {str(e)}")
+            return None
 
     
 
@@ -1038,7 +1060,7 @@ etc.
                                 
                                 # 관련 정보가 있으면 저장
                                 if related_info:
-                                    material.related_papers = related_info
+                                    material.related_documents = related_info
                     except Exception as e:
                         logger.warning(f"유사 문서 검색 중 오류: {str(e)}")
                     
@@ -1074,16 +1096,29 @@ etc.
 
     def analyze_research_materials(self, materials, topic):
         """
-        Analyze research materials to extract key insights.
+        연구 자료를 분석하여 주요 인사이트를 추출합니다.
         
         Args:
-            materials: List of research materials
-            topic: Research topic
+            materials (List[ResearchMaterial]): 연구 자료 목록
+            topic (str): 연구 주제
             
         Returns:
-            dict: Analysis results
+            dict: 분석 결과
         """
-        logger.info(f"Analyzing {len(materials)} research materials for topic: {topic}")
+        if not materials:
+            logger.warning("분석할 연구 자료가 없습니다. 기본 분석 결과를 반환합니다.")
+            return {
+                "topic": topic,
+                "main_themes": ["정보 부족"],
+                "chronology": [],
+                "methodologies": [],
+                "key_findings": ["분석할 자료가 충분하지 않습니다."],
+                "research_gaps": ["자료 부족으로 연구 격차를 식별할 수 없습니다."],
+                "relationships": [],
+                "analysis_text": f"{topic}에 대한 연구 자료가 충분하지 않아 상세한 분석을 수행할 수 없습니다."
+            }
+            
+        logger.info(f"{len(materials)}개 연구 자료 분석 중 (주제: {topic})")
         
         try:
             # Prepare material summaries for analysis
@@ -1532,20 +1567,39 @@ Provide a thorough analysis that will help in writing a literature review.
 
     def generate_report(self, topic, analysis, materials):
         """
-        분석 결과와 연구 자료를 기반으로 문헌 리뷰 보고서를 생성합니다.
+        연구 자료를 바탕으로 문헌 리뷰 보고서를 생성합니다.
         
         Args:
             topic (str): 연구 주제
             analysis (dict): 연구 자료 분석 결과
-            materials (list): 연구 자료 목록
+            materials (List[ResearchMaterial]): 연구 자료 목록
             
         Returns:
-            dict: 생성된 보고서 정보 (성공 여부, 파일 경로 등)
+            dict: 보고서 생성 결과
         """
         try:
-            logger.info("문헌 리뷰 보고서 생성 중...")
+            logger.info(f"'{topic}' 주제에 대한 문헌 리뷰 보고서 생성 시작")
             
-            # 1. 보고서 아웃라인 생성
+            # 1. 참고문헌 추출
+            references = self.extract_references(materials)
+            
+            # 참고문헌 수 제한 로직 추가 (materials에서 추출된 참고문헌이 많을 경우)
+            # run 메서드에서 final_result_count의 기본값은 max_sources로 오버라이드되며 기본값은 30
+            target_ref_count = getattr(self, 'final_result_count', 30)  # 기본값 30 설정
+            
+            # 참고문헌이 target_ref_count보다 많으면 제한
+            if len(references) > target_ref_count:
+                logger.info(f"참고문헌 {len(references)}개를 {target_ref_count}개로 제한합니다.")
+                # 참고문헌을 정렬하여 가장 관련성이 높은 것만 유지
+                # 정렬 기준: 1) 연도(최신순), 2) 제목(알파벳순)
+                sorted_refs = sorted(references, 
+                                     key=lambda ref: (
+                                         -int(ref.get('year', '0') or '0'),  # 연도 내림차순(최신순), 숫자로 변환 불가능하면 0으로 처리
+                                         ref.get('title', '')                # 제목 오름차순
+                                     ))
+                references = sorted_refs[:target_ref_count]
+            
+            # 2. 보고서 아웃라인 생성
             outline = self.create_paper_outline(topic, analysis, materials)
             if not outline:
                 logger.error("보고서 아웃라인 생성에 실패했습니다.")
@@ -1553,28 +1607,87 @@ Provide a thorough analysis that will help in writing a literature review.
                 
             logger.info(f"논문 아웃라인 생성됨: {len(outline.get('sections', []))}개 섹션")
             
-            # 2. 보고서 내용 구성 - 초록, 서론, 결론 제외하고 본문만 포함
+            # 3. 보고서 내용 구성
             # 제목만 포함하고 초록 제외
             title = outline.get('title', '토픽 모델링의 역사와 발전')
             report_content = f"# {title}\n\n"
             
-            # 섹션 필터링 - 초록, 서론, 결론 제외
-            sections = outline.get('sections', [])
-            content_sections = []
-            for section in sections:
-                section_title = section.get('title', '').lower()
-                # 초록, 서론, 결론 관련 섹션 제외
-                if any(keyword in section_title for keyword in ['초록', 'abstract', '서론', 'introduction', '결론', 'conclusion']):
-                    logger.info(f"섹션 제외: {section_title}")
-                    continue
-                content_sections.append(section)
+            # 사용자 제공 목차 확인
+            user_toc = getattr(self, 'user_toc', None)
             
-            logger.info(f"본문 섹션 {len(content_sections)}개 선택됨")
+            # 목차 결정 (사용자 제공 또는 자동 생성)
+            if user_toc:
+                logger.info(f"사용자가 제공한 목차를 사용합니다: {user_toc}")
+                toc = user_toc
+            else:
+                # 요청 내용을 분석하여 적합한 목차 생성
+                logger.info("사용자가 목차를 제공하지 않아 자동으로 생성합니다.")
+                try:
+                    toc_prompt = f"""
+                    다음 주제에 대한 문헌 리뷰 목차를 생성해주세요:
+                    
+                    주제: {topic}
+                    
+                    분석 내용:
+                    {analysis.get('main_themes', '')}
+                    {analysis.get('key_insights', '')}
+                    
+                    목차는 학술적이고 논리적인 구조를 가져야 하며, 
+                    서론(Introduction), 관련 연구(Related Works) 외에 
+                    주제와 관련된 3-5개의 하위 섹션으로 구성해주세요.
+                    
+                    각 섹션의 제목과 간략한 설명만 제공해주세요.
+                    다음 형식으로 응답해주세요:
+                    
+                    1. [섹션명1]: [간략한 설명]
+                    2. [섹션명2]: [간략한 설명]
+                    3. ...
+                    """
+                    
+                    response = self.llm.invoke(toc_prompt)
+                    toc_text = response.content.strip()
+                    
+                    # 응답에서 목차 추출
+                    toc_items = []
+                    for line in toc_text.split('\n'):
+                        if ':' in line and any(c.isdigit() for c in line.split(':')[0]):
+                            parts = line.split(':', 1)
+                            section_num = parts[0].strip().rstrip('.')
+                            section_info = parts[1].strip()
+                            if section_info:
+                                title_parts = section_info.split('-', 1) if '-' in section_info else [section_info, '']
+                                section_title = title_parts[0].strip()
+                                section_desc = title_parts[1].strip() if len(title_parts) > 1 else ''
+                                toc_items.append({
+                                    'title': section_title,
+                                    'description': section_desc
+                                })
+                    
+                    # 최소 2개 이상의 섹션 확보
+                    if len(toc_items) < 2:
+                        toc_items = [
+                            {'title': 'Introduction', 'description': '연구 배경 및 목적'},
+                            {'title': 'Related Works', 'description': '관련 연구 동향 분석'}
+                        ]
+                    
+                    toc = toc_items
+                    
+                except Exception as e:
+                    logger.error(f"목차 자동 생성 중 오류 발생: {e}")
+                    # 기본 목차 설정
+                    toc = [
+                        {'title': 'Introduction', 'description': '연구 배경 및 목적'},
+                        {'title': 'Related Works', 'description': '관련 연구 동향 분석'}
+                    ]
             
-            # 본문 섹션 내용 생성
-            for section in content_sections:
+            # 각 섹션에 대한 내용 생성
+            section_count = 0
+            for section in toc:
                 section_title = section.get('title', '제목 없음')
                 section_desc = section.get('description', '')
+                
+                report_content += f"## {section_title}\n\n"
+                section_count += 1
                 
                 try:
                     # 각 섹션에 대한 상세 내용 생성
@@ -1588,28 +1701,60 @@ Provide a thorough analysis that will help in writing a literature review.
                     주제: {topic}
                     분석 내용: {analysis.get('main_themes', '')}
                     
-                    학술 논문 스타일로 작성하고, 적절한 제목과 소제목을 포함하세요.
-                    * 중요: 초록, 서론, 결론 스타일의 내용은 포함하지 마세요. 오직 본문 콘텐츠만 작성하세요.
+                    학술 논문 스타일로 작성하고, 적절한 소제목을 포함하세요.
                     """
+                    
+                    # 서론(Introduction)인 경우 특별한 프롬프트 사용
+                    if section_title.lower() in ['introduction', 'intro', '서론', '소개', 'introduce']:
+                        section_prompt = f"""
+                        다음 주제에 대한 연구 보고서의 서론을 작성해주세요:
+                        
+                        주제: {topic}
+                        
+                        서론에는 다음 내용이 포함되어야 합니다:
+                        1. 연구 주제 소개 및 배경
+                        2. 연구의 목적과 의의
+                        3. 주요 연구 질문
+                        4. 보고서의 구성 설명
+                        
+                        약 300-500단어로 학술적이고 명확한 서론을 작성해주세요.
+                        """
+                    
+                    # 관련 연구(Related Works)인 경우 특별한 프롬프트 사용
+                    elif section_title.lower() in ['related works', 'related work', '관련 연구', '선행 연구']:
+                        section_prompt = f"""
+                        다음 주제에 대한 문헌 리뷰(Related works)를 작성해주세요:
+                        
+                        주제: {topic}
+                        
+                        다음 분석 내용을 참고하세요:
+                        {analysis.get('main_themes', '')}
+                        {analysis.get('key_insights', '')}
+                        
+                        문헌 리뷰에는 다음 내용이 포함되어야 합니다:
+                        1. 관련 연구 영역의 주요 흐름과 발전 과정
+                        2. 주요 연구자들의 접근 방식과 발견
+                        3. 최신 연구 동향과 쟁점
+                        4. 연구 격차와 향후 연구 방향
+                        
+                        약 700-800단어로 학술적이고 상세한 문헌 리뷰를 작성해주세요.
+                        주요 참고문헌과 인용을 적절히 포함해주세요.
+                        """
                     
                     response = self.llm.invoke(section_prompt)
                     section_content = response.content.strip()
                     
-                    report_content += f"## {section_title}\n\n"
                     report_content += f"{section_content}\n\n"
                     
                 except Exception as e:
                     logger.error(f"섹션 '{section_title}' 내용 생성 중 오류 발생: {e}")
-                    report_content += f"## {section_title}\n\n"
                     report_content += f"{section_desc}\n\n"
             
             # 참고문헌 추가
             report_content += "## References\n\n"
             
-            # 참고문헌 추출 및 포맷팅
-            references = []
+            # 참고문헌 포맷팅 (이미 상단에서 추출했음)
             try:
-                references = self.extract_references(materials)
                 for i, ref in enumerate(references, 1):
                     author = ref.get('authors', '저자 미상')
                     title = ref.get('title', '제목 미상')
@@ -1630,7 +1775,8 @@ Provide a thorough analysis that will help in writing a literature review.
             
             # 3. 보고서 저장
             os.makedirs('output', exist_ok=True)
-            output_file = 'output/literature_review.md'
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_file = f'output/literature_review_{timestamp}.md'
             
             with open(output_file, 'w', encoding='utf-8') as f:
                 f.write(report_content)
@@ -1642,23 +1788,106 @@ Provide a thorough analysis that will help in writing a literature review.
                 try:
                     html_file = output_file.replace('.md', '.html')
                     with open(output_file, 'r', encoding='utf-8') as md_file:
-                        html_content = markdown.markdown(md_file.read(), extensions=['extra'])
+                        # 'extra' 및 'tables' 확장을 사용하여 더 풍부한 마크다운 기능 지원
+                        html_content = markdown.markdown(md_file.read(), extensions=['extra', 'tables'])
                     
+                    # 향상된 CSS 스타일로 HTML 파일 생성
                     with open(html_file, 'w', encoding='utf-8') as f:
                         f.write(f"""<!DOCTYPE html>
                         <html>
                         <head>
                             <meta charset="utf-8">
+                            <meta name="viewport" content="width=device-width, initial-scale=1.0">
                             <title>{title}</title>
                             <style>
-                                body {{ font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }}
-                                h1, h2, h3 {{ color: #333; }}
-                                blockquote {{ border-left: 4px solid #ddd; padding-left: 15px; color: #777; }}
-                                code {{ background-color: #f9f9f9; padding: 2px 4px; border-radius: 4px; }}
+                                body {{ 
+                                    font-family: 'Segoe UI', Arial, sans-serif; 
+                                    line-height: 1.6; 
+                                    max-width: 900px; 
+                                    margin: 0 auto; 
+                                    padding: 30px; 
+                                    color: #333;
+                                    background-color: #fdfdfd;
+                                }}
+                                h1 {{ 
+                                    color: #2c3e50; 
+                                    border-bottom: 2px solid #eaecef;
+                                    padding-bottom: 10px;
+                                }}
+                                h2 {{ 
+                                    color: #3498db; 
+                                    margin-top: 30px;
+                                    border-bottom: 1px solid #eaecef;
+                                    padding-bottom: 7px;
+                                }}
+                                h3 {{ 
+                                    color: #2980b9; 
+                                    margin-top: 25px;
+                                }}
+                                blockquote {{ 
+                                    border-left: 4px solid #4a90e2; 
+                                    padding: 10px 15px; 
+                                    margin: 20px 0; 
+                                    background-color: #f8f9fa;
+                                    color: #555; 
+                                }}
+                                code {{ 
+                                    background-color: #f6f8fa; 
+                                    padding: 2px 4px; 
+                                    border-radius: 3px;
+                                    font-family: Consolas, monospace;
+                                }}
+                                pre {{ 
+                                    background-color: #f6f8fa; 
+                                    padding: 16px; 
+                                    border-radius: 5px;
+                                    overflow-x: auto;
+                                }}
+                                a {{ 
+                                    color: #4183c4; 
+                                    text-decoration: none;
+                                }}
+                                a:hover {{ 
+                                    text-decoration: underline; 
+                                }}
+                                table {{
+                                    border-collapse: collapse;
+                                    width: 100%;
+                                    margin: 25px 0;
+                                }}
+                                table, th, td {{
+                                    border: 1px solid #ddd;
+                                }}
+                                th, td {{
+                                    padding: 10px;
+                                    text-align: left;
+                                }}
+                                th {{
+                                    background-color: #f2f2f2;
+                                }}
+                                tr:nth-child(even) {{
+                                    background-color: #f9f9f9;
+                                }}
+                                img {{
+                                    max-width: 100%;
+                                    height: auto;
+                                }}
+                                .references {{
+                                    margin-top: 40px;
+                                    border-top: 1px solid #eaecef;
+                                    padding-top: 20px;
+                                }}
+                                .timestamp {{
+                                    color: #888;
+                                    font-size: 0.9em;
+                                    margin-top: 40px;
+                                    text-align: right;
+                                }}
                             </style>
                         </head>
                         <body>
                         {html_content}
+                        <div class="timestamp">생성 시간: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}</div>
                         </body>
                         </html>""")
                     
@@ -1666,12 +1895,12 @@ Provide a thorough analysis that will help in writing a literature review.
                 except Exception as e:
                     logger.error(f"HTML 변환 중 오류 발생: {e}")
             else:
-                logger.warning("markdown 모듈이 설치되지 않아 HTML 변환을 건너뜁니다.")
+                logger.warning("markdown 모듈이 설치되지 않아 HTML 변환을 건너뜁니다. 'pip install markdown'으로 설치할 수 있습니다.")
             
             return {
                 "success": True,
                 "file_path": output_file,
-                "section_count": len(content_sections),
+                "section_count": section_count,
                 "reference_count": len(references)
             }
             
@@ -1682,100 +1911,120 @@ Provide a thorough analysis that will help in writing a literature review.
 
 
     def run(self, topic=None, **kwargs):
-
         """
-
         연구 에이전트 실행 메서드
-
         
-
         Args:
-
             topic (str): 연구 주제
-
             **kwargs: 추가 매개변수
-
+                - max_sources (int): 최대 소스 수 (기본값: 30)
+                - toc (List[Dict]): 사용자가 제공하는 목차 (선택 사항)
+                    형식: [{'title': '제목1', 'description': '설명1'}, ...]
+                - citation_style (str): 인용 스타일 (기본값: 'APA')
             
-
         Returns:
-
             dict: 연구 결과
-
         """
-
         if not topic:
-
             logger.error("연구 주제가 제공되지 않았습니다.")
-
             return {"status": "error", "message": "연구 주제가 필요합니다."}
-
         
-
         try:
-
             # 1. 연구 자료 수집
-
-            max_sources = kwargs.get("max_sources", 5)  # 기본값 5로 변경
-
+            max_sources = kwargs.get("max_sources", 30)  # 기본값 30으로 변경
+            # final_result_count 값을 인스턴스 변수로 저장
+            self.final_result_count = max_sources
+            
+            # 사용자가 제공한 목차가 있으면 저장 (generate_report에서 사용)
+            user_toc = kwargs.get("toc", None)
+            if user_toc:
+                if isinstance(user_toc, list) and len(user_toc) > 0:
+                    logger.info(f"사용자가 {len(user_toc)}개의 목차 항목을 제공했습니다.")
+                    self.user_toc = user_toc
+                else:
+                    logger.warning("사용자가 제공한 목차 형식이 올바르지 않아 무시합니다.")
+                    self.user_toc = None
+            else:
+                self.user_toc = None
+            
             # 각 소스별 10개 결과, 최종 max_sources개 선정
-
             materials = self.collect_research_materials(
-
                 topic, 
-
                 max_queries=5,  # 쿼리 수 증가 
-
                 results_per_source=10,  # 각 소스별 10개
-
                 final_result_count=max_sources  # 최종 선정 개수
-
             )
-
             
-
             # 명시적으로 검색 결과가 없는지 확인
-
             if not materials or len(materials) == 0:
-
                 logger.warning("검색 결과가 없습니다. 빈 JSON 파일을 생성합니다.")
-
                 # 검색 결과가 없어도 빈 JSON 파일 생성
-
                 self.save_research_materials_to_json([])
-
                 return {
-
                     "status": "error",
-
                     "message": "검색 결과가 없어 연구를 진행할 수 없습니다. 다른 주제나 검색어를 시도해보세요."
-
                 }
-
             
-
             # 2. 연구 자료 강화 (내용 및 요약 추가 + 벡터 DB 처리)
-
-            enriched_materials = self.enrich_research_materials(materials)
+            enriched_materials = []
+            try:
+                logger.info("연구 자료 강화 시작...")
+                enriched_materials = self.enrich_research_materials(materials)
+                logger.info(f"{len(enriched_materials)}개 자료 강화 완료")
+            except Exception as e:
+                logger.error(f"연구 자료 강화 중 오류 발생: {str(e)}")
+                # 오류 발생 시 원본 자료 사용
+                enriched_materials = materials
+                logger.warning("오류로 인해 원본 자료를 사용합니다.")
             
             # 연구 자료 JSON 파일로 저장
-            self.save_research_materials_to_json(enriched_materials)
-
+            try:
+                self.save_research_materials_to_json(enriched_materials)
+                logger.info("연구 자료 JSON 파일 저장 완료")
+            except Exception as e:
+                logger.error(f"연구 자료 JSON 저장 중 오류: {str(e)}")
+            
             # 병렬로 연구 자료 벡터화
-            logger.info("연구 자료 벡터화 시작...")
-            self.vectorize_materials(enriched_materials)
-            logger.info("연구 자료 벡터화 완료")
+            try:
+                logger.info("연구 자료 병렬 벡터화 시작...")
+                vectorize_result = self.vectorize_materials(enriched_materials)
+                if vectorize_result:
+                    logger.info("연구 자료 벡터화 완료")
+                else:
+                    logger.warning("연구 자료 벡터화가 일부 실패했습니다.")
+            except Exception as e:
+                logger.error(f"연구 자료 벡터화 중 오류 발생: {str(e)}")
 
             # 3. 연구 자료 분석
-
             analysis = self.analyze_research_materials(enriched_materials, topic)
-
             
-
-            # 4. 논문 개요 생성
-
-            outline = self.create_paper_outline(topic, analysis, enriched_materials)
-
+            # 4. 논문 개요 생성 (비활성화)
+            logger.info("논문 개요 생성 단계는 비활성화되었습니다")
             
+            # 기본 개요 생성
+            outline = {
+                "title": f"{topic}에 관한 연구",
+                "abstract": f"{topic}에 대한 문헌 검토입니다.",
+                "sections": [
+                    {
+                        "title": "서론",
+                        "content": "연구 배경 및 목적"
+                    },
+                    {
+                        "title": "방법론",
+                        "content": "연구 방법론 설명"
+                    },
+                    {
+                        "title": "주요 결과",
+                        "content": "주요 연구 결과"
+                    },
+                    {
+                        "title": "논의 및 결론",
+                        "content": "연구 결과에 대한 논의 및 결론"
+                    }
+                ],
+                "references": self.extract_references(enriched_materials)
+            }
 
             # 5. 키워드 및 참고문헌 추출
 
